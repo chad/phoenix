@@ -39,7 +39,7 @@ describe('Functional: Full IU Pipeline (C1 + C2)', () => {
     mkdirSync(phoenixRoot, { recursive: true });
   });
 
-  it('end-to-end: spec → clauses → canon → IUs → generated code → manifest → drift check', () => {
+  it('end-to-end: spec → clauses → canon → IUs → generated code → manifest → drift check', async () => {
     // Phase A: Parse
     const clauses = parseSpec(SPEC, 'spec/auth.md');
     expect(clauses.length).toBeGreaterThan(0);
@@ -53,7 +53,7 @@ describe('Functional: Full IU Pipeline (C1 + C2)', () => {
     expect(ius.length).toBeGreaterThan(0);
 
     // Phase C1: Generate code
-    const results = generateAll(ius);
+    const results = await generateAll(ius);
     expect(results.length).toBe(ius.length);
 
     // Write generated files to disk
@@ -77,11 +77,11 @@ describe('Functional: Full IU Pipeline (C1 + C2)', () => {
     expect(report.clean_count).toBe(results.reduce((sum, r) => sum + r.files.size, 0));
   });
 
-  it('detects drift after manual edit', () => {
+  it('detects drift after manual edit', async () => {
     const clauses = parseSpec(SPEC, 'spec/auth.md');
     const canon = extractCanonicalNodes(clauses);
     const ius = planIUs(canon, clauses);
-    const results = generateAll(ius);
+    const results = await generateAll(ius);
 
     // Write and record
     for (const result of results) {

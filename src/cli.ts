@@ -30,6 +30,7 @@ import { BootstrapStateMachine } from './bootstrap.js';
 // Phase C
 import { planIUs } from './iu-planner.js';
 import { generateIU, generateAll } from './regen.js';
+import type { RegenContext } from './regen.js';
 import { detectDrift } from './drift.js';
 import { extractDependencies } from './dep-extractor.js';
 import { validateBoundary } from './boundary-validator.js';
@@ -46,6 +47,9 @@ import { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
 
 // Scaffold
 import { deriveServices, generateScaffold } from './scaffold.js';
+
+// LLM
+import { resolveProvider, describeAvailability } from './llm/resolve.js';
 
 // Models
 import type { Clause } from './models/clause.js';
@@ -254,7 +258,7 @@ function cmdInit(): void {
   console.log(`    2. Run ${cyan('phoenix bootstrap')} to ingest & canonicalize`);
 }
 
-function cmdBootstrap(): void {
+async function cmdBootstrap(): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
 
   console.log(bold('🔥 Phoenix Bootstrap'));
@@ -323,9 +327,29 @@ function cmdBootstrap(): void {
   console.log();
 
   // Step 4: Generate code
-  console.log(`  ${dim('Phase C:')} Code generation`);
+  const llm = resolveProvider(phoenixDir);
+  const { hint } = describeAvailability();
+  if (llm) {
+    console.log(`  ${dim('Phase C:')} Code generation ${dim(`(${llm.name}/${llm.model})`)}`);
+  } else {
+    console.log(`  ${dim('Phase C:')} Code generation ${dim('(stubs — no LLM)')}`);
+    console.log(`    ${dim(hint)}`);
+  }
+
+  const regenCtx: RegenContext = {
+    llm: llm ?? undefined,
+    canonNodes,
+    allIUs: ius,
+    projectRoot,
+    onProgress: (iu, status, msg) => {
+      if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
+      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
+      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
+    },
+  };
+
   const manifestManager = new ManifestManager(phoenixDir);
-  const regenResults = generateAll(ius);
+  const regenResults = await generateAll(ius, regenCtx);
   for (const result of regenResults) {
     for (const [filePath, content] of result.files) {
       const fullPath = join(projectRoot, filePath);
@@ -333,8 +357,9 @@ function cmdBootstrap(): void {
       writeFileSync(fullPath, content, 'utf8');
     }
     manifestManager.recordIU(result.manifest);
-    const fileCount = result.files.size;
-    console.log(`    ${green('✔')} ${result.iu_id.slice(0, 8)}… → ${fileCount} file(s) generated`);
+    if (!llm) {
+      console.log(`    ${green('✔')} ${result.iu_id.slice(0, 8)}… → ${result.files.size} file(s)`);
+    }
   }
   console.log();
 
@@ -802,7 +827,7 @@ function cmdPlan(): void {
   }
 }
 
-function cmdRegen(args: string[]): void {
+async function cmdRegen(args: string[]): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
 
@@ -811,8 +836,9 @@ function cmdRegen(args: string[]): void {
     return;
   }
 
-  // Parse --iu=<id> flag
+  // Parse --iu=<id> flag and --stubs flag
   const iuFilter = args.find(a => a.startsWith('--iu='))?.split('=')[1];
+  const forceStubs = args.includes('--stubs');
   const targetIUs = iuFilter
     ? ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter)
     : ius;
@@ -822,11 +848,33 @@ function cmdRegen(args: string[]): void {
     return;
   }
 
+  const llm = forceStubs ? null : resolveProvider(phoenixDir);
+  const canonStore = new CanonicalStore(phoenixDir);
+  const canonNodes = canonStore.getAllNodes();
+
   console.log(bold('⚡ Code Regeneration'));
+  if (llm) {
+    console.log(`  ${dim(`Provider: ${llm.name}/${llm.model}`)}`);
+  } else {
+    const { hint } = describeAvailability();
+    console.log(`  ${dim('Mode: stubs')}${forceStubs ? '' : ` ${dim('—')} ${dim(hint)}`}`);
+  }
   console.log();
 
+  const regenCtx: RegenContext = {
+    llm: llm ?? undefined,
+    canonNodes,
+    allIUs: ius,
+    projectRoot,
+    onProgress: (iu, status, msg) => {
+      if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
+      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
+      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
+    },
+  };
+
   const manifestManager = new ManifestManager(phoenixDir);
-  const results = generateAll(targetIUs);
+  const results = await generateAll(targetIUs, regenCtx);
 
   for (const result of results) {
     for (const [filePath, content] of result.files) {
@@ -836,10 +884,12 @@ function cmdRegen(args: string[]): void {
     }
     manifestManager.recordIU(result.manifest);
 
-    const iu = targetIUs.find(i => i.iu_id === result.iu_id);
-    console.log(`  ${green('✔')} ${iu?.name || result.iu_id.slice(0, 12)}`);
-    for (const [filePath] of result.files) {
-      console.log(`    → ${cyan(filePath)}`);
+    if (!llm) {
+      const iu = targetIUs.find(i => i.iu_id === result.iu_id);
+      console.log(`  ${green('✔')} ${iu?.name || result.iu_id.slice(0, 12)}`);
+      for (const [filePath] of result.files) {
+        console.log(`    → ${cyan(filePath)}`);
+      }
     }
   }
 
@@ -1102,6 +1152,8 @@ ${bold('Canonical Graph:')}
 ${bold('Implementation:')}
   ${cyan('plan')}                  Plan Implementation Units from canonical graph
   ${cyan('regen')} [--iu=<id>]    Regenerate code (all or specific IU)
+                         ${dim('Uses LLM if ANTHROPIC_API_KEY or OPENAI_API_KEY is set')}
+                         ${dim('--stubs  Force stub generation (skip LLM)')}
 
 ${bold('Verification:')}
   ${cyan('status')}                Trust dashboard — the primary UX
@@ -1123,7 +1175,7 @@ ${dim('Trust > cleverness.')}
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args[0];
   const commandArgs = args.slice(1);
@@ -1133,7 +1185,7 @@ function main(): void {
       cmdInit();
       break;
     case 'bootstrap':
-      cmdBootstrap();
+      await cmdBootstrap();
       break;
     case 'status':
       cmdStatus();
@@ -1159,7 +1211,7 @@ function main(): void {
       break;
     case 'regen':
     case 'regenerate':
-      cmdRegen(commandArgs);
+      await cmdRegen(commandArgs);
       break;
     case 'drift':
       cmdDrift();
@@ -1195,4 +1247,7 @@ function main(): void {
   }
 }
 
-main();
+main().catch(err => {
+  console.error(red(`✖ ${err.message || err}`));
+  process.exit(1);
+});

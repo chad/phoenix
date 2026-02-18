@@ -1,21 +1,26 @@
 /**
- * Regeneration Engine — generates code stubs for each IU.
+ * Regeneration Engine — generates code for each IU.
  *
- * Produces natural-looking TypeScript modules with:
- * - Typed interfaces for inputs/outputs
- * - Function stubs derived from requirements
- * - Config types from constraints
- * - Clean, readable code a developer would recognize
+ * Two modes:
+ * - Stub mode (no LLM): produces typed skeletons with throw stubs.
+ * - LLM mode: sends IU contract + canonical requirements to an LLM
+ *   and produces real, working implementations.
  *
- * In production this would invoke an LLM with a promptpack.
+ * The LLM provider is pluggable (Anthropic, OpenAI, etc.)
+ * and auto-detected from env vars.
  */
 
+import { execSync } from 'node:child_process';
+import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
+import type { CanonicalNode } from './models/canonical.js';
 import type { IUManifest, RegenMetadata, FileManifestEntry } from './models/manifest.js';
+import type { LLMProvider } from './llm/provider.js';
+import { buildPrompt, SYSTEM_PROMPT } from './llm/prompt.js';
 import { sha256 } from './semhash.js';
 
 const TOOLCHAIN_VERSION = 'phoenix-regen/0.1.0';
-const MODEL_ID = 'stub-generator/1.0';
 
 export interface RegenResult {
   iu_id: string;
@@ -23,14 +28,45 @@ export interface RegenResult {
   manifest: IUManifest;
 }
 
+export interface RegenContext {
+  /** LLM provider for real code generation. Omit for stub mode. */
+  llm?: LLMProvider;
+  /** All canonical nodes (needed for LLM prompt context). */
+  canonNodes?: CanonicalNode[];
+  /** All IUs (for sibling module context). */
+  allIUs?: ImplementationUnit[];
+  /** Project root directory (for typecheck-and-retry). */
+  projectRoot?: string;
+  /** Callback for progress reporting. */
+  onProgress?: (iu: ImplementationUnit, status: 'start' | 'done' | 'error', message?: string) => void;
+}
+
 /**
  * Generate code for a single IU.
+ * Uses LLM if provided in context, otherwise falls back to stubs.
  */
-export function generateIU(iu: ImplementationUnit): RegenResult {
+export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Promise<RegenResult> {
   const files = new Map<string, string>();
+  const modelId = ctx?.llm ? `${ctx.llm.name}/${ctx.llm.model}` : 'stub-generator/1.0';
 
   for (const outputPath of iu.output_files) {
-    const content = generateModule(iu);
+    let content: string;
+
+    if (ctx?.llm && ctx.canonNodes) {
+      ctx.onProgress?.(iu, 'start', `Generating ${iu.name} via ${ctx.llm.name}…`);
+      try {
+        content = await generateWithLLM(iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot);
+        ctx.onProgress?.(iu, 'done');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        ctx.onProgress?.(iu, 'error', msg);
+        // Fall back to stub on LLM failure
+        content = generateModule(iu);
+      }
+    } else {
+      content = generateModule(iu);
+    }
+
     files.set(outputPath, content);
   }
 
@@ -48,7 +84,7 @@ export function generateIU(iu: ImplementationUnit): RegenResult {
   const promptpackHash = sha256(JSON.stringify(iu.contract));
 
   const metadata: RegenMetadata = {
-    model_id: MODEL_ID,
+    model_id: modelId,
     promptpack_hash: promptpackHash,
     toolchain_version: TOOLCHAIN_VERSION,
     generated_at: now,
@@ -67,10 +103,159 @@ export function generateIU(iu: ImplementationUnit): RegenResult {
 }
 
 /**
- * Generate code for all IUs.
+ * Generate code for all IUs. Runs sequentially to respect LLM rate limits.
  */
-export function generateAll(ius: ImplementationUnit[]): RegenResult[] {
-  return ius.map(iu => generateIU(iu));
+export async function generateAll(ius: ImplementationUnit[], ctx?: RegenContext): Promise<RegenResult[]> {
+  const results: RegenResult[] = [];
+  for (const iu of ius) {
+    results.push(await generateIU(iu, ctx));
+  }
+  return results;
+}
+
+// ─── LLM Generation ─────────────────────────────────────────────────────────
+
+const MAX_RETRIES = 2;
+
+/**
+ * Generate code for an IU using an LLM provider.
+ * Includes typecheck-and-retry: if the generated code has TS errors,
+ * feed them back to the LLM for a fix attempt.
+ */
+async function generateWithLLM(
+  iu: ImplementationUnit,
+  llm: LLMProvider,
+  canonNodes: CanonicalNode[],
+  allIUs?: ImplementationUnit[],
+  projectRoot?: string,
+): Promise<string> {
+  // Find sibling modules in the same service
+  const iuDir = iu.output_files[0]?.split('/').slice(0, -1).join('/');
+  const siblings = allIUs
+    ?.filter(other => other.iu_id !== iu.iu_id && other.output_files[0]?.startsWith(iuDir || ''))
+    .map(other => other.name) ?? [];
+
+  const prompt = buildPrompt(iu, canonNodes, siblings);
+
+  let code = cleanCodeResponse(await llm.generate(prompt, {
+    system: SYSTEM_PROMPT,
+    temperature: 0.2,
+    maxTokens: 8192,
+  }));
+
+  // Typecheck-and-retry loop
+  if (projectRoot && iu.output_files[0]) {
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const errors = typecheckFile(projectRoot, iu.output_files[0], code);
+      if (!errors) break; // clean!
+
+      // Feed errors back to LLM
+      const fixPrompt = buildFixPrompt(code, errors);
+      code = cleanCodeResponse(await llm.generate(fixPrompt, {
+        system: SYSTEM_PROMPT,
+        temperature: 0.1,
+        maxTokens: 8192,
+      }));
+    }
+  }
+
+  return code;
+}
+
+const MINIMAL_TSCONFIG = JSON.stringify({
+  compilerOptions: {
+    target: 'ES2022',
+    module: 'Node16',
+    moduleResolution: 'Node16',
+    strict: true,
+    esModuleInterop: true,
+    skipLibCheck: true,
+    outDir: 'dist',
+    rootDir: 'src',
+  },
+  include: ['src'],
+}, null, 2);
+
+/**
+ * Typecheck a single file by writing it to disk and running tsc.
+ * Returns error output or null if clean.
+ */
+function typecheckFile(projectRoot: string, filePath: string, content: string): string | null {
+  const fullPath = join(projectRoot, filePath);
+  mkdirSync(dirname(fullPath), { recursive: true });
+  writeFileSync(fullPath, content, 'utf8');
+
+  // Ensure tsconfig.json exists for tsc
+  const tsconfigPath = join(projectRoot, 'tsconfig.json');
+  const hadTsconfig = existsSync(tsconfigPath);
+  if (!hadTsconfig) {
+    writeFileSync(tsconfigPath, MINIMAL_TSCONFIG, 'utf8');
+  }
+
+  try {
+    execSync('npx tsc --noEmit 2>&1', {
+      cwd: projectRoot,
+      timeout: 30000,
+      stdio: 'pipe',
+    });
+    return null; // clean
+  } catch (err: unknown) {
+    const execErr = err as { stdout?: Buffer; stderr?: Buffer };
+    const output = (execErr.stdout?.toString() || '') + (execErr.stderr?.toString() || '');
+    // Filter to only errors from this file
+    const fileErrors = output
+      .split('\n')
+      .filter(line => line.includes(filePath))
+      .join('\n')
+      .trim();
+    return fileErrors || output.trim();
+  }
+}
+
+/**
+ * Build a prompt asking the LLM to fix typecheck errors.
+ */
+function buildFixPrompt(code: string, errors: string): string {
+  return `The following TypeScript module has compilation errors. Fix them.
+
+## Current code:
+\`\`\`typescript
+${code}
+\`\`\`
+
+## TypeScript errors:
+${errors}
+
+## Rules:
+- Output ONLY the fixed TypeScript module. No markdown fences, no explanation.
+- Do NOT import external packages. Use only Node.js built-in modules.
+- For WebSocket features, use node:http — do NOT import 'ws'.
+- For DOM/browser code, use string HTML templates — no DOM APIs.
+- The code must compile under strict mode.
+- Keep all existing exports and the _phoenix metadata constant.
+
+Output the complete fixed TypeScript module now.`;
+}
+
+/**
+ * Strip markdown code fences from LLM response.
+ */
+function cleanCodeResponse(raw: string): string {
+  let code = raw.trim();
+
+  // Remove ```typescript ... ``` or ```ts ... ``` or ``` ... ```
+  const fenceMatch = code.match(/^```(?:typescript|ts)?\s*\n([\s\S]*?)\n```\s*$/);
+  if (fenceMatch) {
+    code = fenceMatch[1];
+  }
+
+  // Also handle case where there's text before/after the fence
+  const innerMatch = code.match(/```(?:typescript|ts)?\s*\n([\s\S]*?)\n```/);
+  if (innerMatch && innerMatch[1].includes('export')) {
+    code = innerMatch[1];
+  }
+
+  return code;
 }
 
 // ─── Module Generation ───────────────────────────────────────────────────────

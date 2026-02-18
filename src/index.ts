@@ -36,6 +36,7 @@ export { BootstrapStateMachine } from './bootstrap.js';
 // Phase C1
 export { planIUs } from './iu-planner.js';
 export { generateIU, generateAll } from './regen.js';
+export type { RegenContext } from './regen.js';
 export { ManifestManager } from './manifest.js';
 export { detectDrift } from './drift.js';
 
@@ -60,6 +61,14 @@ export { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
 // Scaffold
 export { deriveServices, generateScaffold } from './scaffold.js';
 export type { ServiceDescriptor, ScaffoldResult } from './scaffold.js';
+
+// LLM
+export type { LLMProvider, GenerateOptions, LLMConfig } from './llm/provider.js';
+export { DEFAULT_MODELS } from './llm/provider.js';
+export { AnthropicProvider } from './llm/anthropic.js';
+export { OpenAIProvider } from './llm/openai.js';
+export { resolveProvider, describeAvailability } from './llm/resolve.js';
+export { buildPrompt, SYSTEM_PROMPT } from './llm/prompt.js';
 
 // Stores
 export { ContentStore } from './store/content-store.js';

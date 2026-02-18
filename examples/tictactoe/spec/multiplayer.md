@@ -11,7 +11,7 @@
 
 - A player must be able to create a new game and wait for an opponent
 - A player must be able to join an existing game that is in "waiting" status
-- The creator of a game always plays as X
+- The creator of a game always plays as Y
 - The joiner always plays as O
 - When a second player joins, the game status must change to "in-progress"
 
