@@ -62,6 +62,10 @@ export { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
 
 // Scaffold
 export { deriveServices, generateScaffold } from './scaffold.js';
+
+// Inspect
+export { collectInspectData, renderInspectHTML, serveInspect } from './inspect.js';
+export type { InspectData } from './inspect.js';
 export type { ServiceDescriptor, ScaffoldResult } from './scaffold.js';
 
 // LLM

@@ -50,6 +50,9 @@ import { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
 // Scaffold
 import { deriveServices, generateScaffold } from './scaffold.js';
 
+// Inspect
+import { collectInspectData, renderInspectHTML, serveInspect } from './inspect.js';
+
 // LLM
 import { resolveProvider, describeAvailability } from './llm/resolve.js';
 
@@ -1136,6 +1139,64 @@ function cmdGraph(): void {
   }
 }
 
+async function cmdInspect(args: string[]): Promise<void> {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const machine = loadBootstrapState(phoenixDir);
+  const ius = loadIUs(phoenixDir);
+  const canonStore = new CanonicalStore(phoenixDir);
+  const canonNodes = canonStore.getAllNodes();
+  const specStore = new SpecStore(phoenixDir);
+  const manifestManager = new ManifestManager(phoenixDir);
+  const manifest = manifestManager.load();
+
+  // Collect all clauses
+  const allClauses: Clause[] = [];
+  const specFiles = findSpecFiles(projectRoot);
+  for (const specFile of specFiles) {
+    const docId = relative(projectRoot, specFile);
+    allClauses.push(...specStore.getClauses(docId));
+  }
+
+  // Drift
+  let driftReport = null;
+  if (manifest.generated_at) {
+    driftReport = detectDrift(manifest, projectRoot);
+  }
+
+  const projectName = basename(projectRoot);
+  const data = collectInspectData(
+    projectName,
+    machine.getState(),
+    allClauses,
+    canonNodes,
+    ius,
+    manifest,
+    driftReport,
+  );
+
+  const html = renderInspectHTML(data);
+
+  // Parse --port flag
+  const portArg = args.find(a => a.startsWith('--port='))?.split('=')[1];
+  const port = portArg ? parseInt(portArg, 10) : 0; // 0 = random
+
+  const instance = serveInspect(html, port);
+  await instance.ready;
+
+  console.log();
+  console.log(bold('🔥 Phoenix Inspect'));
+  console.log();
+  console.log(`  ${cyan(`http://localhost:${instance.port}`)}`);
+  console.log();
+  console.log(`  ${dim(`${data.stats.specFiles} specs → ${data.stats.clauses} clauses → ${data.stats.canonNodes} canon → ${data.stats.ius} IUs → ${data.stats.generatedFiles} files`)}`);
+  console.log(`  ${dim(`${data.stats.edgeCount} provenance edges`)}`);
+  console.log();
+  console.log(dim('  Press Ctrl+C to stop.'));
+
+  // Keep process alive
+  await new Promise(() => {});
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -1173,6 +1234,7 @@ ${bold('Verification:')}
   ${cyan('cascade')}               Show cascade failure effects
 
 ${bold('Inspection:')}
+  ${cyan('inspect')} [--port=N]    Interactive pipeline visualisation (opens browser)
   ${cyan('graph')}                 Show provenance graph summary
   ${cyan('bot')} "<command>"       Route a bot command (e.g., "SpecBot: help")
 
@@ -1233,6 +1295,9 @@ async function main(): Promise<void> {
       break;
     case 'cascade':
       cmdCascade();
+      break;
+    case 'inspect':
+      await cmdInspect(commandArgs);
       break;
     case 'graph':
       cmdGraph();
