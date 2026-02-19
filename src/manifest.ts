@@ -28,9 +28,13 @@ export class ManifestManager {
 
   /**
    * Record a single IU's generated files into the manifest.
+   * Evicts stale entries: if another IU previously owned the same
+   * output file paths, the old entry is removed (handles IU ID changes
+   * after re-canonicalization).
    */
   recordIU(iuManifest: IUManifest): void {
     const manifest = this.load();
+    this.evictStaleEntries(manifest, iuManifest);
     manifest.iu_manifests[iuManifest.iu_id] = iuManifest;
     manifest.generated_at = new Date().toISOString();
     this.save(manifest);
@@ -42,10 +46,27 @@ export class ManifestManager {
   recordAll(iuManifests: IUManifest[]): void {
     const manifest = this.load();
     for (const m of iuManifests) {
+      this.evictStaleEntries(manifest, m);
       manifest.iu_manifests[m.iu_id] = m;
     }
     manifest.generated_at = new Date().toISOString();
     this.save(manifest);
+  }
+
+  /**
+   * Remove old IU manifest entries that own the same file paths
+   * as a new entry (but with a different IU ID).
+   */
+  private evictStaleEntries(manifest: GeneratedManifest, incoming: IUManifest): void {
+    const incomingFiles = new Set(Object.keys(incoming.files));
+    for (const [existingId, existing] of Object.entries(manifest.iu_manifests)) {
+      if (existingId === incoming.iu_id) continue;
+      const existingFiles = Object.keys(existing.files);
+      const overlaps = existingFiles.some(f => incomingFiles.has(f));
+      if (overlaps) {
+        delete manifest.iu_manifests[existingId];
+      }
+    }
   }
 
   /**

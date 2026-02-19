@@ -32,3 +32,5 @@ A single-page web dashboard for managing tasks. Served as HTML from the server.
 - Cards must have subtle shadows, rounded corners (8px), and hover effects
 - The font must be system-ui with appropriate size hierarchy (h1: 1.5rem, body: 0.95rem)
 - Buttons must have rounded corners, appropriate padding, and cursor pointer
+
+    Make it noticably hideous.  I mean BAD!!

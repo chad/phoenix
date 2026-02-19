@@ -1,7 +1,7 @@
 export interface Task {
   id: string;
   assignee?: string;
-  status: 'pending' | 'in-progress' | 'done' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'done' | 'cancelled';
 }
 
 export interface AssigneePerformance {
@@ -24,25 +24,35 @@ export class TeamPerformanceCalculator {
     
     for (const task of assignedTasks) {
       const assignee = task.assignee!;
-      const stats = assigneeStats.get(assignee) || { total: 0, completed: 0 };
       
+      if (!assigneeStats.has(assignee)) {
+        assigneeStats.set(assignee, { total: 0, completed: 0 });
+      }
+      
+      const stats = assigneeStats.get(assignee)!;
       stats.total++;
+      
       if (task.status === 'done') {
         stats.completed++;
       }
-      
-      assigneeStats.set(assignee, stats);
     }
     
-    const assigneePerformance: AssigneePerformance[] = Array.from(assigneeStats.entries())
-      .map(([assignee, stats]) => ({
+    const assigneePerformance: AssigneePerformance[] = [];
+    
+    for (const [assignee, stats] of assigneeStats) {
+      const completionRate = stats.total > 0 ? stats.completed / stats.total : 0;
+      
+      assigneePerformance.push({
         assignee,
         totalAssigned: stats.total,
         completed: stats.completed,
-        completionRate: stats.total > 0 ? stats.completed / stats.total : 0
-      }));
+        completionRate
+      });
+    }
     
-    const topPerformer = this.findTopPerformer(assigneePerformance);
+    assigneePerformance.sort((a, b) => b.completionRate - a.completionRate);
+    
+    const topPerformer = this.identifyTopPerformer(assigneePerformance);
     
     return {
       assigneePerformance,
@@ -50,7 +60,7 @@ export class TeamPerformanceCalculator {
     };
   }
   
-  private findTopPerformer(performances: AssigneePerformance[]): AssigneePerformance | null {
+  private identifyTopPerformer(performances: AssigneePerformance[]): AssigneePerformance | null {
     const eligiblePerformers = performances.filter(p => p.totalAssigned >= 3);
     
     if (eligiblePerformers.length === 0) {
@@ -82,6 +92,11 @@ export function calculateTeamPerformance(tasks: Task[]): TeamPerformanceMetrics 
 export function getTopPerformer(tasks: Task[]): AssigneePerformance | null {
   const metrics = calculateTeamPerformance(tasks);
   return metrics.topPerformer;
+}
+
+export function getAssigneeCompletionRate(assignee: string, tasks: Task[]): number {
+  const calculator = new TeamPerformanceCalculator();
+  return calculator.getCompletionRate(assignee, tasks);
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */

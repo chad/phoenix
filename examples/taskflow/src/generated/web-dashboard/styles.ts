@@ -13,13 +13,6 @@ export interface StyleConfig {
     border: string;
     shadow: string;
   };
-  typography: {
-    fontFamily: string;
-    sizes: {
-      h1: string;
-      body: string;
-    };
-  };
   spacing: {
     xs: string;
     sm: string;
@@ -27,20 +20,20 @@ export interface StyleConfig {
     lg: string;
     xl: string;
   };
-  borderRadius: {
-    card: string;
-    button: string;
+  typography: {
+    fontFamily: string;
+    h1Size: string;
+    bodySize: string;
+  };
+  effects: {
+    borderRadius: string;
+    cardShadow: string;
+    cardShadowHover: string;
+    transition: string;
   };
 }
 
-export interface ComponentStyles {
-  layout: string;
-  card: string;
-  button: string;
-  typography: string;
-}
-
-const defaultConfig: StyleConfig = {
+export const defaultStyleConfig: StyleConfig = {
   breakpoints: {
     mobile: '768px',
     desktop: '769px'
@@ -55,13 +48,6 @@ const defaultConfig: StyleConfig = {
     border: '#dee2e6',
     shadow: 'rgba(0, 0, 0, 0.1)'
   },
-  typography: {
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    sizes: {
-      h1: '1.5rem',
-      body: '0.95rem'
-    }
-  },
   spacing: {
     xs: '0.25rem',
     sm: '0.5rem',
@@ -69,177 +55,258 @@ const defaultConfig: StyleConfig = {
     lg: '1.5rem',
     xl: '2rem'
   },
-  borderRadius: {
-    card: '8px',
-    button: '4px'
+  typography: {
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    h1Size: '1.5rem',
+    bodySize: '0.95rem'
+  },
+  effects: {
+    borderRadius: '8px',
+    cardShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    cardShadowHover: '0 4px 8px rgba(0, 0, 0, 0.15)',
+    transition: 'all 0.2s ease-in-out'
   }
 };
 
-export function generateStyles(config: Partial<StyleConfig> = {}): ComponentStyles {
-  const mergedConfig: StyleConfig = {
-    ...defaultConfig,
-    ...config,
-    colors: { ...defaultConfig.colors, ...config.colors },
-    typography: { ...defaultConfig.typography, ...config.typography },
-    spacing: { ...defaultConfig.spacing, ...config.spacing },
-    borderRadius: { ...defaultConfig.borderRadius, ...config.borderRadius }
-  };
+export class StyleManager {
+  private config: StyleConfig;
+  private styleElement: string | null = null;
 
-  const layout = `
-    .phoenix-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: ${mergedConfig.spacing.md};
-      padding: ${mergedConfig.spacing.md};
-      max-width: 100%;
-      margin: 0 auto;
-    }
+  constructor(config: StyleConfig = defaultStyleConfig) {
+    this.config = config;
+  }
 
-    @media (min-width: ${mergedConfig.breakpoints.desktop}) {
-      .phoenix-layout {
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: ${mergedConfig.spacing.lg};
-        padding: ${mergedConfig.spacing.xl};
-        max-width: 1200px;
+  generateCSS(): string {
+    const { breakpoints, colors, spacing, typography, effects } = this.config;
+
+    return `
+      /* Reset and base styles */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
-    }
-  `;
 
-  const card = `
-    .phoenix-card {
-      background: ${mergedConfig.colors.surface};
-      border: 1px solid ${mergedConfig.colors.border};
-      border-radius: ${mergedConfig.borderRadius.card};
-      padding: ${mergedConfig.spacing.lg};
-      box-shadow: 0 2px 4px ${mergedConfig.colors.shadow};
-      transition: box-shadow 0.2s ease, transform 0.2s ease;
-    }
+      body {
+        font-family: ${typography.fontFamily};
+        font-size: ${typography.bodySize};
+        line-height: 1.6;
+        color: ${colors.text};
+        background-color: ${colors.background};
+      }
 
-    .phoenix-card:hover {
-      box-shadow: 0 4px 8px ${mergedConfig.colors.shadow};
-      transform: translateY(-1px);
-    }
-  `;
+      /* Typography */
+      h1 {
+        font-size: ${typography.h1Size};
+        font-weight: 600;
+        color: ${colors.text};
+        margin-bottom: ${spacing.lg};
+      }
 
-  const button = `
-    .phoenix-button {
-      background: ${mergedConfig.colors.primary};
-      color: ${mergedConfig.colors.background};
-      border: none;
-      border-radius: ${mergedConfig.borderRadius.button};
-      padding: ${mergedConfig.spacing.sm} ${mergedConfig.spacing.md};
-      font-family: ${mergedConfig.typography.fontFamily};
-      font-size: ${mergedConfig.typography.sizes.body};
-      cursor: pointer;
-      transition: background-color 0.2s ease, transform 0.1s ease;
-      display: inline-block;
-      text-decoration: none;
-      text-align: center;
-    }
+      /* Layout - Mobile First */
+      .container {
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: ${spacing.md};
+      }
 
-    .phoenix-button:hover {
-      background: ${adjustColor(mergedConfig.colors.primary, -10)};
-      transform: translateY(-1px);
-    }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: ${spacing.lg};
+      }
 
-    .phoenix-button:active {
-      transform: translateY(0);
-    }
+      /* Desktop Layout */
+      @media (min-width: ${breakpoints.desktop}) {
+        .grid {
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
 
-    .phoenix-button--secondary {
-      background: ${mergedConfig.colors.secondary};
-    }
+        .grid-2 {
+          grid-template-columns: repeat(2, 1fr);
+        }
 
-    .phoenix-button--secondary:hover {
-      background: ${adjustColor(mergedConfig.colors.secondary, -10)};
-    }
-  `;
+        .grid-3 {
+          grid-template-columns: repeat(3, 1fr);
+        }
 
-  const typography = `
-    .phoenix-typography {
-      font-family: ${mergedConfig.typography.fontFamily};
-      color: ${mergedConfig.colors.text};
-      line-height: 1.5;
-    }
+        .grid-4 {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
 
-    .phoenix-typography h1 {
-      font-size: ${mergedConfig.typography.sizes.h1};
-      font-weight: 600;
-      margin: 0 0 ${mergedConfig.spacing.md} 0;
-      color: ${mergedConfig.colors.text};
-    }
+      /* Cards */
+      .card {
+        background: ${colors.surface};
+        border: 1px solid ${colors.border};
+        border-radius: ${effects.borderRadius};
+        padding: ${spacing.lg};
+        box-shadow: ${effects.cardShadow};
+        transition: ${effects.transition};
+      }
 
-    .phoenix-typography p,
-    .phoenix-typography div,
-    .phoenix-typography span {
-      font-size: ${mergedConfig.typography.sizes.body};
-      margin: 0 0 ${mergedConfig.spacing.sm} 0;
-    }
+      .card:hover {
+        box-shadow: ${effects.cardShadowHover};
+        transform: translateY(-2px);
+      }
 
-    .phoenix-typography--secondary {
-      color: ${mergedConfig.colors.textSecondary};
-    }
-  `;
+      /* Buttons */
+      .btn {
+        display: inline-block;
+        padding: ${spacing.sm} ${spacing.lg};
+        border: none;
+        border-radius: ${effects.borderRadius};
+        font-family: ${typography.fontFamily};
+        font-size: ${typography.bodySize};
+        font-weight: 500;
+        text-decoration: none;
+        text-align: center;
+        cursor: pointer;
+        transition: ${effects.transition};
+        background-color: ${colors.primary};
+        color: white;
+      }
 
-  return {
-    layout,
-    card,
-    button,
-    typography
-  };
-}
+      .btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
 
-export function injectStyles(styles: ComponentStyles): void {
-  const styleElement = createStyleElement();
-  const combinedStyles = Object.values(styles).join('\n');
-  styleElement.textContent = combinedStyles;
-}
+      .btn:active {
+        transform: translateY(0);
+      }
 
-export function createStyleElement(): HTMLStyleElement {
-  if (typeof document === 'undefined') {
-    throw new Error('createStyleElement can only be used in browser environment');
+      .btn-secondary {
+        background-color: ${colors.secondary};
+      }
+
+      .btn-outline {
+        background-color: transparent;
+        color: ${colors.primary};
+        border: 1px solid ${colors.primary};
+      }
+
+      .btn-outline:hover {
+        background-color: ${colors.primary};
+        color: white;
+      }
+
+      /* Utility classes */
+      .text-center {
+        text-align: center;
+      }
+
+      .text-secondary {
+        color: ${colors.textSecondary};
+      }
+
+      .mb-sm { margin-bottom: ${spacing.sm}; }
+      .mb-md { margin-bottom: ${spacing.md}; }
+      .mb-lg { margin-bottom: ${spacing.lg}; }
+      .mb-xl { margin-bottom: ${spacing.xl}; }
+
+      .mt-sm { margin-top: ${spacing.sm}; }
+      .mt-md { margin-top: ${spacing.md}; }
+      .mt-lg { margin-top: ${spacing.lg}; }
+      .mt-xl { margin-top: ${spacing.xl}; }
+
+      .p-sm { padding: ${spacing.sm}; }
+      .p-md { padding: ${spacing.md}; }
+      .p-lg { padding: ${spacing.lg}; }
+      .p-xl { padding: ${spacing.xl}; }
+
+      /* Responsive utilities */
+      @media (max-width: ${breakpoints.mobile}) {
+        .hide-mobile {
+          display: none;
+        }
+      }
+
+      @media (min-width: ${breakpoints.desktop}) {
+        .hide-desktop {
+          display: none;
+        }
+      }
+    `;
   }
-  
-  const existingStyle = document.getElementById('phoenix-styles');
-  if (existingStyle) {
-    return existingStyle as HTMLStyleElement;
+
+  getStyleElement(): string {
+    if (!this.styleElement) {
+      this.styleElement = `<style>${this.generateCSS()}</style>`;
+    }
+    return this.styleElement;
   }
 
-  const style = document.createElement('style');
-  style.id = 'phoenix-styles';
-  style.type = 'text/css';
-  document.head.appendChild(style);
-  return style;
-}
-
-export function generateCSSString(config?: Partial<StyleConfig>): string {
-  const styles = generateStyles(config);
-  return Object.values(styles).join('\n');
-}
-
-function adjustColor(color: string, percent: number): string {
-  if (!color.startsWith('#')) {
-    return color;
+  updateConfig(newConfig: Partial<StyleConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+    this.styleElement = null; // Reset cached styles
   }
-  
-  const num = parseInt(color.slice(1), 16);
-  const amt = Math.round(2.55 * percent);
-  const R = (num >> 16) + amt;
-  const G = (num >> 8 & 0x00FF) + amt;
-  const B = (num & 0x0000FF) + amt;
-  
-  return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-    (B < 255 ? B < 1 ? 0 : B : 255))
-    .toString(16)
-    .slice(1);
+
+  getConfig(): StyleConfig {
+    return { ...this.config };
+  }
+
+  generateInlineStyles(element: string, styles: Record<string, string>): string {
+    const styleString = Object.entries(styles)
+      .map(([property, value]) => `${property}: ${value}`)
+      .join('; ');
+    
+    return `${element} { ${styleString} }`;
+  }
+
+  createResponsiveGrid(columns: { mobile: number; desktop: number }): string {
+    return `
+      display: grid;
+      grid-template-columns: repeat(${columns.mobile}, 1fr);
+      gap: ${this.config.spacing.lg};
+
+      @media (min-width: ${this.config.breakpoints.desktop}) {
+        grid-template-columns: repeat(${columns.desktop}, 1fr);
+      }
+    `;
+  }
+
+  createCard(content: string, className: string = ''): string {
+    return `<div class="card ${className}">${content}</div>`;
+  }
+
+  createButton(text: string, type: 'primary' | 'secondary' | 'outline' = 'primary', onClick?: string): string {
+    const buttonClass = type === 'primary' ? 'btn' : `btn btn-${type}`;
+    const onClickAttr = onClick ? ` onclick="${onClick}"` : '';
+    return `<button class="${buttonClass}"${onClickAttr}>${text}</button>`;
+  }
 }
 
-export const defaultStyleConfig = defaultConfig;
+export function createStyleManager(config?: Partial<StyleConfig>): StyleManager {
+  const finalConfig = config ? { ...defaultStyleConfig, ...config } : defaultStyleConfig;
+  return new StyleManager(finalConfig);
+}
+
+export function generateResponsiveHTML(content: string, title?: string): string {
+  const styleManager = createStyleManager();
+  
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      ${title ? `<title>${title}</title>` : ''}
+      ${styleManager.getStyleElement()}
+    </head>
+    <body>
+      <div class="container">
+        ${content}
+      </div>
+    </body>
+    </html>
+  `;
+}
 
 /** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
-  iu_id: 'fd1e1e3084a491150550d575098a4a929a5be62ccb0b000a173679da38aed9fa',
+  iu_id: '8d072032308810bce8136ef5a0a51f8e99a35d83edfa38f4d69cdca300d1c6af',
   name: 'Styles',
   risk_tier: 'medium',
   canon_ids: [4 as const],

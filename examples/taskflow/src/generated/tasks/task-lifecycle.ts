@@ -27,12 +27,7 @@ export interface TaskUpdateInput {
   priority?: TaskPriority;
 }
 
-export class TaskLifecycleError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'TaskLifecycleError';
-  }
-}
+export type NotificationCallback = (task: Task, event: string, details?: any) => void;
 
 const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   open: ['in_progress'],
@@ -41,8 +36,30 @@ const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   done: []
 };
 
-export class TaskLifecycle {
+export class TaskLifecycleManager {
   private tasks = new Map<string, Task>();
+  private notificationCallbacks: NotificationCallback[] = [];
+
+  addNotificationCallback(callback: NotificationCallback): void {
+    this.notificationCallbacks.push(callback);
+  }
+
+  removeNotificationCallback(callback: NotificationCallback): void {
+    const index = this.notificationCallbacks.indexOf(callback);
+    if (index >= 0) {
+      this.notificationCallbacks.splice(index, 1);
+    }
+  }
+
+  private notify(task: Task, event: string, details?: any): void {
+    for (const callback of this.notificationCallbacks) {
+      try {
+        callback(task, event, details);
+      } catch (error) {
+        // Ignore notification callback errors
+      }
+    }
+  }
 
   createTask(input: TaskCreateInput): Task {
     const now = new Date();
@@ -57,22 +74,22 @@ export class TaskLifecycle {
     };
 
     this.tasks.set(task.id, task);
-    return { ...task };
+    this.notify(task, 'created');
+    return task;
   }
 
   getTask(id: string): Task | undefined {
-    const task = this.tasks.get(id);
-    return task ? { ...task } : undefined;
+    return this.tasks.get(id);
   }
 
   getAllTasks(): Task[] {
-    return Array.from(this.tasks.values()).map(task => ({ ...task }));
+    return Array.from(this.tasks.values());
   }
 
   updateTask(id: string, input: TaskUpdateInput): Task {
     const task = this.tasks.get(id);
     if (!task) {
-      throw new TaskLifecycleError(`Task with id ${id} not found`);
+      throw new Error(`Task with ID ${id} not found`);
     }
 
     const updatedTask: Task = {
@@ -82,19 +99,25 @@ export class TaskLifecycle {
     };
 
     this.tasks.set(id, updatedTask);
-    return { ...updatedTask };
+    this.notify(updatedTask, 'updated', { changes: input });
+    return updatedTask;
   }
 
   transitionStatus(id: string, newStatus: TaskStatus): Task {
     const task = this.tasks.get(id);
     if (!task) {
-      throw new TaskLifecycleError(`Task with id ${id} not found`);
+      throw new Error(`Task with ID ${id} not found`);
+    }
+
+    if (task.status === newStatus) {
+      return task; // No change needed
     }
 
     const validTransitions = VALID_TRANSITIONS[task.status];
     if (!validTransitions.includes(newStatus)) {
-      throw new TaskLifecycleError(
-        `Invalid status transition from ${task.status} to ${newStatus}. Valid transitions: ${validTransitions.join(', ')}`
+      throw new Error(
+        `Invalid status transition from '${task.status}' to '${newStatus}'. ` +
+        `Valid transitions are: ${validTransitions.join(', ')}`
       );
     }
 
@@ -105,35 +128,54 @@ export class TaskLifecycle {
       updated_at: now
     };
 
-    if (newStatus === 'done') {
+    // Handle completion
+    if (newStatus === 'done' && task.status !== 'done') {
       updatedTask.completed_at = now;
       updatedTask.duration_ms = now.getTime() - task.created_at.getTime();
     }
 
+    // Clear completion data if moving away from done
+    if (task.status === 'done' && newStatus !== 'done') {
+      updatedTask.completed_at = undefined;
+      updatedTask.duration_ms = undefined;
+    }
+
     this.tasks.set(id, updatedTask);
-    return { ...updatedTask };
+    this.notify(updatedTask, 'status_changed', { 
+      from: task.status, 
+      to: newStatus 
+    });
+
+    if (newStatus === 'done') {
+      this.notify(updatedTask, 'completed', {
+        duration_ms: updatedTask.duration_ms
+      });
+    }
+
+    return updatedTask;
   }
 
   deleteTask(id: string): boolean {
-    return this.tasks.delete(id);
+    const task = this.tasks.get(id);
+    if (!task) {
+      return false;
+    }
+
+    this.tasks.delete(id);
+    this.notify(task, 'deleted');
+    return true;
   }
 
   getTasksByStatus(status: TaskStatus): Task[] {
-    return Array.from(this.tasks.values())
-      .filter(task => task.status === status)
-      .map(task => ({ ...task }));
+    return Array.from(this.tasks.values()).filter(task => task.status === status);
   }
 
   getTasksByPriority(priority: TaskPriority): Task[] {
-    return Array.from(this.tasks.values())
-      .filter(task => task.priority === priority)
-      .map(task => ({ ...task }));
+    return Array.from(this.tasks.values()).filter(task => task.priority === priority);
   }
 
   getCompletedTasks(): Task[] {
-    return Array.from(this.tasks.values())
-      .filter(task => task.status === 'done' && task.completed_at)
-      .map(task => ({ ...task }));
+    return this.getTasksByStatus('done');
   }
 
   getTaskDuration(id: string): number | undefined {
@@ -150,16 +192,16 @@ export class TaskLifecycle {
   }
 }
 
-export function createTaskLifecycle(): TaskLifecycle {
-  return new TaskLifecycle();
-}
-
-export function validateTaskStatus(status: string): status is TaskStatus {
-  return ['open', 'in_progress', 'review', 'done'].includes(status);
+export function createTaskLifecycleManager(): TaskLifecycleManager {
+  return new TaskLifecycleManager();
 }
 
 export function validateTaskPriority(priority: string): priority is TaskPriority {
   return ['low', 'medium', 'high', 'critical'].includes(priority);
+}
+
+export function validateTaskStatus(status: string): status is TaskStatus {
+  return ['open', 'in_progress', 'review', 'done'].includes(status);
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */

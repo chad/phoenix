@@ -3,8 +3,8 @@ export interface Task {
   title: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
   created_at: Date;
-  status: string;
   description?: string;
+  status?: string;
   assignee?: string;
   deadline?: Date;
 }
@@ -31,8 +31,8 @@ const PRIORITY_ORDER: Record<Task['priority'], number> = {
 export class TaskSearchEngine {
   private tasks: Task[] = [];
 
-  constructor(tasks: Task[] = []) {
-    this.tasks = [...tasks];
+  constructor(initialTasks: Task[] = []) {
+    this.tasks = [...initialTasks];
   }
 
   addTask(task: Task): void {
@@ -84,7 +84,7 @@ export class TaskSearchEngine {
     };
   }
 
-  private sortTasks(tasks: Task[], sortBy: string, sortOrder: string): Task[] {
+  private sortTasks(tasks: Task[], sortBy: 'priority' | 'created_at', sortOrder: 'asc' | 'desc'): Task[] {
     return [...tasks].sort((a, b) => {
       let comparison = 0;
 
@@ -108,8 +108,8 @@ export class TaskSearchEngine {
     return [...this.tasks];
   }
 
-  getTaskById(taskId: string): Task | undefined {
-    return this.tasks.find(task => task.id === taskId);
+  getTaskCount(): number {
+    return this.tasks.length;
   }
 
   clear(): void {
@@ -133,10 +133,12 @@ export function filterTasksByTitle(tasks: Task[], titleSubstring: string): Task[
   );
 }
 
-export function sortTasksByPriority(tasks: Task[]): Task[] {
+export function sortTasksByPriorityAndDate(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
+    // Critical first, then by priority order
     const priorityComparison = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     
+    // If priorities are equal, sort by created_at
     if (priorityComparison === 0) {
       return a.created_at.getTime() - b.created_at.getTime();
     }

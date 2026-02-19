@@ -1,7 +1,7 @@
 export interface Task {
   id: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'pending' | 'in-progress' | 'completed' | 'blocked' | 'cancelled';
+  status: 'todo' | 'in-progress' | 'review' | 'done' | 'blocked';
 }
 
 export interface PriorityBreakdownItem {
@@ -34,22 +34,18 @@ export class PriorityBreakdown {
   }
 
   removeTask(taskId: string): boolean {
-    const index = this.tasks.findIndex(task => task.id === taskId);
-    if (index !== -1) {
-      this.tasks.splice(index, 1);
-      return true;
-    }
-    return false;
+    const initialLength = this.tasks.length;
+    this.tasks = this.tasks.filter(task => task.id !== taskId);
+    return this.tasks.length < initialLength;
   }
 
   updateTask(taskId: string, updates: Partial<Pick<Task, 'priority' | 'status'>>): boolean {
     const task = this.tasks.find(t => t.id === taskId);
-    if (task) {
-      if (updates.priority) task.priority = updates.priority;
-      if (updates.status) task.status = updates.status;
-      return true;
-    }
-    return false;
+    if (!task) return false;
+
+    if (updates.priority) task.priority = updates.priority;
+    if (updates.status) task.status = updates.status;
+    return true;
   }
 
   clearTasks(): void {
@@ -59,8 +55,47 @@ export class PriorityBreakdown {
   generateReport(): BreakdownReport {
     const totalTasks = this.tasks.length;
 
-    const priorityBreakdown = this.calculatePriorityBreakdown(totalTasks);
-    const statusBreakdown = this.calculateStatusBreakdown(totalTasks);
+    const priorityCounts = new Map<string, number>();
+    const statusCounts = new Map<string, number>();
+
+    for (const task of this.tasks) {
+      priorityCounts.set(task.priority, (priorityCounts.get(task.priority) || 0) + 1);
+      statusCounts.set(task.status, (statusCounts.get(task.status) || 0) + 1);
+    }
+
+    const priorityBreakdown: PriorityBreakdownItem[] = [];
+    for (const [priority, count] of priorityCounts) {
+      priorityBreakdown.push({
+        priority,
+        count,
+        percentage: totalTasks > 0 ? Math.round((count / totalTasks) * 100 * 100) / 100 : 0
+      });
+    }
+
+    const statusBreakdown: StatusBreakdownItem[] = [];
+    for (const [status, count] of statusCounts) {
+      statusBreakdown.push({
+        status,
+        count,
+        percentage: totalTasks > 0 ? Math.round((count / totalTasks) * 100 * 100) / 100 : 0
+      });
+    }
+
+    // Sort by priority order and status order
+    const priorityOrder = ['critical', 'high', 'medium', 'low'];
+    const statusOrder = ['todo', 'in-progress', 'review', 'blocked', 'done'];
+
+    priorityBreakdown.sort((a, b) => {
+      const aIndex = priorityOrder.indexOf(a.priority);
+      const bIndex = priorityOrder.indexOf(b.priority);
+      return aIndex - bIndex;
+    });
+
+    statusBreakdown.sort((a, b) => {
+      const aIndex = statusOrder.indexOf(a.status);
+      const bIndex = statusOrder.indexOf(b.status);
+      return aIndex - bIndex;
+    });
 
     return {
       priorityBreakdown,
@@ -69,65 +104,15 @@ export class PriorityBreakdown {
     };
   }
 
-  private calculatePriorityBreakdown(totalTasks: number): PriorityBreakdownItem[] {
-    const priorityCounts = new Map<string, number>();
-    const priorities = ['low', 'medium', 'high', 'critical'];
-
-    // Initialize all priorities with 0 count
-    priorities.forEach(priority => priorityCounts.set(priority, 0));
-
-    // Count tasks by priority
-    this.tasks.forEach(task => {
-      const current = priorityCounts.get(task.priority) || 0;
-      priorityCounts.set(task.priority, current + 1);
-    });
-
-    return priorities.map(priority => {
-      const count = priorityCounts.get(priority) || 0;
-      const percentage = totalTasks > 0 ? Math.round((count / totalTasks) * 100 * 100) / 100 : 0;
-      
-      return {
-        priority,
-        count,
-        percentage
-      };
-    });
+  getPriorityBreakdown(): PriorityBreakdownItem[] {
+    return this.generateReport().priorityBreakdown;
   }
 
-  private calculateStatusBreakdown(totalTasks: number): StatusBreakdownItem[] {
-    const statusCounts = new Map<string, number>();
-    const statuses = ['pending', 'in-progress', 'completed', 'blocked', 'cancelled'];
-
-    // Initialize all statuses with 0 count
-    statuses.forEach(status => statusCounts.set(status, 0));
-
-    // Count tasks by status
-    this.tasks.forEach(task => {
-      const current = statusCounts.get(task.status) || 0;
-      statusCounts.set(task.status, current + 1);
-    });
-
-    return statuses.map(status => {
-      const count = statusCounts.get(status) || 0;
-      const percentage = totalTasks > 0 ? Math.round((count / totalTasks) * 100 * 100) / 100 : 0;
-      
-      return {
-        status,
-        count,
-        percentage
-      };
-    });
+  getStatusBreakdown(): StatusBreakdownItem[] {
+    return this.generateReport().statusBreakdown;
   }
 
-  getTasksByPriority(priority: Task['priority']): Task[] {
-    return this.tasks.filter(task => task.priority === priority);
-  }
-
-  getTasksByStatus(status: Task['status']): Task[] {
-    return this.tasks.filter(task => task.status === status);
-  }
-
-  getTotalTaskCount(): number {
+  getTotalTasks(): number {
     return this.tasks.length;
   }
 }
@@ -138,6 +123,11 @@ export function createPriorityBreakdown(initialTasks: Task[] = []): PriorityBrea
     breakdown.addTasks(initialTasks);
   }
   return breakdown;
+}
+
+export function generateBreakdownFromTasks(tasks: Task[]): BreakdownReport {
+  const breakdown = createPriorityBreakdown(tasks);
+  return breakdown.generateReport();
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */

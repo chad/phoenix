@@ -57,31 +57,34 @@ export class TaskListDisplay {
     return new Date() > task.deadline && task.status !== 'done';
   }
 
-  private getPriorityColor(priority: Task['priority']): string {
-    switch (priority) {
-      case 'critical': return '#dc2626';
-      case 'high': return '#ea580c';
-      case 'medium': return '#ca8a04';
-      case 'low': return '#16a34a';
-    }
+  private getPriorityBadgeColor(priority: Task['priority']): string {
+    const colors = {
+      critical: '#dc2626',
+      high: '#ea580c',
+      medium: '#ca8a04',
+      low: '#16a34a'
+    };
+    return colors[priority];
   }
 
-  private getStatusColor(status: Task['status']): string {
-    switch (status) {
-      case 'open': return '#6b7280';
-      case 'in_progress': return '#2563eb';
-      case 'review': return '#7c3aed';
-      case 'done': return '#16a34a';
-    }
+  private getStatusBadgeColor(status: Task['status']): string {
+    const colors = {
+      open: '#6b7280',
+      in_progress: '#2563eb',
+      review: '#7c3aed',
+      done: '#16a34a'
+    };
+    return colors[status];
   }
 
   private getStatusTransitions(currentStatus: Task['status']): Task['status'][] {
-    switch (currentStatus) {
-      case 'open': return ['in_progress'];
-      case 'in_progress': return ['review', 'open'];
-      case 'review': return ['done', 'in_progress'];
-      case 'done': return ['open'];
-    }
+    const transitions: Record<Task['status'], Task['status'][]> = {
+      open: ['in_progress'],
+      in_progress: ['review', 'open'],
+      review: ['done', 'in_progress'],
+      done: ['open']
+    };
+    return transitions[currentStatus];
   }
 
   private formatDate(date: Date): string {
@@ -92,115 +95,48 @@ export class TaskListDisplay {
     });
   }
 
-  private renderTaskCard(task: Task): string {
-    const isOverdue = this.isOverdue(task);
-    const priorityColor = this.getPriorityColor(task.priority);
-    const statusColor = this.getStatusColor(task.status);
+  private generateTaskCard(task: Task): string {
+    const isTaskOverdue = this.isOverdue(task);
+    const priorityColor = this.getPriorityBadgeColor(task.priority);
+    const statusColor = this.getStatusBadgeColor(task.status);
     const transitions = this.getStatusTransitions(task.status);
 
-    const cardStyle = `
-      border: 2px solid ${isOverdue ? '#dc2626' : '#e5e7eb'};
-      border-radius: 8px;
-      padding: 16px;
-      background: white;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      position: relative;
-      cursor: pointer;
-      transition: box-shadow 0.2s;
-    `;
+    const overdueIndicator = isTaskOverdue 
+      ? '<div class="overdue-indicator">OVERDUE</div>' 
+      : '';
 
-    const titleStyle = `
-      font-size: 18px;
-      font-weight: 600;
-      color: #111827;
-      margin: 0;
-      line-height: 1.4;
-    `;
-
-    const descriptionStyle = `
-      color: #6b7280;
-      font-size: 14px;
-      line-height: 1.5;
-      margin: 0;
-    `;
-
-    const badgeStyle = `
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 500;
-      text-transform: uppercase;
-      color: white;
-    `;
-
-    const buttonStyle = `
-      padding: 6px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      background: white;
-      color: #374151;
-      font-size: 12px;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    `;
-
-    const overdueIndicator = isOverdue ? `
-      <div style="
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        background: #dc2626;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 10px;
-        font-weight: 600;
-      ">OVERDUE</div>
-    ` : '';
-
-    const transitionButtons = transitions.map(status => `
-      <button 
-        style="${buttonStyle}"
-        onclick="window.taskListDisplay?.handleStatusChange('${task.id}', '${status}')"
-        onmouseover="this.style.backgroundColor='#f3f4f6'"
-        onmouseout="this.style.backgroundColor='white'"
-      >
+    const transitionButtons = transitions.map(status => 
+      `<button class="status-transition-btn" data-task-id="${task.id}" data-new-status="${status}">
         ${status.replace('_', ' ').toUpperCase()}
-      </button>
-    `).join('');
+      </button>`
+    ).join('');
 
     return `
-      <div 
-        style="${cardStyle}"
-        onclick="window.taskListDisplay?.handleTaskClick('${task.id}')"
-        onmouseover="this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)'"
-        onmouseout="this.style.boxShadow='0 1px 3px rgba(0, 0, 0, 0.1)'"
-      >
+      <div class="task-card ${isTaskOverdue ? 'overdue' : ''}" data-task-id="${task.id}">
         ${overdueIndicator}
-        
-        <h3 style="${titleStyle}">${this.escapeHtml(task.title)}</h3>
-        
-        <p style="${descriptionStyle}">${this.escapeHtml(task.description)}</p>
-        
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <span style="${badgeStyle}; background-color: ${priorityColor};">
-            ${task.priority}
-          </span>
-          <span style="${badgeStyle}; background-color: ${statusColor};">
-            ${task.status.replace('_', ' ')}
-          </span>
+        <div class="task-header">
+          <h3 class="task-title">${this.escapeHtml(task.title)}</h3>
+          <div class="task-badges">
+            <span class="priority-badge" style="background-color: ${priorityColor}">
+              ${task.priority.toUpperCase()}
+            </span>
+            <span class="status-badge" style="background-color: ${statusColor}">
+              ${task.status.replace('_', ' ').toUpperCase()}
+            </span>
+          </div>
         </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #6b7280;">
-          <span>Assigned to: ${this.escapeHtml(task.assignee)}</span>
-          <span>Due: ${this.formatDate(task.deadline)}</span>
+        <div class="task-description">
+          ${this.escapeHtml(task.description)}
         </div>
-        
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+        <div class="task-meta">
+          <div class="task-assignee">
+            <strong>Assignee:</strong> ${this.escapeHtml(task.assignee)}
+          </div>
+          <div class="task-deadline">
+            <strong>Deadline:</strong> ${this.formatDate(task.deadline)}
+          </div>
+        </div>
+        <div class="task-actions">
           ${transitionButtons}
         </div>
       </div>
@@ -224,184 +160,180 @@ export class TaskListDisplay {
 
   render(): string {
     const filteredTasks = this.getFilteredTasks();
-
-    const gridStyle = `
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 20px;
-      padding: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-    `;
-
-    const emptyStateStyle = `
-      text-align: center;
-      padding: 40px;
-      color: #6b7280;
-      font-size: 16px;
-    `;
-
+    
     if (filteredTasks.length === 0) {
       return `
-        <div style="${emptyStateStyle}">
-          No tasks match the current filters.
+        <div class="task-list-empty">
+          <p>No tasks match the current filters.</p>
         </div>
       `;
     }
 
-    const taskCards = filteredTasks.map(task => this.renderTaskCard(task)).join('');
+    const taskCards = filteredTasks.map(task => this.generateTaskCard(task)).join('');
 
     return `
-      <div style="${gridStyle}">
-        ${taskCards}
-      </div>
-      <script>
-        window.taskListDisplay = {
-          handleStatusChange: (taskId, newStatus) => {
-            if (window.taskListDisplayInstance?.options.onStatusChange) {
-              window.taskListDisplayInstance.options.onStatusChange(taskId, newStatus);
+      <div class="task-list-display">
+        <style>
+          .task-list-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+          }
+          
+          .task-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+          }
+          
+          .task-card:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          }
+          
+          .task-card.overdue {
+            border-color: #dc2626;
+            border-width: 2px;
+          }
+          
+          .overdue-indicator {
+            background: #dc2626;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+          }
+          
+          .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+          }
+          
+          .task-title {
+            margin: 0;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111827;
+            flex: 1;
+            margin-right: 0.5rem;
+          }
+          
+          .task-badges {
+            display: flex;
+            gap: 0.5rem;
+            flex-shrink: 0;
+          }
+          
+          .priority-badge,
+          .status-badge {
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+          }
+          
+          .task-description {
+            color: #6b7280;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+          }
+          
+          .task-meta {
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+          }
+          
+          .task-assignee,
+          .task-deadline {
+            margin-bottom: 0.25rem;
+          }
+          
+          .task-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+          }
+          
+          .status-transition-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+          }
+          
+          .status-transition-btn:hover {
+            background: #2563eb;
+          }
+          
+          .task-list-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+          }
+          
+          @media (max-width: 768px) {
+            .task-list-display {
+              grid-template-columns: 1fr;
+              padding: 0.5rem;
             }
-          },
-          handleTaskClick: (taskId) => {
-            if (window.taskListDisplayInstance?.options.onTaskClick) {
-              const task = window.taskListDisplayInstance.tasks.find(t => t.id === taskId);
-              if (task) {
-                window.taskListDisplayInstance.options.onTaskClick(task);
-              }
+            
+            .task-header {
+              flex-direction: column;
+              align-items: flex-start;
+            }
+            
+            .task-badges {
+              margin-top: 0.5rem;
             }
           }
-        };
-      </script>
+        </style>
+        ${taskCards}
+      </div>
     `;
   }
 
-  attachToGlobal(): void {
-    (globalThis as any).taskListDisplayInstance = this;
+  attachEventListeners(container: HTMLElement): void {
+    container.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      
+      if (target.classList.contains('status-transition-btn')) {
+        const taskId = target.getAttribute('data-task-id');
+        const newStatus = target.getAttribute('data-new-status') as Task['status'];
+        
+        if (taskId && newStatus && this.options.onStatusChange) {
+          this.options.onStatusChange(taskId, newStatus);
+        }
+      } else if (target.closest('.task-card')) {
+        const taskCard = target.closest('.task-card') as HTMLElement;
+        const taskId = taskCard.getAttribute('data-task-id');
+        const task = this.tasks.find(t => t.id === taskId);
+        
+        if (task && this.options.onTaskClick) {
+          this.options.onTaskClick(task);
+        }
+      }
+    });
   }
 }
 
 export function createTaskListDisplay(options?: TaskListDisplayOptions): TaskListDisplay {
-  const display = new TaskListDisplay(options);
-  display.attachToGlobal();
-  return display;
-}
-
-export function renderTaskFilter(
-  availableStatuses: Task['status'][],
-  availablePriorities: Task['priority'][],
-  availableAssignees: string[],
-  currentFilter: TaskFilter,
-  onFilterChange: (filter: TaskFilter) => void
-): string {
-  const filterStyle = `
-    display: flex;
-    gap: 16px;
-    padding: 16px;
-    background: #f9fafb;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  `;
-
-  const selectStyle = `
-    padding: 8px 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    background: white;
-    font-size: 14px;
-  `;
-
-  const labelStyle = `
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 4px;
-    display: block;
-  `;
-
-  return `
-    <div style="${filterStyle}">
-      <div>
-        <label style="${labelStyle}">Status:</label>
-        <select 
-          style="${selectStyle}" 
-          multiple
-          onchange="window.updateFilter('status', Array.from(this.selectedOptions).map(o => o.value))"
-        >
-          ${availableStatuses.map(status => `
-            <option value="${status}" ${currentFilter.status?.includes(status) ? 'selected' : ''}>
-              ${status.replace('_', ' ').toUpperCase()}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-      
-      <div>
-        <label style="${labelStyle}">Priority:</label>
-        <select 
-          style="${selectStyle}" 
-          multiple
-          onchange="window.updateFilter('priority', Array.from(this.selectedOptions).map(o => o.value))"
-        >
-          ${availablePriorities.map(priority => `
-            <option value="${priority}" ${currentFilter.priority?.includes(priority) ? 'selected' : ''}>
-              ${priority.toUpperCase()}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-      
-      <div>
-        <label style="${labelStyle}">Assignee:</label>
-        <select 
-          style="${selectStyle}" 
-          multiple
-          onchange="window.updateFilter('assignee', Array.from(this.selectedOptions).map(o => o.value))"
-        >
-          ${availableAssignees.map(assignee => `
-            <option value="${assignee}" ${currentFilter.assignee?.includes(assignee) ? 'selected' : ''}>
-              ${assignee}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-      
-      <button 
-        style="${selectStyle}; cursor: pointer; background: #ef4444; color: white; border-color: #dc2626;"
-        onclick="window.clearFilters()"
-      >
-        Clear Filters
-      </button>
-    </div>
-    
-    <script>
-      window.updateFilter = (type, values) => {
-        const newFilter = { ...window.currentTaskFilter };
-        if (values.length === 0) {
-          delete newFilter[type];
-        } else {
-          newFilter[type] = values;
-        }
-        window.currentTaskFilter = newFilter;
-        if (window.onTaskFilterChange) {
-          window.onTaskFilterChange(newFilter);
-        }
-      };
-      
-      window.clearFilters = () => {
-        window.currentTaskFilter = {};
-        if (window.onTaskFilterChange) {
-          window.onTaskFilterChange({});
-        }
-        // Reset all selects
-        document.querySelectorAll('select').forEach(select => {
-          select.selectedIndex = -1;
-        });
-      };
-      
-      window.currentTaskFilter = ${JSON.stringify(currentFilter)};
-      window.onTaskFilterChange = ${onFilterChange.toString()};
-    </script>
-  `;
+  return new TaskListDisplay(options);
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */

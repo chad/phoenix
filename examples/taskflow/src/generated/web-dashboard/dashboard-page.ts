@@ -4,14 +4,7 @@ export interface Task {
   description: string;
   priority: 'low' | 'medium' | 'high';
   deadline?: string;
-  createdAt: string;
-}
-
-export interface TaskFormData {
-  title: string;
-  description: string;
-  priority: 'low' | 'medium' | 'high';
-  deadline?: string;
+  createdAt: Date;
 }
 
 export interface DashboardState {
@@ -21,17 +14,20 @@ export interface DashboardState {
 
 export class DashboardPage {
   private tasks: Task[] = [];
+  private taskIdCounter = 1;
 
-  public addTask(formData: TaskFormData): Task {
-    this.validateTaskForm(formData);
-    
+  public addTask(title: string, description: string, priority: 'low' | 'medium' | 'high', deadline?: string): Task {
+    if (!title.trim()) {
+      throw new Error('Task title cannot be empty');
+    }
+
     const task: Task = {
-      id: this.generateId(),
-      title: formData.title.trim(),
-      description: formData.description.trim(),
-      priority: formData.priority,
-      deadline: formData.deadline || undefined,
-      createdAt: new Date().toISOString(),
+      id: `task-${this.taskIdCounter++}`,
+      title: title.trim(),
+      description: description.trim(),
+      priority,
+      deadline: deadline || undefined,
+      createdAt: new Date()
     };
 
     this.tasks.push(task);
@@ -48,7 +44,8 @@ export class DashboardPage {
 
   public renderHTML(): string {
     const taskCount = this.getTaskCount();
-    
+    const tasks = this.getTasks();
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -61,7 +58,6 @@ export class DashboardPage {
             --danger: #dc2626;
             --success: #16a34a;
             --warning: #d97706;
-            --primary-light: #dbeafe;
             --gray-50: #f9fafb;
             --gray-100: #f3f4f6;
             --gray-200: #e5e7eb;
@@ -104,17 +100,17 @@ export class DashboardPage {
         }
 
         .logo {
-            font-size: 1.75rem;
-            font-weight: 700;
+            font-size: 1.5rem;
+            font-weight: bold;
             color: var(--primary);
         }
 
         .task-summary {
-            background: var(--primary-light);
+            background: var(--primary);
+            color: white;
             padding: 0.5rem 1rem;
             border-radius: 0.5rem;
-            font-weight: 600;
-            color: var(--primary);
+            font-weight: 500;
         }
 
         .main-content {
@@ -126,7 +122,7 @@ export class DashboardPage {
 
         .card {
             background: white;
-            border-radius: 0.75rem;
+            border-radius: 0.5rem;
             padding: 1.5rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
@@ -134,7 +130,7 @@ export class DashboardPage {
         .card-title {
             font-size: 1.25rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             color: var(--gray-800);
         }
 
@@ -145,24 +141,23 @@ export class DashboardPage {
         .form-label {
             display: block;
             font-weight: 500;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
             color: var(--gray-700);
         }
 
         .form-input,
-        .form-select,
-        .form-textarea {
+        .form-textarea,
+        .form-select {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.5rem;
             border: 1px solid var(--gray-300);
-            border-radius: 0.5rem;
+            border-radius: 0.25rem;
             font-size: 0.875rem;
-            transition: border-color 0.2s;
         }
 
         .form-input:focus,
-        .form-select:focus,
-        .form-textarea:focus {
+        .form-textarea:focus,
+        .form-select:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
@@ -170,20 +165,16 @@ export class DashboardPage {
 
         .form-textarea {
             resize: vertical;
-            min-height: 80px;
+            min-height: 4rem;
         }
 
         .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.75rem 1.5rem;
+            padding: 0.5rem 1rem;
             border: none;
-            border-radius: 0.5rem;
+            border-radius: 0.25rem;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
+            transition: background-color 0.2s;
         }
 
         .btn-primary {
@@ -200,41 +191,6 @@ export class DashboardPage {
             cursor: not-allowed;
         }
 
-        .error-message {
-            color: var(--danger);
-            font-size: 0.875rem;
-            margin-top: 0.25rem;
-            display: none;
-        }
-
-        .error-message.show {
-            display: block;
-        }
-
-        .priority-badge {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .priority-low {
-            background: var(--success);
-            color: white;
-        }
-
-        .priority-medium {
-            background: var(--warning);
-            color: white;
-        }
-
-        .priority-high {
-            background: var(--danger);
-            color: white;
-        }
-
         .task-list {
             display: flex;
             flex-direction: column;
@@ -242,22 +198,28 @@ export class DashboardPage {
         }
 
         .task-item {
-            padding: 1rem;
-            border: 1px solid var(--gray-200);
+            background: white;
             border-radius: 0.5rem;
-            background: var(--gray-50);
+            padding: 1rem;
+            border-left: 4px solid var(--gray-300);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
-        .task-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 0.5rem;
+        .task-item.priority-high {
+            border-left-color: var(--danger);
+        }
+
+        .task-item.priority-medium {
+            border-left-color: var(--warning);
+        }
+
+        .task-item.priority-low {
+            border-left-color: var(--success);
         }
 
         .task-title {
             font-weight: 600;
-            color: var(--gray-800);
+            margin-bottom: 0.5rem;
         }
 
         .task-description {
@@ -268,8 +230,37 @@ export class DashboardPage {
         .task-meta {
             display: flex;
             gap: 1rem;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: var(--gray-500);
+        }
+
+        .priority-badge {
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.625rem;
+        }
+
+        .priority-high {
+            background: rgba(220, 38, 38, 0.1);
+            color: var(--danger);
+        }
+
+        .priority-medium {
+            background: rgba(217, 119, 6, 0.1);
+            color: var(--warning);
+        }
+
+        .priority-low {
+            background: rgba(22, 163, 74, 0.1);
+            color: var(--success);
+        }
+
+        .error-message {
+            color: var(--danger);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
         }
 
         @media (max-width: 768px) {
@@ -290,193 +281,164 @@ export class DashboardPage {
             <div class="header-content">
                 <h1 class="logo">TaskFlow</h1>
                 <div class="task-summary">
-                    <span id="task-count">${taskCount}</span> tasks
+                    Total Tasks: <span id="taskCount">${taskCount}</span>
                 </div>
             </div>
         </div>
     </header>
 
-    <div class="container">
+    <main class="container">
         <div class="main-content">
             <div class="card">
                 <h2 class="card-title">Create New Task</h2>
-                <form id="task-form">
+                <form id="taskForm">
                     <div class="form-group">
                         <label class="form-label" for="title">Title *</label>
-                        <input type="text" id="title" name="title" class="form-input" required>
-                        <div class="error-message" id="title-error">Title is required</div>
+                        <input type="text" id="title" class="form-input" required>
+                        <div id="titleError" class="error-message" style="display: none;"></div>
                     </div>
-
+                    
                     <div class="form-group">
                         <label class="form-label" for="description">Description</label>
-                        <textarea id="description" name="description" class="form-textarea" rows="3"></textarea>
+                        <textarea id="description" class="form-textarea"></textarea>
                     </div>
-
+                    
                     <div class="form-group">
                         <label class="form-label" for="priority">Priority</label>
-                        <select id="priority" name="priority" class="form-select">
+                        <select id="priority" class="form-select">
                             <option value="low">Low</option>
                             <option value="medium" selected>Medium</option>
                             <option value="high">High</option>
                         </select>
                     </div>
-
+                    
                     <div class="form-group">
                         <label class="form-label" for="deadline">Deadline (Optional)</label>
-                        <input type="date" id="deadline" name="deadline" class="form-input">
+                        <input type="date" id="deadline" class="form-input">
                     </div>
-
+                    
                     <button type="submit" class="btn btn-primary">Create Task</button>
                 </form>
             </div>
 
             <div class="card">
-                <h2 class="card-title">Recent Tasks</h2>
-                <div class="task-list" id="task-list">
-                    ${this.renderTaskList()}
+                <h2 class="card-title">Tasks</h2>
+                <div id="taskList" class="task-list">
+                    ${tasks.length === 0 ? '<p style="color: var(--gray-600); text-align: center; padding: 2rem;">No tasks yet. Create your first task!</p>' : 
+                      tasks.map(task => this.renderTaskItem(task)).join('')}
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
-        (function() {
-            const form = document.getElementById('task-form');
-            const titleInput = document.getElementById('title');
-            const titleError = document.getElementById('title-error');
-            const taskCountEl = document.getElementById('task-count');
-            const taskList = document.getElementById('task-list');
+        let tasks = ${JSON.stringify(tasks)};
+        let taskIdCounter = ${this.taskIdCounter};
 
-            function validateTitle() {
-                const title = titleInput.value.trim();
-                if (!title) {
-                    titleError.classList.add('show');
-                    titleInput.style.borderColor = 'var(--danger)';
-                    return false;
-                } else {
-                    titleError.classList.remove('show');
-                    titleInput.style.borderColor = '';
-                    return true;
-                }
-            }
+        function updateTaskCount() {
+            document.getElementById('taskCount').textContent = tasks.length;
+        }
 
-            function formatDate(dateString) {
-                if (!dateString) return '';
-                return new Date(dateString).toLocaleDateString();
-            }
-
-            function createTaskElement(task) {
-                return \`
-                    <div class="task-item">
-                        <div class="task-header">
-                            <h3 class="task-title">\${task.title}</h3>
-                            <span class="priority-badge priority-\${task.priority}">\${task.priority}</span>
-                        </div>
-                        \${task.description ? \`<p class="task-description">\${task.description}</p>\` : ''}
-                        <div class="task-meta">
-                            <span>Created: \${formatDate(task.createdAt)}</span>
-                            \${task.deadline ? \`<span>Due: \${formatDate(task.deadline)}</span>\` : ''}
-                        </div>
+        function renderTaskItem(task) {
+            const deadline = task.deadline ? new Date(task.deadline).toLocaleDateString() : null;
+            const createdAt = new Date(task.createdAt).toLocaleDateString();
+            
+            return \`
+                <div class="task-item priority-\${task.priority}">
+                    <div class="task-title">\${task.title}</div>
+                    <div class="task-description">\${task.description}</div>
+                    <div class="task-meta">
+                        <span class="priority-badge priority-\${task.priority}">\${task.priority}</span>
+                        <span>Created: \${createdAt}</span>
+                        \${deadline ? \`<span>Due: \${deadline}</span>\` : ''}
                     </div>
-                \`;
+                </div>
+            \`;
+        }
+
+        function renderTaskList() {
+            const taskList = document.getElementById('taskList');
+            if (tasks.length === 0) {
+                taskList.innerHTML = '<p style="color: var(--gray-600); text-align: center; padding: 2rem;">No tasks yet. Create your first task!</p>';
+            } else {
+                taskList.innerHTML = tasks.map(renderTaskItem).join('');
             }
+        }
 
-            titleInput.addEventListener('blur', validateTitle);
-            titleInput.addEventListener('input', function() {
-                if (titleError.classList.contains('show')) {
-                    validateTitle();
-                }
-            });
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
 
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                if (!validateTitle()) {
-                    return;
-                }
+        function hideError(elementId) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.style.display = 'none';
+        }
 
-                const formData = new FormData(form);
-                const task = {
-                    id: Date.now().toString(),
-                    title: formData.get('title').trim(),
-                    description: formData.get('description').trim(),
-                    priority: formData.get('priority'),
-                    deadline: formData.get('deadline') || null,
-                    createdAt: new Date().toISOString()
-                };
+        function validateTitle(title) {
+            if (!title.trim()) {
+                showError('titleError', 'Task title cannot be empty');
+                return false;
+            }
+            hideError('titleError');
+            return true;
+        }
 
-                // Add task to list
-                const taskElement = createTaskElement(task);
-                if (taskList.children.length === 0 || taskList.textContent.includes('No tasks yet')) {
-                    taskList.innerHTML = taskElement;
-                } else {
-                    taskList.insertAdjacentHTML('afterbegin', taskElement);
-                }
+        document.getElementById('taskForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            const priority = document.getElementById('priority').value;
+            const deadline = document.getElementById('deadline').value;
+            
+            if (!validateTitle(title)) {
+                return;
+            }
+            
+            const task = {
+                id: \`task-\${taskIdCounter++}\`,
+                title: title.trim(),
+                description: description.trim(),
+                priority: priority,
+                deadline: deadline || undefined,
+                createdAt: new Date()
+            };
+            
+            tasks.push(task);
+            updateTaskCount();
+            renderTaskList();
+            
+            // Reset form
+            this.reset();
+            document.getElementById('priority').value = 'medium';
+        });
 
-                // Update task count
-                const currentCount = parseInt(taskCountEl.textContent);
-                taskCountEl.textContent = currentCount + 1;
-
-                // Reset form
-                form.reset();
-                document.getElementById('priority').value = 'medium';
-            });
-        })();
+        // Real-time title validation
+        document.getElementById('title').addEventListener('input', function() {
+            validateTitle(this.value);
+        });
     </script>
 </body>
 </html>`;
   }
 
-  private validateTaskForm(formData: TaskFormData): void {
-    if (!formData.title || formData.title.trim().length === 0) {
-      throw new Error('Title is required');
-    }
-  }
-
-  private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-  }
-
-  private renderTaskList(): string {
-    if (this.tasks.length === 0) {
-      return '<p style="color: var(--gray-500); text-align: center; padding: 2rem;">No tasks yet. Create your first task!</p>';
-    }
-
-    return this.tasks
-      .slice(-5) // Show last 5 tasks
-      .reverse()
-      .map(task => `
-        <div class="task-item">
-          <div class="task-header">
-            <h3 class="task-title">${this.escapeHtml(task.title)}</h3>
-            <span class="priority-badge priority-${task.priority}">${task.priority}</span>
-          </div>
-          ${task.description ? `<p class="task-description">${this.escapeHtml(task.description)}</p>` : ''}
-          <div class="task-meta">
-            <span>Created: ${this.formatDate(task.createdAt)}</span>
-            ${task.deadline ? `<span>Due: ${this.formatDate(task.deadline)}</span>` : ''}
-          </div>
+  private renderTaskItem(task: Task): string {
+    const deadline = task.deadline ? new Date(task.deadline).toLocaleDateString() : null;
+    const createdAt = task.createdAt.toLocaleDateString();
+    
+    return `
+        <div class="task-item priority-${task.priority}">
+            <div class="task-title">${task.title}</div>
+            <div class="task-description">${task.description}</div>
+            <div class="task-meta">
+                <span class="priority-badge priority-${task.priority}">${task.priority}</span>
+                <span>Created: ${createdAt}</span>
+                ${deadline ? `<span>Due: ${deadline}</span>` : ''}
+            </div>
         </div>
-      `).join('');
-  }
-
-  private escapeHtml(text: string): string {
-    const div = { innerHTML: '' } as any;
-    div.textContent = text;
-    return div.innerHTML || text.replace(/[&<>"']/g, (match: string) => {
-      const escapeMap: Record<string, string> = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-      };
-      return escapeMap[match];
-    });
-  }
-
-  private formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString();
+    `;
   }
 }
 

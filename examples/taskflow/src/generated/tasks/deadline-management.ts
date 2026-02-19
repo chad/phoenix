@@ -1,98 +1,139 @@
+export interface TaskDeadline {
+  taskId: string;
+  deadline: Date;
+  isOverdue: boolean;
+  daysOverdue: number;
+}
+
 export interface Task {
   id: string;
   title: string;
   description?: string;
-  completed: boolean;
+  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
   deadline?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface DeadlineWarning {
-  taskId: string;
   message: string;
-  timestamp: Date;
-}
-
-export interface OverdueTask {
-  task: Task;
-  daysPastDeadline: number;
+  taskId: string;
+  deadline: Date;
+  currentDate: Date;
 }
 
 export class DeadlineManager {
   private tasks = new Map<string, Task>();
-  private warnings: DeadlineWarning[] = [];
+  private warningCallbacks: Array<(warning: DeadlineWarning) => void> = [];
 
-  setTaskDeadline(taskId: string, deadline: Date): DeadlineWarning | null {
-    const task = this.tasks.get(taskId);
-    if (!task) {
-      throw new Error(`Task with id ${taskId} not found`);
-    }
-
-    const now = new Date();
-    let warning: DeadlineWarning | null = null;
-
-    if (deadline < now) {
-      warning = {
-        taskId,
-        message: `Warning: Deadline set in the past (${deadline.toISOString()})`,
-        timestamp: now
+  addTask(task: Task): void {
+    if (task.deadline && this.isDateInPast(task.deadline)) {
+      const warning: DeadlineWarning = {
+        message: `Warning: Task "${task.title}" has a deadline in the past (${task.deadline.toISOString()})`,
+        taskId: task.id,
+        deadline: task.deadline,
+        currentDate: new Date()
       };
-      this.warnings.push(warning);
+      this.emitWarning(warning);
     }
-
-    task.deadline = deadline;
-    task.updatedAt = now;
-
-    return warning;
+    this.tasks.set(task.id, { ...task });
   }
 
-  addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Task {
-    const now = new Date();
-    const newTask: Task = {
-      ...task,
-      id: this.generateId(),
-      createdAt: now,
-      updatedAt: now
-    };
-
-    if (newTask.deadline && newTask.deadline < now) {
-      const warning: DeadlineWarning = {
-        taskId: newTask.id,
-        message: `Warning: Task created with deadline in the past (${newTask.deadline.toISOString()})`,
-        timestamp: now
-      };
-      this.warnings.push(warning);
-    }
-
-    this.tasks.set(newTask.id, newTask);
-    return newTask;
-  }
-
-  updateTask(taskId: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>): Task {
+  updateTask(taskId: string, updates: Partial<Task>): boolean {
     const task = this.tasks.get(taskId);
     if (!task) {
-      throw new Error(`Task with id ${taskId} not found`);
+      return false;
     }
 
-    const now = new Date();
-    const updatedTask: Task = {
-      ...task,
-      ...updates,
-      updatedAt: now
-    };
+    const updatedTask = { ...task, ...updates, updatedAt: new Date() };
 
-    if (updates.deadline && updates.deadline < now && !task.completed) {
+    if (updates.deadline && this.isDateInPast(updates.deadline)) {
       const warning: DeadlineWarning = {
-        taskId,
-        message: `Warning: Deadline updated to past date (${updates.deadline.toISOString()})`,
-        timestamp: now
+        message: `Warning: Task "${updatedTask.title}" deadline updated to a past date (${updates.deadline.toISOString()})`,
+        taskId: taskId,
+        deadline: updates.deadline,
+        currentDate: new Date()
       };
-      this.warnings.push(warning);
+      this.emitWarning(warning);
     }
 
     this.tasks.set(taskId, updatedTask);
-    return updatedTask;
+    return true;
+  }
+
+  setDeadline(taskId: string, deadline: Date): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return false;
+    }
+
+    if (this.isDateInPast(deadline)) {
+      const warning: DeadlineWarning = {
+        message: `Warning: Setting deadline in the past for task "${task.title}" (${deadline.toISOString()})`,
+        taskId: taskId,
+        deadline: deadline,
+        currentDate: new Date()
+      };
+      this.emitWarning(warning);
+    }
+
+    const updatedTask = { ...task, deadline, updatedAt: new Date() };
+    this.tasks.set(taskId, updatedTask);
+    return true;
+  }
+
+  removeDeadline(taskId: string): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return false;
+    }
+
+    const updatedTask = { ...task, deadline: undefined, updatedAt: new Date() };
+    this.tasks.set(taskId, updatedTask);
+    return true;
+  }
+
+  getOverdueTasks(): TaskDeadline[] {
+    const now = new Date();
+    const overdueTasks: TaskDeadline[] = [];
+
+    for (const task of this.tasks.values()) {
+      if (task.deadline && task.status !== 'completed' && task.status !== 'cancelled') {
+        const isOverdue = now > task.deadline;
+        if (isOverdue) {
+          const daysOverdue = Math.ceil((now.getTime() - task.deadline.getTime()) / (1000 * 60 * 60 * 24));
+          overdueTasks.push({
+            taskId: task.id,
+            deadline: task.deadline,
+            isOverdue: true,
+            daysOverdue
+          });
+        }
+      }
+    }
+
+    return overdueTasks.sort((a, b) => b.daysOverdue - a.daysOverdue);
+  }
+
+  getTasksWithDeadlines(): TaskDeadline[] {
+    const now = new Date();
+    const tasksWithDeadlines: TaskDeadline[] = [];
+
+    for (const task of this.tasks.values()) {
+      if (task.deadline) {
+        const isOverdue = now > task.deadline && task.status !== 'completed' && task.status !== 'cancelled';
+        const daysOverdue = isOverdue ? Math.ceil((now.getTime() - task.deadline.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+        
+        tasksWithDeadlines.push({
+          taskId: task.id,
+          deadline: task.deadline,
+          isOverdue,
+          daysOverdue
+        });
+      }
+    }
+
+    return tasksWithDeadlines.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
   }
 
   getTask(taskId: string): Task | undefined {
@@ -103,43 +144,29 @@ export class DeadlineManager {
     return Array.from(this.tasks.values());
   }
 
-  getOverdueTasks(): OverdueTask[] {
-    const now = new Date();
-    const overdueTasks: OverdueTask[] = [];
+  onWarning(callback: (warning: DeadlineWarning) => void): void {
+    this.warningCallbacks.push(callback);
+  }
 
-    for (const task of this.tasks.values()) {
-      if (task.deadline && !task.completed && task.deadline < now) {
-        const daysPastDeadline = Math.floor(
-          (now.getTime() - task.deadline.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        overdueTasks.push({
-          task,
-          daysPastDeadline
-        });
+  removeWarningCallback(callback: (warning: DeadlineWarning) => void): void {
+    const index = this.warningCallbacks.indexOf(callback);
+    if (index > -1) {
+      this.warningCallbacks.splice(index, 1);
+    }
+  }
+
+  private isDateInPast(date: Date): boolean {
+    return date < new Date();
+  }
+
+  private emitWarning(warning: DeadlineWarning): void {
+    for (const callback of this.warningCallbacks) {
+      try {
+        callback(warning);
+      } catch (error) {
+        // Silently continue if callback throws
       }
     }
-
-    return overdueTasks.sort((a, b) => b.daysPastDeadline - a.daysPastDeadline);
-  }
-
-  isTaskOverdue(taskId: string): boolean {
-    const task = this.tasks.get(taskId);
-    if (!task || !task.deadline || task.completed) {
-      return false;
-    }
-    return task.deadline < new Date();
-  }
-
-  getWarnings(): DeadlineWarning[] {
-    return [...this.warnings];
-  }
-
-  clearWarnings(): void {
-    this.warnings = [];
-  }
-
-  private generateId(): string {
-    return Math.random().toString(36).substring(2) + Date.now().toString(36);
   }
 }
 
@@ -147,10 +174,18 @@ export function createDeadlineManager(): DeadlineManager {
   return new DeadlineManager();
 }
 
-export function calculateDaysUntilDeadline(deadline: Date): number {
-  const now = new Date();
-  const diffTime = deadline.getTime() - now.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+export function isTaskOverdue(task: Task): boolean {
+  if (!task.deadline || task.status === 'completed' || task.status === 'cancelled') {
+    return false;
+  }
+  return new Date() > task.deadline;
+}
+
+export function getDaysOverdue(task: Task): number {
+  if (!isTaskOverdue(task) || !task.deadline) {
+    return 0;
+  }
+  return Math.ceil((new Date().getTime() - task.deadline.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function formatDeadlineStatus(task: Task): string {
@@ -158,20 +193,27 @@ export function formatDeadlineStatus(task: Task): string {
     return 'No deadline';
   }
 
-  if (task.completed) {
+  if (task.status === 'completed') {
     return 'Completed';
   }
 
-  const daysUntil = calculateDaysUntilDeadline(task.deadline);
-  
-  if (daysUntil < 0) {
-    return `Overdue by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'}`;
-  } else if (daysUntil === 0) {
+  if (task.status === 'cancelled') {
+    return 'Cancelled';
+  }
+
+  const now = new Date();
+  if (now > task.deadline) {
+    const daysOverdue = getDaysOverdue(task);
+    return `Overdue by ${daysOverdue} day${daysOverdue === 1 ? '' : 's'}`;
+  }
+
+  const daysUntilDeadline = Math.ceil((task.deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysUntilDeadline === 0) {
     return 'Due today';
-  } else if (daysUntil === 1) {
+  } else if (daysUntilDeadline === 1) {
     return 'Due tomorrow';
   } else {
-    return `Due in ${daysUntil} days`;
+    return `Due in ${daysUntilDeadline} days`;
   }
 }
 

@@ -21,8 +21,8 @@ export function calculateCompletionRate(completed: number, total: number): numbe
   return Math.round((completed / total) * 100);
 }
 
-export function formatMetricValue(value: number, type: 'count' | 'percentage'): string {
-  if (type === 'percentage') {
+export function formatMetricValue(value: number, isPercentage: boolean = false): string {
+  if (isPercentage) {
     return `${value}%`;
   }
   return value.toString();
@@ -32,22 +32,22 @@ export function createMetricCards(stats: TaskStats): MetricCard[] {
   return [
     {
       name: 'Total Tasks',
-      value: formatMetricValue(stats.totalTasks, 'count'),
+      value: formatMetricValue(stats.totalTasks),
       emoji: '📋'
     },
     {
       name: 'Completed',
-      value: formatMetricValue(stats.completedCount, 'count'),
+      value: formatMetricValue(stats.completedCount),
       emoji: '✅'
     },
     {
       name: 'Overdue',
-      value: formatMetricValue(stats.overdueCount, 'count'),
+      value: formatMetricValue(stats.overdueCount),
       emoji: '⚠️'
     },
     {
       name: 'Completion Rate',
-      value: formatMetricValue(stats.completionRate, 'percentage'),
+      value: formatMetricValue(stats.completionRate, true),
       emoji: '📊'
     }
   ];
@@ -67,13 +67,16 @@ export function renderMetricCard(card: MetricCard): string {
 
 export function renderAnalyticsPanel(options: AnalyticsPanelOptions): string {
   const { stats, className = 'analytics-panel' } = options;
-  const cards = createMetricCards(stats);
-  const cardHtml = cards.map(renderMetricCard).join('\n');
+  const metricCards = createMetricCards(stats);
+  
+  const cardsHtml = metricCards
+    .map(card => renderMetricCard(card))
+    .join('\n');
 
   return `
     <div class="${className}">
       <div class="metrics-row">
-        ${cardHtml}
+        ${cardsHtml}
       </div>
     </div>
   `.trim();
@@ -83,17 +86,13 @@ export class AnalyticsPanel {
   private stats: TaskStats;
   private className: string;
 
-  constructor(stats: TaskStats, className = 'analytics-panel') {
+  constructor(stats: TaskStats, className: string = 'analytics-panel') {
     this.stats = stats;
     this.className = className;
   }
 
   updateStats(newStats: TaskStats): void {
     this.stats = { ...newStats };
-    this.stats.completionRate = calculateCompletionRate(
-      newStats.completedCount,
-      newStats.totalTasks
-    );
   }
 
   getStats(): TaskStats {
@@ -105,10 +104,6 @@ export class AnalyticsPanel {
       stats: this.stats,
       className: this.className
     });
-  }
-
-  getMetricCards(): MetricCard[] {
-    return createMetricCards(this.stats);
   }
 }
 

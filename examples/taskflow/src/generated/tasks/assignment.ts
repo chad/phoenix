@@ -1,65 +1,66 @@
 export interface AssignmentRecord {
   taskId: string;
-  assigneeId: string | null;
+  userId: string | null;
   assignedAt: Date;
   assignedBy: string;
 }
 
 export interface AssignmentAuditEntry {
   taskId: string;
-  previousAssigneeId: string | null;
-  newAssigneeId: string | null;
+  previousUserId: string | null;
+  newUserId: string | null;
   changedAt: Date;
   changedBy: string;
-  action: 'assigned' | 'reassigned' | 'unassigned';
+  reason?: string;
 }
 
-export interface Task {
-  id: string;
-  assigneeId: string | null;
-  [key: string]: any;
+export interface TaskAssignment {
+  taskId: string;
+  currentUserId: string | null;
+  assignedAt: Date | null;
+  assignedBy: string | null;
+  auditTrail: AssignmentAuditEntry[];
 }
 
 export class AssignmentManager {
-  private assignments = new Map<string, AssignmentRecord>();
-  private auditTrail: AssignmentAuditEntry[] = [];
+  private assignments = new Map<string, TaskAssignment>();
 
-  assignTask(taskId: string, assigneeId: string, assignedBy: string): void {
+  assignTask(taskId: string, userId: string, assignedBy: string, reason?: string): void {
     if (!taskId.trim()) {
       throw new Error('Task ID cannot be empty');
     }
-    if (!assigneeId.trim()) {
+    if (!userId.trim()) {
       throw new Error('User ID cannot be empty');
     }
     if (!assignedBy.trim()) {
       throw new Error('Assigned by user ID cannot be empty');
     }
 
-    const existingAssignment = this.assignments.get(taskId);
-    const previousAssigneeId = existingAssignment?.assigneeId || null;
-
-    const assignment: AssignmentRecord = {
-      taskId,
-      assigneeId,
-      assignedAt: new Date(),
-      assignedBy
-    };
-
-    this.assignments.set(taskId, assignment);
+    const now = new Date();
+    const existing = this.assignments.get(taskId);
+    const previousUserId = existing?.currentUserId || null;
 
     const auditEntry: AssignmentAuditEntry = {
       taskId,
-      previousAssigneeId,
-      newAssigneeId: assigneeId,
-      changedAt: new Date(),
+      previousUserId,
+      newUserId: userId,
+      changedAt: now,
       changedBy: assignedBy,
-      action: previousAssigneeId ? 'reassigned' : 'assigned'
+      reason,
     };
 
-    this.auditTrail.push(auditEntry);
+    const assignment: TaskAssignment = {
+      taskId,
+      currentUserId: userId,
+      assignedAt: now,
+      assignedBy,
+      auditTrail: existing ? [...existing.auditTrail, auditEntry] : [auditEntry],
+    };
+
+    this.assignments.set(taskId, assignment);
   }
 
-  unassignTask(taskId: string, unassignedBy: string): void {
+  unassignTask(taskId: string, unassignedBy: string, reason?: string): void {
     if (!taskId.trim()) {
       throw new Error('Task ID cannot be empty');
     }
@@ -67,69 +68,105 @@ export class AssignmentManager {
       throw new Error('Unassigned by user ID cannot be empty');
     }
 
-    const existingAssignment = this.assignments.get(taskId);
-    if (!existingAssignment) {
-      throw new Error(`Task ${taskId} is not assigned`);
+    const existing = this.assignments.get(taskId);
+    if (!existing || !existing.currentUserId) {
+      throw new Error('Task is not currently assigned');
     }
 
-    const previousAssigneeId = existingAssignment.assigneeId;
-    this.assignments.delete(taskId);
-
+    const now = new Date();
     const auditEntry: AssignmentAuditEntry = {
       taskId,
-      previousAssigneeId,
-      newAssigneeId: null,
-      changedAt: new Date(),
+      previousUserId: existing.currentUserId,
+      newUserId: null,
+      changedAt: now,
       changedBy: unassignedBy,
-      action: 'unassigned'
+      reason,
     };
 
-    this.auditTrail.push(auditEntry);
+    const assignment: TaskAssignment = {
+      taskId,
+      currentUserId: null,
+      assignedAt: null,
+      assignedBy: null,
+      auditTrail: [...existing.auditTrail, auditEntry],
+    };
+
+    this.assignments.set(taskId, assignment);
   }
 
-  getAssignment(taskId: string): AssignmentRecord | null {
+  getAssignment(taskId: string): TaskAssignment | null {
     return this.assignments.get(taskId) || null;
   }
 
-  getAssignedTasks(assigneeId: string): AssignmentRecord[] {
-    if (!assigneeId.trim()) {
-      throw new Error('User ID cannot be empty');
+  getUnassignedTasks(): string[] {
+    const unassigned: string[] = [];
+    for (const [taskId, assignment] of this.assignments) {
+      if (!assignment.currentUserId) {
+        unassigned.push(taskId);
+      }
     }
-
-    return Array.from(this.assignments.values()).filter(
-      assignment => assignment.assigneeId === assigneeId
-    );
+    return unassigned;
   }
 
-  getUnassignedTasks(allTasks: Task[]): Task[] {
-    return allTasks.filter(task => !this.assignments.has(task.id));
+  getTasksAssignedTo(userId: string): string[] {
+    if (!userId.trim()) {
+      return [];
+    }
+
+    const assigned: string[] = [];
+    for (const [taskId, assignment] of this.assignments) {
+      if (assignment.currentUserId === userId) {
+        assigned.push(taskId);
+      }
+    }
+    return assigned;
   }
 
-  getAuditTrail(taskId?: string): AssignmentAuditEntry[] {
-    if (taskId) {
-      return this.auditTrail.filter(entry => entry.taskId === taskId);
-    }
-    return [...this.auditTrail];
+  getAssignmentHistory(taskId: string): AssignmentAuditEntry[] {
+    const assignment = this.assignments.get(taskId);
+    return assignment ? [...assignment.auditTrail] : [];
+  }
+
+  getAllAssignments(): TaskAssignment[] {
+    return Array.from(this.assignments.values()).map(assignment => ({
+      ...assignment,
+      auditTrail: [...assignment.auditTrail],
+    }));
   }
 
   isTaskAssigned(taskId: string): boolean {
-    return this.assignments.has(taskId);
+    const assignment = this.assignments.get(taskId);
+    return assignment ? assignment.currentUserId !== null : false;
   }
 
-  getTaskAssignee(taskId: string): string | null {
-    const assignment = this.assignments.get(taskId);
-    return assignment?.assigneeId || null;
+  reassignTask(taskId: string, newUserId: string, reassignedBy: string, reason?: string): void {
+    if (!taskId.trim()) {
+      throw new Error('Task ID cannot be empty');
+    }
+    if (!newUserId.trim()) {
+      throw new Error('New user ID cannot be empty');
+    }
+    if (!reassignedBy.trim()) {
+      throw new Error('Reassigned by user ID cannot be empty');
+    }
+
+    const existing = this.assignments.get(taskId);
+    if (!existing) {
+      throw new Error('Task has no assignment record');
+    }
+
+    this.assignTask(taskId, newUserId, reassignedBy, reason);
   }
+}
+
+export function createAssignmentManager(): AssignmentManager {
+  return new AssignmentManager();
 }
 
 export function validateUserId(userId: string): void {
   if (!userId || !userId.trim()) {
     throw new Error('User ID cannot be empty');
   }
-}
-
-export function createAssignmentManager(): AssignmentManager {
-  return new AssignmentManager();
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */
