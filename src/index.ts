@@ -28,8 +28,10 @@ export { diffClauses } from './diff.js';
 
 // Phase B
 export { extractCanonicalNodes, extractTerms } from './canonicalizer.js';
+export { extractCanonicalNodesLLM } from './canonicalizer-llm.js';
 export { contextSemhashWarm, computeWarmHashes } from './warm-hasher.js';
 export { classifyChange, classifyChanges } from './classifier.js';
+export { classifyChangeWithLLM, classifyChangesWithLLM } from './classifier-llm.js';
 export { DRateTracker } from './d-rate.js';
 export { BootstrapStateMachine } from './bootstrap.js';
 

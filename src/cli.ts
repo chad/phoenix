@@ -22,8 +22,10 @@ import { diffClauses } from './diff.js';
 
 // Phase B
 import { extractCanonicalNodes } from './canonicalizer.js';
+import { extractCanonicalNodesLLM } from './canonicalizer-llm.js';
 import { computeWarmHashes } from './warm-hasher.js';
 import { classifyChanges } from './classifier.js';
+import { classifyChangesWithLLM } from './classifier-llm.js';
 import { DRateTracker } from './d-rate.js';
 import { BootstrapStateMachine } from './bootstrap.js';
 
@@ -287,7 +289,12 @@ async function cmdBootstrap(): Promise<void> {
   console.log();
 
   // Step 2: Canonicalization
-  console.log(`  ${dim('Phase B:')} Canonicalization + warm context hashing`);
+  const llmEarly = resolveProvider(phoenixDir);
+  if (llmEarly) {
+    console.log(`  ${dim('Phase B:')} Canonicalization + warm context hashing ${dim(`(LLM: ${llmEarly.name}/${llmEarly.model})`)}`);
+  } else {
+    console.log(`  ${dim('Phase B:')} Canonicalization + warm context hashing ${dim('(rule-based)')}`);
+  }
 
   // Collect all clauses
   const allClauses: Clause[] = [];
@@ -296,8 +303,8 @@ async function cmdBootstrap(): Promise<void> {
     allClauses.push(...specStore.getClauses(docId));
   }
 
-  // Extract canonical nodes
-  const canonNodes = extractCanonicalNodes(allClauses);
+  // Extract canonical nodes (LLM-enhanced when available)
+  const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly);
   canonStore.saveNodes(canonNodes);
   console.log(`    ${green('✔')} ${canonNodes.length} canonical nodes extracted`);
 
@@ -955,7 +962,7 @@ function cmdDrift(): void {
   }
 }
 
-function cmdCanonicalize(): void {
+async function cmdCanonicalize(): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const specStore = new SpecStore(phoenixDir);
   const canonStore = new CanonicalStore(phoenixDir);
@@ -972,10 +979,14 @@ function cmdCanonicalize(): void {
     return;
   }
 
+  const llm = resolveProvider(phoenixDir);
   console.log(bold('📐 Canonicalization'));
+  if (llm) {
+    console.log(`  ${dim(`LLM: ${llm.name}/${llm.model}`)}`);
+  }
   console.log();
 
-  const canonNodes = extractCanonicalNodes(allClauses);
+  const canonNodes = await extractCanonicalNodesLLM(allClauses, llm);
   canonStore.saveNodes(canonNodes);
 
   console.log(`  ${green('✔')} ${canonNodes.length} canonical nodes extracted from ${allClauses.length} clauses`);
@@ -1201,7 +1212,7 @@ async function main(): Promise<void> {
       break;
     case 'canonicalize':
     case 'canon-extract':
-      cmdCanonicalize();
+      await cmdCanonicalize();
       break;
     case 'canon':
       cmdCanon();

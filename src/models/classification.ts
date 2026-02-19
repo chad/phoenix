@@ -38,6 +38,8 @@ export interface ChangeClassification {
   /** Clause IDs involved */
   clause_id_before?: string;
   clause_id_after?: string;
+  /** Whether an LLM was used to resolve a D-class classification */
+  llm_resolved?: boolean;
 }
 
 export enum DRateLevel {
