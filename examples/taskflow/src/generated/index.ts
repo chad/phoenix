@@ -6,8 +6,10 @@
 
 export * as analytics from './analytics/index.js';
 export * as tasks from './tasks/index.js';
+export * as webDashboard from './web-dashboard/index.js';
 
 export const services = [
   { name: 'Analytics', dir: 'analytics', port: 3000, modules: 3 },
   { name: 'Tasks', dir: 'tasks', port: 3001, modules: 4 },
+  { name: 'Web Dashboard', dir: 'web-dashboard', port: 3002, modules: 4 },
 ] as const;

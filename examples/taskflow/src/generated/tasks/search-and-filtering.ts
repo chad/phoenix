@@ -3,8 +3,8 @@ export interface Task {
   title: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
   created_at: Date;
+  status: string;
   description?: string;
-  status?: string;
   assignee?: string;
   deadline?: Date;
 }
@@ -31,8 +31,8 @@ const PRIORITY_ORDER: Record<Task['priority'], number> = {
 export class TaskSearchEngine {
   private tasks: Task[] = [];
 
-  constructor(initialTasks: Task[] = []) {
-    this.tasks = [...initialTasks];
+  constructor(tasks: Task[] = []) {
+    this.tasks = [...tasks];
   }
 
   addTask(task: Task): void {
@@ -44,18 +44,21 @@ export class TaskSearchEngine {
   }
 
   removeTask(taskId: string): boolean {
-    const initialLength = this.tasks.length;
-    this.tasks = this.tasks.filter(task => task.id !== taskId);
-    return this.tasks.length < initialLength;
+    const index = this.tasks.findIndex(task => task.id === taskId);
+    if (index !== -1) {
+      this.tasks.splice(index, 1);
+      return true;
+    }
+    return false;
   }
 
   updateTask(taskId: string, updates: Partial<Task>): boolean {
-    const taskIndex = this.tasks.findIndex(task => task.id === taskId);
-    if (taskIndex === -1) {
-      return false;
+    const index = this.tasks.findIndex(task => task.id === taskId);
+    if (index !== -1) {
+      this.tasks[index] = { ...this.tasks[index], ...updates };
+      return true;
     }
-    this.tasks[taskIndex] = { ...this.tasks[taskIndex], ...updates };
-    return true;
+    return false;
   }
 
   search(options: SearchOptions = {}): SearchResult {
@@ -124,18 +127,16 @@ export function filterTasksByTitle(tasks: Task[], titleSubstring: string): Task[
     return [...tasks];
   }
 
-  const searchTerm = titleSubstring.toLowerCase().trim();
+  const searchQuery = titleSubstring.toLowerCase().trim();
   return tasks.filter(task =>
-    task.title.toLowerCase().includes(searchTerm)
+    task.title.toLowerCase().includes(searchQuery)
   );
 }
 
-export function sortTasksByPriorityAndDate(tasks: Task[]): Task[] {
+export function sortTasksByPriority(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
-    // Critical first, then by priority order
     const priorityComparison = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     
-    // If priorities are equal, sort by created_at
     if (priorityComparison === 0) {
       return a.created_at.getTime() - b.created_at.getTime();
     }

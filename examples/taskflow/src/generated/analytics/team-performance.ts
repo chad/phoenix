@@ -40,10 +40,9 @@ export class TeamPerformanceCalculator {
         totalAssigned: stats.total,
         completed: stats.completed,
         completionRate: stats.total > 0 ? stats.completed / stats.total : 0
-      }))
-      .sort((a, b) => b.completionRate - a.completionRate);
+      }));
     
-    const topPerformer = this.identifyTopPerformer(assigneePerformance);
+    const topPerformer = this.findTopPerformer(assigneePerformance);
     
     return {
       assigneePerformance,
@@ -51,8 +50,8 @@ export class TeamPerformanceCalculator {
     };
   }
   
-  private identifyTopPerformer(performance: AssigneePerformance[]): AssigneePerformance | null {
-    const eligiblePerformers = performance.filter(p => p.totalAssigned >= 3);
+  private findTopPerformer(performances: AssigneePerformance[]): AssigneePerformance | null {
+    const eligiblePerformers = performances.filter(p => p.totalAssigned >= 3);
     
     if (eligiblePerformers.length === 0) {
       return null;
@@ -83,11 +82,6 @@ export function calculateTeamPerformance(tasks: Task[]): TeamPerformanceMetrics 
 export function getTopPerformer(tasks: Task[]): AssigneePerformance | null {
   const metrics = calculateTeamPerformance(tasks);
   return metrics.topPerformer;
-}
-
-export function getAssigneeCompletionRate(assignee: string, tasks: Task[]): number {
-  const calculator = new TeamPerformanceCalculator();
-  return calculator.getCompletionRate(assignee, tasks);
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */

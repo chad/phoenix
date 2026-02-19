@@ -18,8 +18,8 @@ export interface MetricsSnapshot {
 export class Metrics {
   private tasks: TaskRecord[] = [];
 
-  constructor(tasks: TaskRecord[] = []) {
-    this.tasks = [...tasks];
+  constructor(initialTasks: TaskRecord[] = []) {
+    this.tasks = [...initialTasks];
   }
 
   updateTasks(tasks: TaskRecord[]): void {
@@ -34,109 +34,87 @@ export class Metrics {
     this.tasks = this.tasks.filter(task => task.id !== taskId);
   }
 
-  calculateMetrics(): MetricsSnapshot {
+  getSnapshot(): MetricsSnapshot {
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const totalTasksCreated = this.tasks.length;
     
-    const completedTasks = this.tasks.filter(task => task.status === 'completed' && task.completedAt);
-    const totalTasksCompleted = completedTasks.length;
-
-    const overdueTasks = this.tasks.filter(task => {
-      if (!task.dueDate || task.status === 'completed' || task.status === 'cancelled') {
-        return false;
-      }
-      return now > task.dueDate;
-    });
-    const totalTasksOverdue = overdueTasks.length;
-
-    const averageCompletionTimeHours = this.calculateAverageCompletionTime(completedTasks);
-
-    const throughputTasksPerDay = this.calculateThroughput(completedTasks, sevenDaysAgo, now);
-
     return {
-      totalTasksCreated,
-      totalTasksCompleted,
-      totalTasksOverdue,
-      averageCompletionTimeHours,
-      throughputTasksPerDay,
+      totalTasksCreated: this.calculateTotalTasksCreated(),
+      totalTasksCompleted: this.calculateTotalTasksCompleted(),
+      totalTasksOverdue: this.calculateTotalTasksOverdue(now),
+      averageCompletionTimeHours: this.calculateAverageCompletionTime(),
+      throughputTasksPerDay: this.calculateThroughput(now),
       calculatedAt: now
     };
   }
 
-  private calculateAverageCompletionTime(completedTasks: TaskRecord[]): number {
+  private calculateTotalTasksCreated(): number {
+    return this.tasks.length;
+  }
+
+  private calculateTotalTasksCompleted(): number {
+    return this.tasks.filter(task => task.status === 'completed').length;
+  }
+
+  private calculateTotalTasksOverdue(now: Date): number {
+    return this.tasks.filter(task => {
+      if (task.status === 'completed' || task.status === 'cancelled') {
+        return false;
+      }
+      return task.dueDate && task.dueDate < now;
+    }).length;
+  }
+
+  private calculateAverageCompletionTime(): number {
+    const completedTasks = this.tasks.filter(task => 
+      task.status === 'completed' && task.completedAt
+    );
+
     if (completedTasks.length === 0) {
       return 0;
     }
 
     const totalCompletionTimeMs = completedTasks.reduce((sum, task) => {
-      if (!task.completedAt) {
-        return sum;
-      }
-      const completionTimeMs = task.completedAt.getTime() - task.createdAt.getTime();
-      return sum + completionTimeMs;
+      const completionTime = task.completedAt!.getTime() - task.createdAt.getTime();
+      return sum + completionTime;
     }, 0);
 
     const averageCompletionTimeMs = totalCompletionTimeMs / completedTasks.length;
     return averageCompletionTimeMs / (1000 * 60 * 60); // Convert to hours
   }
 
-  private calculateThroughput(completedTasks: TaskRecord[], startDate: Date, endDate: Date): number {
-    const tasksCompletedInWindow = completedTasks.filter(task => {
-      if (!task.completedAt) {
+  private calculateThroughput(now: Date): number {
+    const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    const completedInWindow = this.tasks.filter(task => {
+      if (task.status !== 'completed' || !task.completedAt) {
         return false;
       }
-      return task.completedAt >= startDate && task.completedAt <= endDate;
+      return task.completedAt >= sevenDaysAgo && task.completedAt <= now;
     });
 
-    const windowDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-    
-    if (windowDays === 0) {
-      return 0;
-    }
-
-    return tasksCompletedInWindow.length / windowDays;
-  }
-
-  getTotalTasksCreated(): number {
-    return this.tasks.length;
-  }
-
-  getTotalTasksCompleted(): number {
-    return this.tasks.filter(task => task.status === 'completed').length;
-  }
-
-  getTotalTasksOverdue(): number {
-    const now = new Date();
-    return this.tasks.filter(task => {
-      if (!task.dueDate || task.status === 'completed' || task.status === 'cancelled') {
-        return false;
-      }
-      return now > task.dueDate;
-    }).length;
-  }
-
-  getAverageCompletionTimeHours(): number {
-    const completedTasks = this.tasks.filter(task => task.status === 'completed' && task.completedAt);
-    return this.calculateAverageCompletionTime(completedTasks);
-  }
-
-  getThroughputTasksPerDay(): number {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const completedTasks = this.tasks.filter(task => task.status === 'completed' && task.completedAt);
-    return this.calculateThroughput(completedTasks, sevenDaysAgo, now);
+    return completedInWindow.length / 7;
   }
 }
 
-export function createMetrics(tasks: TaskRecord[] = []): Metrics {
-  return new Metrics(tasks);
-}
-
-export function calculateMetricsFromTasks(tasks: TaskRecord[]): MetricsSnapshot {
+export function calculateMetrics(tasks: TaskRecord[]): MetricsSnapshot {
   const metrics = new Metrics(tasks);
-  return metrics.calculateMetrics();
+  return metrics.getSnapshot();
+}
+
+export function isTaskOverdue(task: TaskRecord, referenceDate: Date = new Date()): boolean {
+  if (task.status === 'completed' || task.status === 'cancelled') {
+    return false;
+  }
+  return task.dueDate ? task.dueDate < referenceDate : false;
+}
+
+export function getCompletionTimeHours(task: TaskRecord): number | null {
+  if (task.status !== 'completed' || !task.completedAt) {
+    return null;
+  }
+  
+  const completionTimeMs = task.completedAt.getTime() - task.createdAt.getTime();
+  return completionTimeMs / (1000 * 60 * 60);
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */
