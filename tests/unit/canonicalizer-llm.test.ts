@@ -1,8 +1,9 @@
 /**
- * Tests for LLM-enhanced canonicalization.
+ * Tests for LLM-enhanced canonicalization (v2: normalizer mode).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { extractCanonicalNodesLLM } from '../../src/canonicalizer-llm.js';
+import { extractCandidates } from '../../src/canonicalizer.js';
 import { parseSpec } from '../../src/spec-parser.js';
 import { CanonicalType } from '../../src/models/canonical.js';
 import type { LLMProvider, GenerateOptions } from '../../src/llm/provider.js';
@@ -28,46 +29,39 @@ const SPEC = `# Auth Service
 - All endpoints must use HTTPS
 - Tokens must be signed with RS256`;
 
-describe('LLM-Enhanced Canonicalizer', () => {
+describe('LLM-Enhanced Canonicalizer (v2 normalizer mode)', () => {
   const clauses = parseSpec(SPEC, 'spec/auth.md');
 
   it('falls back to rule-based when no LLM provided', async () => {
     const nodes = await extractCanonicalNodesLLM(clauses, null);
     expect(nodes.length).toBeGreaterThan(0);
-    // Should still work — this is the rule-based fallback
+    // Should still work — rule-based extraction + resolution
     const reqs = nodes.filter(n => n.type === CanonicalType.REQUIREMENT);
     expect(reqs.length).toBeGreaterThan(0);
   });
 
-  it('uses LLM response to build canonical nodes', async () => {
-    const llmResponse = JSON.stringify([
-      { type: 'REQUIREMENT', statement: 'Users must authenticate with email and password', tags: ['authentication', 'email', 'password'] },
-      { type: 'REQUIREMENT', statement: 'Sessions expire after 24 hours', tags: ['sessions', 'expiration'] },
-      { type: 'CONSTRAINT', statement: 'Rate limit login attempts to 5 per minute', tags: ['rate-limit', 'login'] },
-      { type: 'CONSTRAINT', statement: 'All endpoints must use HTTPS', tags: ['https', 'security'] },
-      { type: 'CONSTRAINT', statement: 'Tokens must be signed with RS256', tags: ['tokens', 'rs256', 'signing'] },
-    ]);
-
-    const llm = makeMockLLM(llmResponse);
+  it('normalizes candidate statements via LLM', async () => {
+    const llm = makeMockLLM('{"statement": "The system shall authenticate users via email and password"}');
     const nodes = await extractCanonicalNodesLLM(clauses, llm);
 
-    expect(nodes.length).toBe(5);
-    expect(nodes.filter(n => n.type === CanonicalType.REQUIREMENT).length).toBe(2);
-    expect(nodes.filter(n => n.type === CanonicalType.CONSTRAINT).length).toBe(3);
+    // Should have nodes (rule-based extraction + LLM normalization)
+    expect(nodes.length).toBeGreaterThan(0);
 
-    // Each node should have provenance back to a clause
-    for (const node of nodes) {
-      expect(node.source_clause_ids.length).toBeGreaterThan(0);
-      expect(node.tags.length).toBeGreaterThan(0);
-    }
+    // LLM was called for each non-CONTEXT candidate
+    const { candidates } = extractCandidates(clauses);
+    const nonContext = candidates.filter(c => c.type !== CanonicalType.CONTEXT);
+    expect(llm.generate).toHaveBeenCalledTimes(nonContext.length);
   });
 
-  it('handles LLM returning markdown-fenced JSON', async () => {
-    const llmResponse = '```json\n[\n  { "type": "REQUIREMENT", "statement": "Users must authenticate", "tags": ["auth"] }\n]\n```';
-    const llm = makeMockLLM(llmResponse);
-    const nodes = await extractCanonicalNodesLLM(clauses, llm);
-    expect(nodes.length).toBe(1);
-    expect(nodes[0].statement).toBe('Users must authenticate');
+  it('calls LLM with normalizer system prompt and temperature 0', async () => {
+    const llm = makeMockLLM('{"statement": "normalized text"}');
+    await extractCanonicalNodesLLM(clauses, llm);
+
+    const callArgs = (llm.generate as ReturnType<typeof vi.fn>).mock.calls[0];
+    const options = callArgs[1] as GenerateOptions;
+    expect(options.system).toContain('canonical form');
+    expect(options.temperature).toBe(0);
+    expect(options.maxTokens).toBe(150);
   });
 
   it('falls back to rule-based on LLM error', async () => {
@@ -82,38 +76,45 @@ describe('LLM-Enhanced Canonicalizer', () => {
     expect(nodes.length).toBeGreaterThan(0);
   });
 
-  it('falls back on invalid JSON response', async () => {
+  it('falls back to original statement on invalid LLM response', async () => {
     const llm = makeMockLLM('Sorry, I cannot help with that.');
     const nodes = await extractCanonicalNodesLLM(clauses, llm);
-    // Falls back to rule-based since LLM response is empty after parse
+    // Falls back per-node — still produces nodes
     expect(nodes.length).toBeGreaterThan(0);
   });
 
-  it('links nodes with shared terms', async () => {
-    const llmResponse = JSON.stringify([
-      { type: 'REQUIREMENT', statement: 'User authentication via email login', tags: ['authentication', 'email', 'user', 'login'] },
-      { type: 'CONSTRAINT', statement: 'Authentication login tokens must use RS256', tags: ['authentication', 'login', 'tokens', 'rs256'] },
-    ]);
-
-    const llm = makeMockLLM(llmResponse);
+  it('preserves provenance through normalization', async () => {
+    const llm = makeMockLLM('{"statement": "The system shall authenticate users"}');
     const nodes = await extractCanonicalNodesLLM(clauses, llm);
 
-    // Both nodes share "authentication" and "login" tags (2+ shared) — should be linked
-    const linked = nodes.filter(n => n.linked_canon_ids.length > 0);
-    expect(linked.length).toBe(2);
+    for (const node of nodes) {
+      expect(node.source_clause_ids.length).toBeGreaterThan(0);
+      // Each source clause should be from our parsed clauses
+      const clauseIds = new Set(clauses.map(c => c.clause_id));
+      for (const srcId of node.source_clause_ids) {
+        expect(clauseIds.has(srcId)).toBe(true);
+      }
+    }
   });
 
-  it('calls LLM with system prompt and low temperature', async () => {
-    const llmResponse = JSON.stringify([
-      { type: 'REQUIREMENT', statement: 'test', tags: ['test'] },
-    ]);
-    const llm = makeMockLLM(llmResponse);
-    await extractCanonicalNodesLLM(clauses, llm);
+  it('marks LLM-normalized nodes with extraction_method=llm', async () => {
+    const llm = makeMockLLM('{"statement": "The system shall authenticate users"}');
+    const nodes = await extractCanonicalNodesLLM(clauses, llm);
 
-    expect(llm.generate).toHaveBeenCalledTimes(1);
-    const callArgs = (llm.generate as ReturnType<typeof vi.fn>).mock.calls[0];
-    const options = callArgs[1] as GenerateOptions;
-    expect(options.system).toBeTruthy();
-    expect(options.temperature).toBe(0.1);
+    const llmNodes = nodes.filter(n => n.extraction_method === 'llm');
+    // At least some nodes should be marked as LLM-normalized
+    expect(llmNodes.length).toBeGreaterThan(0);
+  });
+
+  it('skips CONTEXT nodes for LLM normalization', async () => {
+    const simpleSpec = '# Title\n\nJust some description.\n\n## Reqs\n\n- Must do X.';
+    const simpleClauses = parseSpec(simpleSpec, 'test.md');
+    const llm = makeMockLLM('{"statement": "normalized"}');
+    await extractCanonicalNodesLLM(simpleClauses, llm);
+
+    // CONTEXT nodes should NOT trigger LLM calls
+    const { candidates } = extractCandidates(simpleClauses);
+    const nonContext = candidates.filter(c => c.type !== CanonicalType.CONTEXT);
+    expect(llm.generate).toHaveBeenCalledTimes(nonContext.length);
   });
 });

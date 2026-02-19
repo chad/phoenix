@@ -12,6 +12,7 @@
  */
 
 import type { CanonicalNode } from './models/canonical.js';
+import { CanonicalType } from './models/canonical.js';
 import type { Clause } from './models/clause.js';
 import type { ImplementationUnit } from './models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from './models/iu.js';
@@ -22,11 +23,14 @@ import { sha256 } from './semhash.js';
  *
  * Each top-level section of each spec document becomes one IU.
  * Canon nodes are assigned to the IU of their source clause's section.
+ * CONTEXT nodes are excluded from IU generation (they don't produce code).
  */
 export function planIUs(
   canonNodes: CanonicalNode[],
   clauses: Clause[],
 ): ImplementationUnit[] {
+  // Filter out CONTEXT nodes — they don't generate code
+  canonNodes = canonNodes.filter(n => n.type !== CanonicalType.CONTEXT);
   if (canonNodes.length === 0) return [];
 
   // Index clauses by ID

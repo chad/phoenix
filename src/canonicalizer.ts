@@ -1,37 +1,136 @@
 /**
- * Canonicalization Engine
+ * Canonicalization Engine v2
  *
- * Extracts structured canonical nodes (Requirements, Constraints,
- * Invariants, Definitions) from clauses using rule-based extraction.
+ * Phase 1: Extraction — sentence-level, scoring rubric, CONTEXT type.
+ * Produces CandidateNode[] with confidence scores and coverage.
+ *
+ * Also exports the legacy extractCanonicalNodes() for backward compat,
+ * which runs extraction + resolution in one call.
  */
 
 import type { Clause } from './models/clause.js';
-import type { CanonicalNode } from './models/canonical.js';
+import type { CanonicalNode, CandidateNode, ExtractionCoverage } from './models/canonical.js';
 import { CanonicalType } from './models/canonical.js';
 import { sha256 } from './semhash.js';
 import { normalizeText } from './normalizer.js';
+import { segmentSentences } from './sentence-segmenter.js';
+import { resolveGraph } from './resolution.js';
 
-/** Patterns for classifying lines into canonical types */
-const REQUIREMENT_PATTERNS = [
-  /\b(?:must|shall|required|requires?)\b/i,
-  /\b(?:needs? to|has to|will)\b/i,
-];
+// ─── Domain term whitelist (short tokens to keep) ────────────────────────────
 
-const CONSTRAINT_PATTERNS = [
-  /\b(?:must not|shall not|forbidden|prohibited|cannot|disallowed)\b/i,
-  /\b(?:limited to|maximum|minimum|at most|at least|no more than)\b/i,
-];
+const DOMAIN_TERMS = new Set([
+  'id', 'ui', 'ux', 'api', 'jwt', 'sso', 'otp', 'ip', 'db', 'tls', 'ssl',
+  'rsa', 'aes', 'rs256', 'hs256', 'oidc', 'oauth', '2fa', 'mfa', 'url',
+  'uri', 'http', 'https', 'sql', 'css', 'html', 'xml', 'json', 'yaml',
+  'csv', 'tcp', 'udp', 'dns', 'cdn', 'ci', 'cd', 'io', 'os', 'vm',
+]);
 
-const INVARIANT_PATTERNS = [
-  /\b(?:always|never|invariant|at all times|guaranteed)\b/i,
-];
+// ─── Scoring rubric for type classification ──────────────────────────────────
 
-const DEFINITION_PATTERNS = [
-  /\b(?:is defined as|means|refers to)\b/i,
-  /:\s+\S/,  // colon followed by text (definition-style)
-];
+interface TypeScores {
+  [CanonicalType.REQUIREMENT]: number;
+  [CanonicalType.CONSTRAINT]: number;
+  [CanonicalType.INVARIANT]: number;
+  [CanonicalType.DEFINITION]: number;
+  [CanonicalType.CONTEXT]: number;
+}
 
-/** Heading patterns that provide type context */
+function emptyScores(): TypeScores {
+  return {
+    [CanonicalType.REQUIREMENT]: 0,
+    [CanonicalType.CONSTRAINT]: 0,
+    [CanonicalType.INVARIANT]: 0,
+    [CanonicalType.DEFINITION]: 0,
+    [CanonicalType.CONTEXT]: 0,
+  };
+}
+
+/** Score a sentence across all types; highest score wins */
+function scoreSentence(text: string, headingContext: CanonicalType | null): { type: CanonicalType; confidence: number } {
+  const scores = emptyScores();
+  const lower = text.toLowerCase();
+
+  // ── Constraint signals ──
+  if (/\b(?:must not|shall not|may not|cannot|can't|disallowed|forbidden|prohibited)\b/i.test(text)) {
+    scores[CanonicalType.CONSTRAINT] += 4;
+  }
+  if (/\b(?:limited to|maximum|minimum|at most|at least|no more than|no fewer than|up to|ceiling|floor)\b/i.test(text)) {
+    scores[CanonicalType.CONSTRAINT] += 3;
+  }
+  // Numeric bounds: "5 per minute", "≤ 100", "between 1 and 10"
+  if (/\b\d+\s*(?:per|\/)\s*\w+\b/i.test(text) || /[≤≥<>]\s*\d+/.test(text)) {
+    scores[CanonicalType.CONSTRAINT] += 2;
+  }
+
+  // ── Invariant signals ──
+  if (/\b(?:always|never|at all times|regardless|invariant|guaranteed|must remain|must always|must never)\b/i.test(text)) {
+    scores[CanonicalType.INVARIANT] += 4;
+  }
+
+  // ── Requirement signals ──
+  if (/\b(?:must|shall)\b/i.test(text) && !/\b(?:must not|shall not|must always|must never|must remain)\b/i.test(text)) {
+    scores[CanonicalType.REQUIREMENT] += 2;
+  }
+  if (/\b(?:required|requires?|needs? to|has to|will)\b/i.test(text)) {
+    scores[CanonicalType.REQUIREMENT] += 2;
+  }
+  if (/\b(?:support|provide|implement|enable|allow|accept|return|create|delete|update|send|receive|handle|manage|track|store|validate|generate)\b/i.test(text)) {
+    scores[CanonicalType.REQUIREMENT] += 1;
+  }
+
+  // ── Definition signals ──
+  if (/\b(?:is defined as|means|refers to|is a|is an)\b/i.test(text) && text.length < 200) {
+    scores[CanonicalType.DEFINITION] += 4;
+  }
+  // Colon pattern "Term: definition text" but not enumerations
+  if (/^[A-Z][a-zA-Z\s]{2,30}:\s+[A-Z]/.test(text) && !/[:,]\s*$/.test(text)) {
+    scores[CanonicalType.DEFINITION] += 3;
+  }
+
+  // ── Context signals (no actionable keywords) ──
+  if (!hasAnyModal(lower) && !hasAnyKeyword(lower)) {
+    scores[CanonicalType.CONTEXT] += 2;
+  }
+  // Short sentence without verb-like keywords
+  if (text.split(/\s+/).length < 8 && !hasAnyModal(lower)) {
+    scores[CanonicalType.CONTEXT] += 1;
+  }
+
+  // ── Heading context bonus ──
+  if (headingContext) {
+    scores[headingContext] += 2;
+  }
+
+  // ── Also give constraint "must" credit since "must" appears in constraints too ──
+  if (/\b(?:must|shall)\b/i.test(text)) {
+    scores[CanonicalType.CONSTRAINT] += 1;
+  }
+
+  // Pick winner
+  const entries = Object.entries(scores) as [CanonicalType, number][];
+  entries.sort((a, b) => b[1] - a[1]);
+  const [winType, winScore] = entries[0];
+  const runnerUp = entries[1][1];
+
+  // If nothing scored above 0, it's CONTEXT
+  if (winScore === 0) {
+    return { type: CanonicalType.CONTEXT, confidence: 0.3 };
+  }
+
+  const confidence = Math.max(0.3, Math.min(1.0, (winScore - runnerUp) / Math.max(winScore, 1)));
+  return { type: winType, confidence };
+}
+
+function hasAnyModal(lower: string): boolean {
+  return /\b(?:must|shall|should|will|required|requires?|needs? to|has to|cannot|forbidden|prohibited)\b/.test(lower);
+}
+
+function hasAnyKeyword(lower: string): boolean {
+  return /\b(?:support|provide|implement|enable|allow|accept|return|create|delete|update|send|receive|handle|manage|track|store|validate|generate|defined|means|refers)\b/.test(lower);
+}
+
+// ─── Heading context (same as v1) ────────────────────────────────────────────
+
 const HEADING_CONTEXT: [RegExp, CanonicalType][] = [
   [/\b(?:constraint|security|limit|restrict)/i, CanonicalType.CONSTRAINT],
   [/\b(?:requirement|feature|capability)/i, CanonicalType.REQUIREMENT],
@@ -39,92 +138,7 @@ const HEADING_CONTEXT: [RegExp, CanonicalType][] = [
   [/\b(?:invariant|guarantee)/i, CanonicalType.INVARIANT],
 ];
 
-/**
- * Extract canonical nodes from an array of clauses.
- */
-export function extractCanonicalNodes(clauses: Clause[]): CanonicalNode[] {
-  const allNodes: CanonicalNode[] = [];
-
-  for (const clause of clauses) {
-    const nodes = extractFromClause(clause);
-    allNodes.push(...nodes);
-  }
-
-  // Link nodes that share terms
-  linkNodesByTerms(allNodes);
-
-  return allNodes;
-}
-
-/**
- * Extract canonical nodes from a single clause.
- */
-function extractFromClause(clause: Clause): CanonicalNode[] {
-  const nodes: CanonicalNode[] = [];
-  const lines = clause.raw_text.split('\n');
-
-  // Determine heading context type
-  const headingContext = getHeadingContext(clause.section_path);
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.match(/^#{1,6}\s/)) continue; // skip empty and heading lines
-
-    // Strip list markers for analysis
-    const content = trimmed.replace(/^(?:[-*•]|\d+[.)]\s*)\s*/, '');
-    if (!content || content.length < 5) continue;
-
-    const type = classifyLine(content, headingContext);
-    if (!type) continue;
-
-    const normalizedStatement = normalizeText(content);
-    if (!normalizedStatement) continue;
-
-    const tags = extractTerms(normalizedStatement);
-    const canonId = sha256([type, normalizedStatement, clause.clause_id].join('\x00'));
-
-    nodes.push({
-      canon_id: canonId,
-      type,
-      statement: normalizedStatement,
-      source_clause_ids: [clause.clause_id],
-      linked_canon_ids: [],
-      tags,
-    });
-  }
-
-  return nodes;
-}
-
-/**
- * Classify a line into a canonical type based on patterns and context.
- */
-function classifyLine(content: string, headingContext: CanonicalType | null): CanonicalType | null {
-  // Check specific patterns first (most specific wins)
-  for (const pattern of CONSTRAINT_PATTERNS) {
-    if (pattern.test(content)) return CanonicalType.CONSTRAINT;
-  }
-  for (const pattern of INVARIANT_PATTERNS) {
-    if (pattern.test(content)) return CanonicalType.INVARIANT;
-  }
-  for (const pattern of REQUIREMENT_PATTERNS) {
-    if (pattern.test(content)) return CanonicalType.REQUIREMENT;
-  }
-  for (const pattern of DEFINITION_PATTERNS) {
-    if (pattern.test(content)) return CanonicalType.DEFINITION;
-  }
-
-  // Fall back to heading context
-  if (headingContext) return headingContext;
-
-  return null;
-}
-
-/**
- * Determine canonical type context from section path headings.
- */
 function getHeadingContext(sectionPath: string[]): CanonicalType | null {
-  // Check from most specific (deepest) to least specific
   for (let i = sectionPath.length - 1; i >= 0; i--) {
     for (const [pattern, type] of HEADING_CONTEXT) {
       if (pattern.test(sectionPath[i])) return type;
@@ -133,46 +147,147 @@ function getHeadingContext(sectionPath: string[]): CanonicalType | null {
   return null;
 }
 
-/**
- * Extract key terms from normalized text for linking.
- */
-export function extractTerms(text: string): string[] {
-  // Split into words, filter short/common words
-  const stopWords = new Set([
-    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-    'should', 'may', 'might', 'shall', 'can', 'must', 'need', 'to', 'of',
-    'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through',
-    'and', 'or', 'but', 'not', 'no', 'if', 'then', 'else', 'when', 'where',
-    'that', 'this', 'these', 'those', 'it', 'its', 'all', 'each', 'every',
-    'any', 'both', 'few', 'more', 'most', 'other', 'some', 'such',
-  ]);
+// ─── Phase 1: Extract candidates ─────────────────────────────────────────────
 
-  const words = text.toLowerCase()
-    .split(/\s+/)
-    .map(w => w.replace(/[^a-z0-9]/g, ''))
-    .filter(Boolean);
-  return [...new Set(
-    words.filter(w => w.length > 2 && !stopWords.has(w))
-  )];
+export interface ExtractionResult {
+  candidates: CandidateNode[];
+  coverage: ExtractionCoverage[];
 }
 
 /**
- * Link canonical nodes that share significant terms.
- * Modifies nodes in place.
+ * Phase 1: Extract candidate nodes from clauses using sentence segmentation
+ * and scoring rubric.
  */
-function linkNodesByTerms(nodes: CanonicalNode[]): void {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const shared = nodes[i].tags.filter(t => nodes[j].tags.includes(t));
-      if (shared.length >= 2) {
-        if (!nodes[i].linked_canon_ids.includes(nodes[j].canon_id)) {
-          nodes[i].linked_canon_ids.push(nodes[j].canon_id);
-        }
-        if (!nodes[j].linked_canon_ids.includes(nodes[i].canon_id)) {
-          nodes[j].linked_canon_ids.push(nodes[i].canon_id);
-        }
-      }
+export function extractCandidates(clauses: Clause[]): ExtractionResult {
+  const allCandidates: CandidateNode[] = [];
+  const allCoverage: ExtractionCoverage[] = [];
+
+  for (const clause of clauses) {
+    const { candidates, coverage } = extractFromClause(clause);
+    allCandidates.push(...candidates);
+    allCoverage.push(coverage);
+  }
+
+  return { candidates: allCandidates, coverage: allCoverage };
+}
+
+function extractFromClause(clause: Clause): { candidates: CandidateNode[]; coverage: ExtractionCoverage } {
+  const sentences = segmentSentences(clause.raw_text);
+  const headingContext = getHeadingContext(clause.section_path);
+  const candidates: CandidateNode[] = [];
+  let extractedCount = 0;
+  let contextCount = 0;
+  const uncovered: ExtractionCoverage['uncovered'] = [];
+
+  for (const sentence of sentences) {
+    const content = sentence.text.trim();
+    if (!content || content.length < 5) {
+      uncovered.push({ text: content, reason: 'too_short' });
+      continue;
+    }
+
+    const normalizedStatement = normalizeText(content);
+    if (!normalizedStatement) {
+      uncovered.push({ text: content, reason: 'too_short' });
+      continue;
+    }
+
+    const { type, confidence } = scoreSentence(content, headingContext);
+    const tags = extractTerms(normalizedStatement);
+
+    const candidateId = sha256([type, normalizedStatement, clause.clause_id].join('\x00'));
+
+    candidates.push({
+      candidate_id: candidateId,
+      type,
+      statement: normalizedStatement,
+      confidence,
+      source_clause_ids: [clause.clause_id],
+      tags,
+      sentence_index: sentence.index,
+      extraction_method: 'rule',
+    });
+
+    if (type === CanonicalType.CONTEXT) {
+      contextCount++;
+    } else {
+      extractedCount++;
     }
   }
+
+  const total = sentences.length;
+  const coverage: ExtractionCoverage = {
+    clause_id: clause.clause_id,
+    total_sentences: total,
+    extracted_sentences: extractedCount,
+    context_sentences: contextCount,
+    coverage_pct: total > 0 ? ((extractedCount + contextCount) / total) * 100 : 0,
+    uncovered,
+  };
+
+  return { candidates, coverage };
+}
+
+// ─── Term extraction (v2: acronym whitelist + hyphenated compounds) ───────────
+
+const STOP_WORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'shall', 'can', 'must', 'need', 'to', 'of',
+  'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through',
+  'and', 'or', 'but', 'not', 'no', 'if', 'then', 'else', 'when', 'where',
+  'that', 'this', 'these', 'those', 'it', 'its', 'all', 'each', 'every',
+  'any', 'both', 'few', 'more', 'most', 'other', 'some', 'such',
+]);
+
+/**
+ * Extract key terms from normalized text.
+ * Preserves domain acronyms and hyphenated compounds.
+ */
+export function extractTerms(text: string): string[] {
+  const lower = text.toLowerCase();
+
+  // Extract hyphenated compounds first (e.g., rate-limit, in-progress)
+  const hyphenated = lower.match(/\b[a-z0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*/g) || [];
+
+  // Split remaining into words
+  const words = lower
+    .split(/\s+/)
+    .map(w => w.replace(/[^a-z0-9-]/g, ''))
+    .filter(Boolean);
+
+  const terms = new Set<string>();
+
+  // Add hyphenated compounds
+  for (const h of hyphenated) {
+    if (h.length >= 3) terms.add(h);
+  }
+
+  // Add individual words
+  for (const w of words) {
+    // Skip stop words
+    if (STOP_WORDS.has(w)) continue;
+    // Keep domain terms regardless of length
+    if (DOMAIN_TERMS.has(w)) {
+      terms.add(w);
+      continue;
+    }
+    // Keep words > 2 chars
+    if (w.length > 2 && !w.includes('-')) {
+      terms.add(w);
+    }
+  }
+
+  return [...terms];
+}
+
+// ─── Legacy API: extract + resolve in one call ───────────────────────────────
+
+/**
+ * Extract canonical nodes from clauses (v2: sentence-level + resolution).
+ * Backward-compatible API — returns CanonicalNode[].
+ */
+export function extractCanonicalNodes(clauses: Clause[]): CanonicalNode[] {
+  const { candidates } = extractCandidates(clauses);
+  return resolveGraph(candidates, clauses);
 }

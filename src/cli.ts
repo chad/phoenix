@@ -1175,12 +1175,13 @@ async function cmdInspect(args: string[]): Promise<void> {
   );
 
   const html = renderInspectHTML(data);
+  const dataJson = JSON.stringify(data);
 
   // Parse --port flag
   const portArg = args.find(a => a.startsWith('--port='))?.split('=')[1];
   const port = portArg ? parseInt(portArg, 10) : 0; // 0 = random
 
-  const instance = serveInspect(html, port);
+  const instance = serveInspect(html, port, dataJson);
   await instance.ready;
 
   console.log();

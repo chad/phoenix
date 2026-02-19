@@ -3,13 +3,13 @@ export interface TaskRecord {
   createdAt: Date;
   completedAt?: Date;
   dueDate?: Date;
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'completed' | 'overdue';
 }
 
 export interface MetricsSnapshot {
-  totalTasksCreated: number;
-  totalTasksCompleted: number;
-  totalTasksOverdue: number;
+  totalCreated: number;
+  totalCompleted: number;
+  totalOverdue: number;
   averageCompletionTimeHours: number;
   throughputTasksPerDay: number;
   calculatedAt: Date;
@@ -26,32 +26,35 @@ export class Metrics {
     this.tasks.push({ ...task });
   }
 
-  updateTask(taskId: string, updates: Partial<TaskRecord>): void {
-    const index = this.tasks.findIndex(task => task.id === taskId);
-    if (index >= 0) {
-      this.tasks[index] = { ...this.tasks[index], ...updates };
+  addTasks(tasks: TaskRecord[]): void {
+    this.tasks.push(...tasks.map(task => ({ ...task })));
+  }
+
+  updateTask(taskId: string, updates: Partial<TaskRecord>): boolean {
+    const taskIndex = this.tasks.findIndex(task => task.id === taskId);
+    if (taskIndex === -1) {
+      return false;
     }
+    
+    this.tasks[taskIndex] = { ...this.tasks[taskIndex], ...updates };
+    return true;
   }
 
-  removeTask(taskId: string): void {
-    this.tasks = this.tasks.filter(task => task.id !== taskId);
-  }
-
-  getTotalTasksCreated(): number {
+  getTotalCreated(): number {
     return this.tasks.length;
   }
 
-  getTotalTasksCompleted(): number {
+  getTotalCompleted(): number {
     return this.tasks.filter(task => task.status === 'completed').length;
   }
 
-  getTotalTasksOverdue(): number {
+  getTotalOverdue(): number {
     const now = new Date();
     return this.tasks.filter(task => {
-      return task.status !== 'completed' && 
-             task.status !== 'cancelled' && 
-             task.dueDate && 
-             task.dueDate < now;
+      if (task.status === 'completed' || !task.dueDate) {
+        return false;
+      }
+      return task.dueDate < now;
     }).length;
   }
 
@@ -65,11 +68,8 @@ export class Metrics {
     }
 
     const totalHours = completedTasks.reduce((sum, task) => {
-      const createdTime = task.createdAt.getTime();
-      const completedTime = task.completedAt!.getTime();
-      const durationMs = completedTime - createdTime;
-      const durationHours = durationMs / (1000 * 60 * 60);
-      return sum + durationHours;
+      const completionTime = task.completedAt!.getTime() - task.createdAt.getTime();
+      return sum + (completionTime / (1000 * 60 * 60)); // Convert ms to hours
     }, 0);
 
     return totalHours / completedTasks.length;
@@ -91,51 +91,49 @@ export class Metrics {
 
   getSnapshot(): MetricsSnapshot {
     return {
-      totalTasksCreated: this.getTotalTasksCreated(),
-      totalTasksCompleted: this.getTotalTasksCompleted(),
-      totalTasksOverdue: this.getTotalTasksOverdue(),
+      totalCreated: this.getTotalCreated(),
+      totalCompleted: this.getTotalCompleted(),
+      totalOverdue: this.getTotalOverdue(),
       averageCompletionTimeHours: this.getAverageCompletionTimeHours(),
       throughputTasksPerDay: this.getThroughputTasksPerDay(),
       calculatedAt: new Date()
     };
   }
 
-  static fromTaskRecords(tasks: TaskRecord[]): Metrics {
-    return new Metrics(tasks);
+  reset(): void {
+    this.tasks = [];
   }
 
-  static calculateMetrics(tasks: TaskRecord[]): MetricsSnapshot {
-    const metrics = new Metrics(tasks);
-    return metrics.getSnapshot();
+  getAllTasks(): TaskRecord[] {
+    return this.tasks.map(task => ({ ...task }));
   }
 }
 
 export function calculateMetricsFromTasks(tasks: TaskRecord[]): MetricsSnapshot {
-  return Metrics.calculateMetrics(tasks);
+  const metrics = new Metrics(tasks);
+  return metrics.getSnapshot();
 }
 
 export function isTaskOverdue(task: TaskRecord, referenceDate: Date = new Date()): boolean {
-  return task.status !== 'completed' && 
-         task.status !== 'cancelled' && 
-         task.dueDate !== undefined && 
-         task.dueDate < referenceDate;
+  if (task.status === 'completed' || !task.dueDate) {
+    return false;
+  }
+  return task.dueDate < referenceDate;
 }
 
-export function getTaskCompletionTimeHours(task: TaskRecord): number {
+export function getCompletionTimeHours(task: TaskRecord): number | null {
   if (task.status !== 'completed' || !task.completedAt) {
-    return 0;
+    return null;
   }
   
-  const createdTime = task.createdAt.getTime();
-  const completedTime = task.completedAt.getTime();
-  const durationMs = completedTime - createdTime;
-  return durationMs / (1000 * 60 * 60);
+  const completionTime = task.completedAt.getTime() - task.createdAt.getTime();
+  return completionTime / (1000 * 60 * 60);
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
-  iu_id: 'c6a76ccf723cbaf85f990a1b7260b82c8063e5b48c1ef23fcbcc42161e235cbd',
+  iu_id: '91cdb7e04a917c132c5de2e90731694b755d911d82ab03eb8b67e2232d3aa0b4',
   name: 'Metrics',
-  risk_tier: 'high',
+  risk_tier: 'medium',
   canon_ids: [4 as const],
 } as const;

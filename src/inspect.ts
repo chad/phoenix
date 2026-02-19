@@ -539,13 +539,12 @@ function esc(s: string): string {
 export function serveInspect(
   html: string,
   port: number,
+  dataJson?: string,
 ): { server: ReturnType<typeof createServer>; port: number; ready: Promise<void> } {
   const server = createServer((req, res) => {
     if (req.url === '/data.json') {
-      // Also expose raw JSON for external tools
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      const match = html.match(/const DATA = ({.*?});/s);
-      res.end(match?.[1] ?? '{}');
+      res.end(dataJson ?? '{}');
     } else {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);

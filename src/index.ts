@@ -5,7 +5,8 @@
 // Models
 export type { Clause, IngestResult, ClauseDiff } from './models/clause.js';
 export { DiffType } from './models/clause.js';
-export type { CanonicalNode, CanonicalGraph } from './models/canonical.js';
+export type { CanonicalNode, CandidateNode, CanonicalGraph, ExtractionCoverage } from './models/canonical.js';
+export type { EdgeType } from './models/canonical.js';
 export { CanonicalType } from './models/canonical.js';
 export type { ClassificationSignals, ChangeClassification, DRateStatus } from './models/classification.js';
 export { ChangeClass, DRateLevel, BootstrapState } from './models/classification.js';
@@ -27,8 +28,12 @@ export { parseSpec } from './spec-parser.js';
 export { diffClauses } from './diff.js';
 
 // Phase B
-export { extractCanonicalNodes, extractTerms } from './canonicalizer.js';
-export { extractCanonicalNodesLLM } from './canonicalizer-llm.js';
+export { extractCanonicalNodes, extractCandidates, extractTerms } from './canonicalizer.js';
+export type { ExtractionResult } from './canonicalizer.js';
+export { extractCanonicalNodesLLM, extractWithLLMFull } from './canonicalizer-llm.js';
+export { resolveGraph } from './resolution.js';
+export { segmentSentences } from './sentence-segmenter.js';
+export type { Sentence } from './sentence-segmenter.js';
 export { contextSemhashWarm, computeWarmHashes } from './warm-hasher.js';
 export { classifyChange, classifyChanges } from './classifier.js';
 export { classifyChangeWithLLM, classifyChangesWithLLM } from './classifier-llm.js';

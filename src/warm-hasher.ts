@@ -3,11 +3,17 @@
  *
  * Computes context_semhash_warm after canonicalization is available.
  * Incorporates canonical graph context into the clause hash.
+ *
+ * v2: Uses only typed edges (not untyped 'relates_to') and
+ * filters by confidence threshold to reduce incidental invalidation.
  */
 
 import type { Clause } from './models/clause.js';
 import type { CanonicalNode } from './models/canonical.js';
 import { sha256 } from './semhash.js';
+
+/** Minimum confidence for a node to be included in warm context */
+const MIN_CONFIDENCE = 0.3;
 
 /**
  * Compute warm context hash for a clause, incorporating canonical context.
@@ -15,7 +21,7 @@ import { sha256 } from './semhash.js';
  * Includes:
  * - normalized text
  * - section path
- * - sorted linked canonical node IDs
+ * - sorted linked canonical node IDs (typed edges only, excluding weak 'relates_to')
  * - sorted canonical node types
  */
 export function contextSemhashWarm(
@@ -25,14 +31,19 @@ export function contextSemhashWarm(
   // Find canonical nodes sourced from this clause
   const relatedNodes = canonicalNodes.filter(
     n => n.source_clause_ids.includes(clause.clause_id)
+      && (n.confidence ?? 1.0) >= MIN_CONFIDENCE
   );
 
-  // Collect all linked canon IDs (including transitive through this clause's nodes)
+  // Collect linked canon IDs — only from typed edges (not 'relates_to')
   const linkedIds = new Set<string>();
   for (const node of relatedNodes) {
     linkedIds.add(node.canon_id);
     for (const linkedId of node.linked_canon_ids) {
-      linkedIds.add(linkedId);
+      const edgeType = node.link_types?.[linkedId];
+      // Include all typed edges except weak 'relates_to'
+      if (!edgeType || edgeType !== 'relates_to') {
+        linkedIds.add(linkedId);
+      }
     }
   }
 

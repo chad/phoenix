@@ -3,7 +3,8 @@
  *
  * Goals:
  * - Formatting-only changes produce identical normalized output
- * - List order does not affect hash (items sorted)
+ * - Unordered list items are sorted for hash stability
+ * - Ordered/sequence lists are preserved (arrows, ordinals, numbered)
  * - Deterministic and idempotent
  */
 
@@ -36,15 +37,16 @@ export function normalizeText(raw: string): string {
   const lines = text.split('\n');
   const processed: string[] = [];
   let listBuffer: string[] = [];
+  let listIsOrdered = false;
 
   for (const line of lines) {
     const trimmed = line.replace(/\s+/g, ' ').trim();
     if (trimmed === '') {
       // Flush list buffer on blank line
       if (listBuffer.length > 0) {
-        listBuffer.sort();
-        processed.push(...listBuffer);
+        flushList(listBuffer, listIsOrdered, processed);
         listBuffer = [];
+        listIsOrdered = false;
       }
       continue;
     }
@@ -52,13 +54,22 @@ export function normalizeText(raw: string): string {
     // Detect list items (-, *, •, numbered)
     const listMatch = trimmed.match(/^(?:[-*•]|\d+[.)]\s*)\s*(.*)/);
     if (listMatch) {
-      listBuffer.push(listMatch[1].trim());
+      const content = listMatch[1].trim();
+      // Detect if this is a numbered list (ordered) on first item
+      if (listBuffer.length === 0) {
+        listIsOrdered = /^\d+[.)]/.test(trimmed);
+      }
+      // Detect sequence indicators in any item
+      if (isSequenceContent(content)) {
+        listIsOrdered = true;
+      }
+      listBuffer.push(content);
     } else {
       // Flush any pending list
       if (listBuffer.length > 0) {
-        listBuffer.sort();
-        processed.push(...listBuffer);
+        flushList(listBuffer, listIsOrdered, processed);
         listBuffer = [];
+        listIsOrdered = false;
       }
       processed.push(trimmed);
     }
@@ -66,9 +77,33 @@ export function normalizeText(raw: string): string {
 
   // Flush remaining list
   if (listBuffer.length > 0) {
-    listBuffer.sort();
-    processed.push(...listBuffer);
+    flushList(listBuffer, listIsOrdered, processed);
   }
 
   return processed.join('\n');
+}
+
+/**
+ * Check if list item content contains sequence/order indicators
+ * that should prevent sorting.
+ */
+function isSequenceContent(text: string): boolean {
+  // Arrows: →, ->, =>, ←
+  if (/[→←⇒⇐]|->|<-|=>/.test(text)) return true;
+  // Ordinals: 1st, 2nd, first, second, then, finally
+  if (/\b(?:1st|2nd|3rd|\d+th|first|second|third|then|finally|next|after)\b/i.test(text)) return true;
+  // Comma-delimited sequence with 3+ items that look like states/steps
+  if (/\w+\s*,\s*\w+\s*,\s*\w+/.test(text)) return true;
+  return false;
+}
+
+/**
+ * Flush a list buffer to processed lines.
+ * Unordered lists are sorted; ordered/sequence lists preserve order.
+ */
+function flushList(items: string[], isOrdered: boolean, out: string[]): void {
+  if (!isOrdered) {
+    items.sort();
+  }
+  out.push(...items);
 }

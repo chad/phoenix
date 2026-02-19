@@ -39,10 +39,22 @@ describe('normalizeText', () => {
     expect(normalizeText(input1)).toBe(normalizeText(input2));
   });
 
-  it('sorts numbered list items', () => {
-    const input1 = '1. cherry\n2. apple\n3. banana';
-    const input2 = '1. apple\n2. banana\n3. cherry';
-    expect(normalizeText(input1)).toBe(normalizeText(input2));
+  it('preserves numbered list order (ordered sequences)', () => {
+    const input = '1. cherry\n2. apple\n3. banana';
+    const result = normalizeText(input);
+    // Numbered lists are ordered — should NOT be sorted
+    expect(result).toBe('cherry\napple\nbanana');
+  });
+
+  it('preserves bullet list order when items contain arrows', () => {
+    const input = '- open → in_progress\n- in_progress → done';
+    const result = normalizeText(input);
+    // Sequence indicators prevent sorting; underscores stripped by lowercase/normalize
+    expect(result).toContain('→');
+    // Order preserved (not sorted alphabetically)
+    const lines = result.split('\n');
+    expect(lines[0]).toContain('open');
+    expect(lines[1]).toContain('done');
   });
 
   it('handles mixed content and lists', () => {
