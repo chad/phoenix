@@ -40,6 +40,8 @@ import { validateBoundary } from './boundary-validator.js';
 // Phase D
 import { evaluatePolicy, evaluateAllPolicies } from './policy-engine.js';
 import { computeCascade } from './cascade.js';
+import { runEvidence, runAllEvidence } from './evidence-runner.js';
+import type { EvidenceRunResult, CheckResult } from './evidence-runner.js';
 
 // Phase E
 import { runShadowPipeline } from './shadow-pipeline.js';
@@ -57,7 +59,7 @@ import { collectInspectData, renderInspectHTML, serveInspect } from './inspect.j
 import { resolveProvider, describeAvailability } from './llm/resolve.js';
 
 // Models
-import type { Clause } from './models/clause.js';
+import type { Clause, ClauseDiff } from './models/clause.js';
 import { DiffType } from './models/clause.js';
 import type { CanonicalNode } from './models/canonical.js';
 import type { ImplementationUnit } from './models/iu.js';
@@ -392,7 +394,27 @@ async function cmdBootstrap(): Promise<void> {
   // Save state
   saveBootstrapState(phoenixDir, machine);
 
-  // Step 6: First trust dashboard
+  // Step 6: Evidence verification
+  console.log(`  ${dim('Phase D:')} Evidence verification`);
+  const evidenceStore = new EvidenceStore(phoenixDir);
+  const evidenceResults = runAllEvidence(ius, {
+    projectRoot,
+    onProgress: (u, check, status) => {
+      if (status === 'start') process.stdout.write(`    ${dim('⏳')} ${u.name} · ${check}…`);
+      else if (status === 'pass') process.stdout.write(` ${green('✔')}\n`);
+      else if (status === 'fail') process.stdout.write(` ${red('✖')}\n`);
+      else if (status === 'skip') process.stdout.write(` ${dim('⊘')}\n`);
+    },
+  });
+  for (const r of evidenceResults) {
+    evidenceStore.addRecords(r.records);
+  }
+  const evPass = evidenceResults.flatMap(r => r.checks).filter(c => c.status === 'PASS').length;
+  const evFail = evidenceResults.flatMap(r => r.checks).filter(c => c.status === 'FAIL').length;
+  console.log(`    ${evFail === 0 ? green('✔') : red('✖')} ${evPass} pass, ${evFail} fail`);
+  console.log();
+
+  // Step 7: Trust dashboard
   console.log(`  ${dim('Phase D:')} Trust Dashboard`);
   console.log();
   printTrustDashboard(phoenixDir, projectRoot, machine, ius, canonNodes, allClauses);
@@ -1098,6 +1120,106 @@ function cmdEvaluate(args: string[]): void {
   }
 }
 
+function cmdVerify(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+
+  if (ius.length === 0) {
+    console.log(yellow('⚠ No IUs planned. Run `phoenix bootstrap` or `phoenix plan` first.'));
+    return;
+  }
+
+  // Parse flags
+  const iuFilter = args.find(a => a.startsWith('--iu='))?.split('=')[1];
+  const onlyFlag = args.find(a => a.startsWith('--only='))?.split('=')[1];
+  const skipFlag = args.find(a => a.startsWith('--skip='))?.split('=')[1];
+  const timeoutFlag = args.find(a => a.startsWith('--timeout='))?.split('=')[1];
+
+  const targetIUs = iuFilter
+    ? ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter)
+    : ius;
+
+  if (targetIUs.length === 0) {
+    console.log(red(`✖ No IU matching: ${iuFilter}`));
+    return;
+  }
+
+  const only = onlyFlag ? onlyFlag.split(',') as any[] : undefined;
+  const skip = skipFlag ? skipFlag.split(',') as any[] : undefined;
+  const timeout = timeoutFlag ? parseInt(timeoutFlag) : 30000;
+
+  console.log(bold('🔬 Evidence Verification'));
+  console.log(`  ${dim(`${targetIUs.length} IU(s), timeout ${timeout / 1000}s`)}`);
+  console.log();
+
+  const evidenceStore = new EvidenceStore(phoenixDir);
+  let totalPass = 0;
+  let totalFail = 0;
+  let totalSkip = 0;
+
+  for (const iu of targetIUs) {
+    const result = runEvidence(iu, {
+      projectRoot,
+      only,
+      skip,
+      timeout,
+      onProgress: (u, check, status) => {
+        if (status === 'start') {
+          process.stdout.write(`  ${dim('⏳')} ${u.name} · ${check}…`);
+        } else if (status === 'pass') {
+          process.stdout.write(` ${green('✔')}\n`);
+        } else if (status === 'fail') {
+          process.stdout.write(` ${red('✖')}\n`);
+        } else if (status === 'skip') {
+          process.stdout.write(` ${dim('⊘')}\n`);
+        }
+      },
+    });
+
+    // Store evidence records
+    evidenceStore.addRecords(result.records);
+
+    // Tally
+    for (const check of result.checks) {
+      switch (check.status) {
+        case 'PASS': totalPass++; break;
+        case 'FAIL': totalFail++; break;
+        default: totalSkip++; break;
+      }
+    }
+
+    // Show details for failures
+    for (const check of result.checks) {
+      if (check.status === 'FAIL' && check.details) {
+        console.log(`    ${dim('│')} ${red(check.kind)}: ${check.message}`);
+        for (const line of check.details.split('\n').slice(0, 5)) {
+          console.log(`    ${dim('│')}   ${dim(line)}`);
+        }
+      }
+    }
+
+    // Summary line per IU
+    const iuPass = result.checks.filter(c => c.status === 'PASS').length;
+    const iuFail = result.checks.filter(c => c.status === 'FAIL').length;
+    const iuTime = result.checks.reduce((s, c) => s + c.duration_ms, 0);
+    if (iuFail > 0) {
+      console.log(`    ${red('✖')} ${iu.name}: ${iuPass} pass, ${iuFail} fail ${dim(`(${iuTime}ms)`)}`);
+    } else {
+      console.log(`    ${green('✔')} ${iu.name}: ${iuPass} pass ${dim(`(${iuTime}ms)`)}`);
+    }
+    console.log();
+  }
+
+  // Grand totals
+  console.log(`  ${dim('─────────────────────────────')}`);
+  if (totalFail === 0) {
+    console.log(`  ${green('✔')} All evidence passed: ${green(String(totalPass))} pass${totalSkip ? `, ${dim(String(totalSkip))} skipped` : ''}`);
+  } else {
+    console.log(`  ${red('✖')} Evidence: ${green(String(totalPass))} pass, ${red(String(totalFail))} fail${totalSkip ? `, ${dim(String(totalSkip))} skipped` : ''}`);
+  }
+  console.log(`  ${dim('Results stored. Run `phoenix status` to see updated trust dashboard.')}`);
+}
+
 function cmdCascade(): void {
   const { phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
@@ -1249,6 +1371,371 @@ async function cmdInspect(args: string[]): Promise<void> {
   await new Promise(() => {});
 }
 
+// ─── Sync Command ────────────────────────────────────────────────────────────
+
+async function cmdSync(args: string[]): Promise<void> {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const dryRun = args.includes('--dry-run');
+  const forceStubs = args.includes('--stubs');
+
+  console.log(bold('🔄 Phoenix Sync'));
+  console.log(`  ${dim('Detecting spec changes and regenerating only affected IUs')}`);
+  console.log();
+
+  const specStore = new SpecStore(phoenixDir);
+  const canonStore = new CanonicalStore(phoenixDir);
+  const specFiles = findSpecFiles(projectRoot);
+
+  if (specFiles.length === 0) {
+    console.log(yellow('  ⚠ No spec files found in spec/ directory.'));
+    return;
+  }
+
+  // ─── Step 1: Diff all specs against stored state ───────────────────────────
+
+  console.log(`  ${dim('Step 1:')} Detecting spec changes`);
+
+  interface DocDiff {
+    docId: string;
+    filePath: string;
+    diffs: ClauseDiff[];
+    hasChanges: boolean;
+    addedCount: number;
+    removedCount: number;
+    modifiedCount: number;
+    isNew: boolean;
+  }
+
+  const docDiffs: DocDiff[] = [];
+  let totalChangedClauses = 0;
+  const changedClauseIds = new Set<string>();   // clause IDs that changed (before + after)
+  const addedClauseAfterIds = new Set<string>(); // clause IDs that are brand new
+
+  for (const file of specFiles) {
+    const docId = relative(projectRoot, file);
+    const storedClauses = specStore.getClauses(docId);
+    const isNew = storedClauses.length === 0;
+
+    const diffs = isNew ? [] : specStore.diffDocument(file, projectRoot);
+
+    const added = diffs.filter(d => d.diff_type === DiffType.ADDED).length;
+    const removed = diffs.filter(d => d.diff_type === DiffType.REMOVED).length;
+    const modified = diffs.filter(d => d.diff_type === DiffType.MODIFIED).length;
+    const hasChanges = isNew || added > 0 || removed > 0 || modified > 0;
+
+    if (hasChanges) {
+      // Track affected clause IDs for graph tracing
+      for (const d of diffs) {
+        if (d.diff_type === DiffType.MODIFIED || d.diff_type === DiffType.REMOVED) {
+          if (d.clause_id_before) changedClauseIds.add(d.clause_id_before);
+        }
+        if (d.diff_type === DiffType.MODIFIED || d.diff_type === DiffType.ADDED) {
+          if (d.clause_id_after) {
+            changedClauseIds.add(d.clause_id_after);
+            addedClauseAfterIds.add(d.clause_id_after);
+          }
+        }
+      }
+      totalChangedClauses += added + removed + modified;
+    }
+
+    docDiffs.push({ docId, filePath: file, diffs, hasChanges, addedCount: added, removedCount: removed, modifiedCount: modified, isNew });
+  }
+
+  const changedDocs = docDiffs.filter(d => d.hasChanges);
+
+  if (changedDocs.length === 0) {
+    console.log(`    ${green('✔')} No spec changes detected. Everything is up to date.`);
+    return;
+  }
+
+  for (const doc of changedDocs) {
+    if (doc.isNew) {
+      console.log(`    ${green('+')} ${doc.docId} ${dim('(new spec)')}`);
+    } else {
+      const parts: string[] = [];
+      if (doc.addedCount > 0) parts.push(green(`+${doc.addedCount}`));
+      if (doc.removedCount > 0) parts.push(red(`-${doc.removedCount}`));
+      if (doc.modifiedCount > 0) parts.push(yellow(`~${doc.modifiedCount}`));
+      console.log(`    ${yellow('~')} ${doc.docId} ${dim('(')}${parts.join(dim(', '))}${dim(')')}`);
+    }
+  }
+  console.log(`    ${dim(`${changedDocs.length} doc(s), ${totalChangedClauses} clause change(s)`)}`);
+  console.log();
+
+  // ─── Step 2: Trace impact through canonical graph ──────────────────────────
+
+  console.log(`  ${dim('Step 2:')} Tracing impact through graphs`);
+
+  const oldCanonNodes = canonStore.getAllNodes();
+  const oldIUs = loadIUs(phoenixDir);
+
+  // Find canon nodes sourced from changed clauses
+  const affectedCanonIds = new Set<string>();
+  for (const node of oldCanonNodes) {
+    for (const clauseId of node.source_clause_ids) {
+      if (changedClauseIds.has(clauseId)) {
+        affectedCanonIds.add(node.canon_id);
+        break;
+      }
+    }
+  }
+
+  // Find IUs sourced from affected canon nodes
+  const affectedIUIds = new Set<string>();
+  for (const iu of oldIUs) {
+    for (const canonId of iu.source_canon_ids) {
+      if (affectedCanonIds.has(canonId)) {
+        affectedIUIds.add(iu.iu_id);
+        break;
+      }
+    }
+  }
+
+  // Also trace IU dependencies (cascading)
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const iu of oldIUs) {
+      if (affectedIUIds.has(iu.iu_id)) continue;
+      for (const dep of iu.dependencies) {
+        if (affectedIUIds.has(dep)) {
+          affectedIUIds.add(iu.iu_id);
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // For new docs, all new IUs will be created — we'll detect them after re-planning
+  const newDocIds = new Set(changedDocs.filter(d => d.isNew).map(d => d.docId));
+
+  console.log(`    ${dim('Affected canonical nodes:')} ${affectedCanonIds.size > 0 ? yellow(String(affectedCanonIds.size)) : green('0')}`);
+  console.log(`    ${dim('Affected IUs:')}             ${affectedIUIds.size > 0 ? yellow(String(affectedIUIds.size)) : green('0')}`);
+  if (newDocIds.size > 0) {
+    console.log(`    ${dim('New spec docs:')}            ${green(String(newDocIds.size))} ${dim('(will create new IUs)')}`);
+  }
+  console.log();
+
+  if (dryRun) {
+    console.log(cyan('  ── Dry run ──'));
+    console.log();
+    if (affectedIUIds.size > 0) {
+      console.log(`  ${bold('IUs that would be regenerated:')}`);
+      for (const iu of oldIUs) {
+        if (affectedIUIds.has(iu.iu_id)) {
+          console.log(`    ${yellow('⟳')} ${iu.name} ${dim(`(${iu.output_files.join(', ')})`)}`);
+        }
+      }
+    }
+    if (newDocIds.size > 0) {
+      console.log(`  ${bold('New specs that would be fully processed:')}`);
+      for (const docId of newDocIds) {
+        console.log(`    ${green('+')} ${docId}`);
+      }
+    }
+    console.log();
+    console.log(dim('  Run without --dry-run to apply changes.'));
+    return;
+  }
+
+  // ─── Step 3: Re-ingest changed specs ───────────────────────────────────────
+
+  console.log(`  ${dim('Step 3:')} Re-ingesting changed specs`);
+
+  for (const doc of changedDocs) {
+    const result = specStore.ingestDocument(doc.filePath, projectRoot);
+    console.log(`    ${green('✔')} ${doc.docId} → ${result.clauses.length} clauses`);
+  }
+  console.log();
+
+  // ─── Step 4: Re-canonicalize (full — canon nodes are content-addressed) ────
+
+  console.log(`  ${dim('Step 4:')} Re-canonicalization`);
+
+  const allClauses: Clause[] = [];
+  for (const specFile of specFiles) {
+    const docId = relative(projectRoot, specFile);
+    allClauses.push(...specStore.getClauses(docId));
+  }
+
+  const llm = forceStubs ? null : resolveProvider(phoenixDir);
+  if (llm) {
+    console.log(`    ${dim(`LLM: ${llm.name}/${llm.model}`)}`);
+  }
+
+  const newCanonNodes = await extractCanonicalNodesLLM(allClauses, llm);
+  canonStore.saveNodes(newCanonNodes);
+
+  // Compute warm hashes
+  const warmHashes = computeWarmHashes(allClauses, newCanonNodes);
+  const warmPath = join(phoenixDir, 'graphs', 'warm-hashes.json');
+  const warmObj: Record<string, string> = {};
+  for (const [k, v] of warmHashes) warmObj[k] = v;
+  writeFileSync(warmPath, JSON.stringify(warmObj, null, 2), 'utf8');
+
+  console.log(`    ${green('✔')} ${newCanonNodes.length} canonical nodes ${dim(`(was ${oldCanonNodes.length})`)}`);
+  console.log();
+
+  // ─── Step 5: Re-plan IUs ──────────────────────────────────────────────────
+
+  console.log(`  ${dim('Step 5:')} Re-planning IUs`);
+
+  const newIUs = planIUs(newCanonNodes, allClauses);
+  saveIUs(phoenixDir, newIUs);
+
+  // Determine which IUs to regenerate:
+  // 1. IUs that existed before and were affected
+  // 2. Brand new IUs (not in old set)
+  const oldIUNames = new Set(oldIUs.map(iu => iu.name));
+  const newIUNames = new Set(newIUs.map(iu => iu.name));
+
+  // Match by name since IU IDs are content-addressed (change on any input change)
+  const brandNewIUs = newIUs.filter(iu => !oldIUNames.has(iu.name));
+  const removedIUNames = [...oldIUNames].filter(name => !newIUNames.has(name));
+
+  // For existing IUs, check if their source canon nodes changed
+  const iusToRegen: ImplementationUnit[] = [];
+  for (const iu of newIUs) {
+    if (!oldIUNames.has(iu.name)) {
+      // Brand new IU — always regen
+      iusToRegen.push(iu);
+      continue;
+    }
+    // Check if any of its source canon IDs overlap with affected canon IDs,
+    // OR if the IU's canon set itself changed (new canon nodes from changed clauses)
+    const oldIU = oldIUs.find(o => o.name === iu.name);
+    if (!oldIU) {
+      iusToRegen.push(iu);
+      continue;
+    }
+
+    // Did the canon sources change?
+    const oldCanonSet = new Set(oldIU.source_canon_ids);
+    const newCanonSet = new Set(iu.source_canon_ids);
+    const canonChanged = iu.source_canon_ids.some(id => !oldCanonSet.has(id)) ||
+                         oldIU.source_canon_ids.some(id => !newCanonSet.has(id));
+
+    // Did the contract change? (different description, inputs, outputs, invariants)
+    const contractChanged = JSON.stringify(oldIU.contract) !== JSON.stringify(iu.contract);
+
+    if (canonChanged || contractChanged) {
+      iusToRegen.push(iu);
+    }
+  }
+
+  const unchangedCount = newIUs.length - iusToRegen.length;
+
+  console.log(`    ${green('✔')} ${newIUs.length} IUs planned ${dim(`(was ${oldIUs.length})`)}`);
+  if (brandNewIUs.length > 0) {
+    console.log(`    ${green(`+ ${brandNewIUs.length} new IU(s)`)}`);
+  }
+  if (removedIUNames.length > 0) {
+    console.log(`    ${red(`- ${removedIUNames.length} removed IU(s):`)} ${dim(removedIUNames.join(', '))}`);
+  }
+  console.log(`    ${yellow(`⟳ ${iusToRegen.length} IU(s) need regeneration`)}, ${green(`${unchangedCount} unchanged`)}`);
+  console.log();
+
+  if (iusToRegen.length === 0) {
+    console.log(green('  ✔ No IUs need regeneration. Sync complete.'));
+    return;
+  }
+
+  // ─── Step 6: Regenerate only affected IUs ──────────────────────────────────
+
+  console.log(`  ${dim('Step 6:')} Regenerating ${iusToRegen.length} IU(s)`);
+
+  const regenLLM = forceStubs ? null : resolveProvider(phoenixDir);
+  if (regenLLM) {
+    console.log(`    ${dim(`Provider: ${regenLLM.name}/${regenLLM.model}`)}`);
+  } else {
+    const { hint } = describeAvailability();
+    console.log(`    ${dim('Mode: stubs')}${forceStubs ? '' : ` ${dim('—')} ${dim(hint)}`}`);
+  }
+
+  const regenCtx: RegenContext = {
+    llm: regenLLM ?? undefined,
+    canonNodes: newCanonNodes,
+    allIUs: newIUs,
+    projectRoot,
+    onProgress: (iu, status, msg) => {
+      if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
+      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
+      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
+    },
+  };
+
+  const manifestManager = new ManifestManager(phoenixDir);
+  const results = await generateAll(iusToRegen, regenCtx);
+
+  for (const result of results) {
+    for (const [filePath, content] of result.files) {
+      const fullPath = join(projectRoot, filePath);
+      mkdirSync(join(fullPath, '..'), { recursive: true });
+      writeFileSync(fullPath, content, 'utf8');
+    }
+    manifestManager.recordIU(result.manifest);
+
+    if (!regenLLM) {
+      const iu = iusToRegen.find(i => i.iu_id === result.iu_id);
+      console.log(`    ${green('✔')} ${iu?.name || result.iu_id.slice(0, 12)}`);
+      for (const [filePath] of result.files) {
+        console.log(`      → ${cyan(filePath)}`);
+      }
+    }
+  }
+  console.log();
+
+  // ─── Step 7: Re-scaffold ──────────────────────────────────────────────────
+
+  console.log(`  ${dim('Step 7:')} Updating scaffold`);
+  const services = deriveServices(newIUs);
+  const projectName = basename(projectRoot);
+  const scaffold = generateScaffold(services, projectName);
+  for (const [filePath, content] of scaffold.files) {
+    const fullPath = join(projectRoot, filePath);
+    mkdirSync(join(fullPath, '..'), { recursive: true });
+    writeFileSync(fullPath, content, 'utf8');
+  }
+  for (const svc of services) {
+    console.log(`    ${green('✔')} ${svc.name} → :${svc.port}`);
+  }
+  console.log();
+
+  // ─── Step 8: Verify regenerated IUs ─────────────────────────────────────
+
+  console.log(`  ${dim('Step 8:')} Verifying regenerated IUs`);
+
+  const evidenceStore = new EvidenceStore(phoenixDir);
+  const evidenceResults = runAllEvidence(iusToRegen, {
+    projectRoot,
+    onProgress: (u, check, status) => {
+      if (status === 'start') process.stdout.write(`    ${dim('⏳')} ${u.name} · ${check}…`);
+      else if (status === 'pass') process.stdout.write(` ${green('✔')}\n`);
+      else if (status === 'fail') process.stdout.write(` ${red('✖')}\n`);
+      else if (status === 'skip') process.stdout.write(` ${dim('⊘')}\n`);
+    },
+  });
+  for (const r of evidenceResults) {
+    evidenceStore.addRecords(r.records);
+  }
+  const evPass = evidenceResults.flatMap(r => r.checks).filter(c => c.status === 'PASS').length;
+  const evFail = evidenceResults.flatMap(r => r.checks).filter(c => c.status === 'FAIL').length;
+  console.log(`    ${evFail === 0 ? green('✔') : red('✖')} ${evPass} pass, ${evFail} fail`);
+  console.log();
+
+  // ─── Summary ──────────────────────────────────────────────────────────────
+
+  console.log(green('  ✔ Sync complete.'));
+  console.log(`    ${dim('Specs changed:')}   ${changedDocs.length}`);
+  console.log(`    ${dim('IUs regenerated:')} ${iusToRegen.length}/${newIUs.length}`);
+  console.log(`    ${dim('IUs unchanged:')}   ${unchangedCount}`);
+  console.log(`    ${dim('Evidence:')}         ${green(String(evPass))} pass${evFail ? `, ${red(String(evFail))} fail` : ''}`);
+  console.log();
+  console.log(`    Run ${cyan('phoenix status')} to see the trust dashboard.`);
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -1263,6 +1750,9 @@ ${bold('Usage:')} phoenix <command> [options]
 ${bold('Getting Started:')}
   ${cyan('init')}                 Initialize a new Phoenix project
   ${cyan('bootstrap')}            Full bootstrap: ingest → canonicalize → plan → generate
+  ${cyan('sync')} [--dry-run]      Detect spec changes → regen only affected IUs
+                         ${dim('--dry-run  Show what would change without applying')}
+                         ${dim('--stubs    Force stub generation (skip LLM)')}
 
 ${bold('Spec Management:')}
   ${cyan('ingest')} [files...]     Ingest spec documents (default: all in spec/)
@@ -1281,8 +1771,12 @@ ${bold('Implementation:')}
 
 ${bold('Verification:')}
   ${cyan('status')}                Trust dashboard — the primary UX
+  ${cyan('verify')} [--iu=<id>]   Run evidence checks (typecheck, lint, boundary, tests)
+                         ${dim('--only=typecheck,unit_tests   Run specific checks')}
+                         ${dim('--skip=lint                   Skip specific checks')}
+                         ${dim('--timeout=30000               Per-check timeout (ms)')}
   ${cyan('drift')}                 Check generated files for drift
-  ${cyan('evaluate')} [--iu=<id>] Evaluate evidence against policy
+  ${cyan('evaluate')} [--iu=<id>] Evaluate evidence against policy (read-only)
   ${cyan('cascade')}               Show cascade failure effects
 
 ${bold('Inspection:')}
@@ -1312,6 +1806,9 @@ async function main(): Promise<void> {
     case 'bootstrap':
       await cmdBootstrap();
       break;
+    case 'sync':
+      await cmdSync(commandArgs);
+      break;
     case 'status':
       cmdStatus();
       break;
@@ -1340,6 +1837,10 @@ async function main(): Promise<void> {
       break;
     case 'drift':
       cmdDrift();
+      break;
+    case 'verify':
+    case 'evidence':
+      cmdVerify(commandArgs);
       break;
     case 'evaluate':
     case 'eval':

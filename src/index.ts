@@ -57,6 +57,8 @@ export type { UnitBoundaryChange } from './boundary-validator.js';
 // Phase D
 export { evaluatePolicy, evaluateAllPolicies } from './policy-engine.js';
 export { computeCascade, getTransitiveDependents } from './cascade.js';
+export { runEvidence, runAllEvidence } from './evidence-runner.js';
+export type { EvidenceRunResult, CheckResult, RunnerOptions } from './evidence-runner.js';
 
 // Phase E
 export { computeShadowDiff, classifyShadowDiff, runShadowPipeline } from './shadow-pipeline.js';

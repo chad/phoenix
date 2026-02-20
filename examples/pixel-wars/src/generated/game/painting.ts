@@ -32,24 +32,28 @@ export interface PaintBroadcast {
 }
 
 export class PaintingSystem extends EventEmitter {
-  private readonly grid: Map<string, GridCell>;
-  private readonly playerCooldowns: Map<string, number>;
+  private grid: Map<string, GridCell> = new Map();
+  private playerCooldowns: Map<string, number> = new Map();
+  private readonly cooldownMs = 500;
   private readonly gridWidth: number;
   private readonly gridHeight: number;
-  private readonly cooldownMs: number = 500;
 
-  constructor(gridWidth: number, gridHeight: number) {
+  constructor(gridWidth: number = 100, gridHeight: number = 100) {
     super();
     this.gridWidth = gridWidth;
     this.gridHeight = gridHeight;
-    this.grid = new Map();
-    this.playerCooldowns = new Map();
-    
-    // Initialize empty grid
-    for (let x = 0; x < gridWidth; x++) {
-      for (let y = 0; y < gridHeight; y++) {
-        const key = this.getCellKey(x, y);
-        this.grid.set(key, { x, y, color: null });
+    this.initializeGrid();
+  }
+
+  private initializeGrid(): void {
+    for (let x = 0; x < this.gridWidth; x++) {
+      for (let y = 0; y < this.gridHeight; y++) {
+        const key = `${x},${y}`;
+        this.grid.set(key, {
+          x,
+          y,
+          color: null
+        });
       }
     }
   }
@@ -89,7 +93,7 @@ export class PaintingSystem extends EventEmitter {
       };
     }
 
-    // Paint the cell (overwrite existing color)
+    // Execute paint
     const cellKey = this.getCellKey(x, y);
     const cell = this.grid.get(cellKey)!;
     
@@ -97,7 +101,7 @@ export class PaintingSystem extends EventEmitter {
     cell.lastPaintedBy = playerId;
     cell.lastPaintedAt = timestamp;
 
-    // Update player cooldown
+    // Update cooldown
     this.playerCooldowns.set(playerId, timestamp);
 
     // Broadcast to all connected players
@@ -126,20 +130,12 @@ export class PaintingSystem extends EventEmitter {
     return this.grid.get(cellKey) || null;
   }
 
-  public getGrid(): GridCell[][] {
-    const result: GridCell[][] = [];
-    for (let x = 0; x < this.gridWidth; x++) {
-      result[x] = [];
-      for (let y = 0; y < this.gridHeight; y++) {
-        const cell = this.getCell(x, y);
-        result[x][y] = cell!;
-      }
-    }
-    return result;
+  public getGrid(): GridCell[] {
+    return Array.from(this.grid.values());
   }
 
-  public getPlayerLastPaintTime(playerId: string): number | undefined {
-    return this.playerCooldowns.get(playerId);
+  public getPlayerLastPaintTime(playerId: string): number | null {
+    return this.playerCooldowns.get(playerId) || null;
   }
 
   public getRemainingCooldown(playerId: string, currentTime: number): number {
@@ -150,27 +146,18 @@ export class PaintingSystem extends EventEmitter {
     const elapsed = currentTime - lastPaintTime;
     return Math.max(0, this.cooldownMs - elapsed);
   }
+
+  public clearGrid(): void {
+    this.initializeGrid();
+  }
+
+  public resetPlayerCooldowns(): void {
+    this.playerCooldowns.clear();
+  }
 }
 
-export function createPaintingSystem(gridWidth: number, gridHeight: number): PaintingSystem {
+export function createPaintingSystem(gridWidth?: number, gridHeight?: number): PaintingSystem {
   return new PaintingSystem(gridWidth, gridHeight);
-}
-
-export function validatePaintRequest(request: Partial<PaintRequest>): request is PaintRequest {
-  return (
-    typeof request.playerId === 'string' &&
-    typeof request.teamColor === 'string' &&
-    typeof request.x === 'number' &&
-    typeof request.y === 'number' &&
-    typeof request.timestamp === 'number' &&
-    request.playerId.length > 0 &&
-    request.teamColor.length > 0 &&
-    Number.isInteger(request.x) &&
-    Number.isInteger(request.y) &&
-    request.x >= 0 &&
-    request.y >= 0 &&
-    request.timestamp > 0
-  );
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */

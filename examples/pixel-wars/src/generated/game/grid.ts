@@ -1,6 +1,6 @@
 export interface GridCell {
   isEmpty: boolean;
-  value?: any;
+  value?: string;
 }
 
 export interface GridPosition {
@@ -15,53 +15,49 @@ export interface GridDimensions {
 
 export class Grid {
   private cells: GridCell[][];
-  private dimensions: GridDimensions;
+  private readonly dimensions: GridDimensions;
 
   constructor(rows: number = 10, cols: number = 10) {
+    if (rows <= 0 || cols <= 0) {
+      throw new Error('Grid dimensions must be positive integers');
+    }
+    
     this.dimensions = { rows, cols };
-    this.cells = this.initializeEmptyCells();
+    this.cells = this.initializeEmptyGrid();
   }
 
-  private initializeEmptyCells(): GridCell[][] {
-    const cells: GridCell[][] = [];
+  private initializeEmptyGrid(): GridCell[][] {
+    const grid: GridCell[][] = [];
     for (let row = 0; row < this.dimensions.rows; row++) {
-      cells[row] = [];
+      grid[row] = [];
       for (let col = 0; col < this.dimensions.cols; col++) {
-        cells[row][col] = { isEmpty: true };
+        grid[row][col] = { isEmpty: true };
       }
     }
-    return cells;
+    return grid;
   }
 
-  public getCell(position: GridPosition): GridCell | null {
-    if (!this.isValidPosition(position)) {
-      return null;
-    }
-    return this.cells[position.row][position.col];
+  public getCell(position: GridPosition): GridCell {
+    this.validatePosition(position);
+    return { ...this.cells[position.row][position.col] };
   }
 
-  public setCell(position: GridPosition, value: any): boolean {
-    if (!this.isValidPosition(position)) {
-      return false;
-    }
+  public setCell(position: GridPosition, value: string): void {
+    this.validatePosition(position);
     this.cells[position.row][position.col] = {
       isEmpty: false,
-      value: value
+      value
     };
-    return true;
   }
 
-  public clearCell(position: GridPosition): boolean {
-    if (!this.isValidPosition(position)) {
-      return false;
-    }
+  public clearCell(position: GridPosition): void {
+    this.validatePosition(position);
     this.cells[position.row][position.col] = { isEmpty: true };
-    return true;
   }
 
-  public isCellEmpty(position: GridPosition): boolean {
-    const cell = this.getCell(position);
-    return cell ? cell.isEmpty : false;
+  public isEmpty(position: GridPosition): boolean {
+    this.validatePosition(position);
+    return this.cells[position.row][position.col].isEmpty;
   }
 
   public getDimensions(): GridDimensions {
@@ -72,8 +68,21 @@ export class Grid {
     return this.cells.map(row => row.map(cell => ({ ...cell })));
   }
 
-  public clearAll(): void {
-    this.cells = this.initializeEmptyCells();
+  public reset(): void {
+    this.cells = this.initializeEmptyGrid();
+  }
+
+  public isValidPosition(position: GridPosition): boolean {
+    return position.row >= 0 && 
+           position.row < this.dimensions.rows &&
+           position.col >= 0 && 
+           position.col < this.dimensions.cols;
+  }
+
+  private validatePosition(position: GridPosition): void {
+    if (!this.isValidPosition(position)) {
+      throw new Error(`Invalid grid position: row ${position.row}, col ${position.col}`);
+    }
   }
 
   public getEmptyCells(): GridPosition[] {
@@ -100,11 +109,12 @@ export class Grid {
     return occupiedCells;
   }
 
-  private isValidPosition(position: GridPosition): boolean {
-    return position.row >= 0 && 
-           position.row < this.dimensions.rows && 
-           position.col >= 0 && 
-           position.col < this.dimensions.cols;
+  public isFull(): boolean {
+    return this.getEmptyCells().length === 0;
+  }
+
+  public getTotalCells(): number {
+    return this.dimensions.rows * this.dimensions.cols;
   }
 }
 
@@ -114,7 +124,7 @@ export function createGrid(rows?: number, cols?: number): Grid {
 
 /** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
-  iu_id: '076f6719d071712bc9eabad5d3df9adf59f4ed9cb24991a72f6ad87f06168ca0',
+  iu_id: '54402d513f568c24bdb33696d7728b336aebce2df635c3570e86a8269c39c664',
   name: 'Grid',
   risk_tier: 'low',
   canon_ids: [2 as const],

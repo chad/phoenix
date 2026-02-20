@@ -4,7 +4,7 @@ Pixel Wars is a team-based territory capture game on a shared grid.
 
 ## Grid
 
-- The grid is 20 columns × 20 rows (400 total cells)
+- The grid is 15 columns × 15 rows 
 - Each cell is either empty (null) or owned by a team color
 - Initial grid state must be all empty cells
 - Grid state must be stored in memory (no persistence needed)
@@ -27,7 +27,7 @@ Pixel Wars is a team-based territory capture game on a shared grid.
 
 ## Scoring and Rounds
 
-- A round lasts 120 seconds
+- A round lasts 110 seconds
 - The server must broadcast the remaining time every second
 - When the timer reaches zero, the team with the most cells wins
 - After a round ends, the server must broadcast the final scores and winning team

@@ -18,7 +18,7 @@ export interface RoomEvents {
   player_joined: (player: Player) => void;
   player_left: (playerId: string) => void;
   cells_updated: (playerId: string, newCount: number) => void;
-  room_full: (playerId: string) => void;
+  room_full: () => void;
 }
 
 export class GameRoom extends EventEmitter {
@@ -34,17 +34,17 @@ export class GameRoom extends EventEmitter {
     };
   }
 
-  public addPlayer(playerId: string): Player | null {
-    if (this.state.players.size >= this.state.maxPlayers) {
-      this.emit('room_full', playerId);
+  canJoin(): boolean {
+    return this.state.players.size < this.state.maxPlayers;
+  }
+
+  addPlayer(playerId: string): Player | null {
+    if (!this.canJoin()) {
+      this.emit('room_full');
       return null;
     }
 
-    if (this.state.players.has(playerId)) {
-      return this.state.players.get(playerId)!;
-    }
-
-    const teamColor = this.assignTeamColor();
+    const teamColor = this.assignTeam();
     const player: Player = {
       id: playerId,
       teamColor,
@@ -57,7 +57,7 @@ export class GameRoom extends EventEmitter {
     return player;
   }
 
-  public removePlayer(playerId: string): boolean {
+  removePlayer(playerId: string): boolean {
     const player = this.state.players.get(playerId);
     if (!player) {
       return false;
@@ -76,16 +76,16 @@ export class GameRoom extends EventEmitter {
     return true;
   }
 
-  public updatePlayerCells(playerId: string, newCellCount: number): boolean {
+  updatePlayerCells(playerId: string, cellCount: number): boolean {
     const player = this.state.players.get(playerId);
     if (!player) {
       return false;
     }
 
     const oldCount = player.cellsPainted;
-    const difference = newCellCount - oldCount;
+    const difference = cellCount - oldCount;
 
-    player.cellsPainted = newCellCount;
+    player.cellsPainted = cellCount;
 
     // Update team totals
     if (player.teamColor === 'red') {
@@ -94,34 +94,30 @@ export class GameRoom extends EventEmitter {
       this.state.blueTeamCells += difference;
     }
 
-    this.emit('cells_updated', playerId, newCellCount);
+    this.emit('cells_updated', playerId, cellCount);
     return true;
   }
 
-  public getPlayer(playerId: string): Player | undefined {
+  getPlayer(playerId: string): Player | undefined {
     return this.state.players.get(playerId);
   }
 
-  public getPlayerCount(): number {
+  getAllPlayers(): Player[] {
+    return Array.from(this.state.players.values());
+  }
+
+  getPlayerCount(): number {
     return this.state.players.size;
   }
 
-  public getTeamCounts(): { red: number; blue: number } {
+  getTeamStats(): { red: number; blue: number } {
     return {
       red: this.state.redTeamCells,
       blue: this.state.blueTeamCells,
     };
   }
 
-  public getAllPlayers(): Player[] {
-    return Array.from(this.state.players.values());
-  }
-
-  public isFull(): boolean {
-    return this.state.players.size >= this.state.maxPlayers;
-  }
-
-  private assignTeamColor(): 'red' | 'blue' {
+  private assignTeam(): 'red' | 'blue' {
     let redCount = 0;
     let blueCount = 0;
 
@@ -139,45 +135,10 @@ export class GameRoom extends EventEmitter {
 
 export const globalRoom = new GameRoom();
 
-export function joinGlobalRoom(playerId: string): { success: boolean; player?: Player; error?: string } {
-  if (globalRoom.isFull()) {
-    return {
-      success: false,
-      error: 'room_full',
-    };
-  }
-
-  const player = globalRoom.addPlayer(playerId);
-  if (!player) {
-    return {
-      success: false,
-      error: 'room_full',
-    };
-  }
-
+export function createRoomFullError(): { type: 'error'; message: 'room_full' } {
   return {
-    success: true,
-    player,
-  };
-}
-
-export function leaveGlobalRoom(playerId: string): boolean {
-  return globalRoom.removePlayer(playerId);
-}
-
-export function updatePlayerProgress(playerId: string, cellsPainted: number): boolean {
-  return globalRoom.updatePlayerCells(playerId, cellsPainted);
-}
-
-export function getRoomStats(): {
-  playerCount: number;
-  maxPlayers: number;
-  teamCounts: { red: number; blue: number };
-} {
-  return {
-    playerCount: globalRoom.getPlayerCount(),
-    maxPlayers: 20,
-    teamCounts: globalRoom.getTeamCounts(),
+    type: 'error',
+    message: 'room_full',
   };
 }
 

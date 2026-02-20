@@ -7,189 +7,239 @@ export interface FeedbackSystem {
 }
 
 export interface FeedbackOptions {
-  gridContainer: string;
-  rootContainer: string;
+  gridContainer: HTMLElement;
+  overlayContainer: HTMLElement;
+  cooldownContainer: HTMLElement;
 }
 
 export class Feedback implements FeedbackSystem {
-  private gridContainer: string;
-  private rootContainer: string;
-  private cooldownBarId: string | null = null;
-  private activeToastId: string | null = null;
-  private activeOverlayId: string | null = null;
-  private styleId: string | null = null;
+  private gridContainer: HTMLElement;
+  private overlayContainer: HTMLElement;
+  private cooldownContainer: HTMLElement;
+  private activeFlashes = new Set<string>();
+  private activeToast: HTMLElement | null = null;
+  private activeOverlay: HTMLElement | null = null;
+  private cooldownBar: HTMLElement | null = null;
 
   constructor(options: FeedbackOptions) {
     this.gridContainer = options.gridContainer;
-    this.rootContainer = options.rootContainer;
+    this.overlayContainer = options.overlayContainer;
+    this.cooldownContainer = options.cooldownContainer;
     this.initializeCooldownBar();
   }
 
-  private generateId(): string {
-    return `feedback-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-  }
-
   private initializeCooldownBar(): void {
-    this.cooldownBarId = this.generateId();
-    const progressFillId = this.generateId();
-
-    const cooldownBarHtml = `
-      <div id="${this.cooldownBarId}" style="
-        position: absolute;
-        bottom: -8px;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background-color: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
-        overflow: hidden;
-      ">
-        <div id="${progressFillId}" data-progress-fill="true" style="
-          height: 100%;
-          width: 0%;
-          background-color: #ff6b6b;
-          transition: width 0.1s ease-out;
-          border-radius: 2px;
-        "></div>
-      </div>
+    this.cooldownBar = document.createElement('div');
+    this.cooldownBar.style.cssText = `
+      position: relative;
+      width: 100%;
+      height: 4px;
+      background-color: #e0e0e0;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
     `;
 
-    // In a real implementation, this would append to the actual DOM element
-    // For this module, we store the HTML template
+    const progressFill = document.createElement('div');
+    progressFill.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      background-color: #ff6b6b;
+      border-radius: 2px;
+      transition: width 0.1s ease-out;
+    `;
+    progressFill.setAttribute('data-progress-fill', 'true');
+
+    this.cooldownBar.appendChild(progressFill);
+    this.cooldownContainer.appendChild(this.cooldownBar);
   }
 
   flashCell(row: number, col: number): void {
-    // Generate HTML template for cell flash effect
-    const flashHtml = `
-      <style>
-        [data-row="${row}"][data-col="${col}"] {
-          background-color: white !important;
-          transition: background-color 0.15s ease-out;
-        }
-      </style>
-    `;
+    const cellKey = `${row}-${col}`;
+    if (this.activeFlashes.has(cellKey)) {
+      return;
+    }
 
-    // In a real implementation, this would manipulate the actual DOM
+    const cell = this.gridContainer.querySelector(`[data-row="${row}"][data-col="${col}"]`) as HTMLElement;
+    if (!cell) {
+      return;
+    }
+
+    this.activeFlashes.add(cellKey);
+
+    const originalBackground = cell.style.backgroundColor;
+    const originalTransition = cell.style.transition;
+
+    cell.style.transition = 'background-color 0.05s ease-out';
+    cell.style.backgroundColor = '#ffffff';
+
     setTimeout(() => {
-      // Reset styles after flash
-    }, 150);
+      cell.style.backgroundColor = originalBackground;
+      
+      setTimeout(() => {
+        cell.style.transition = originalTransition;
+        this.activeFlashes.delete(cellKey);
+      }, 150);
+    }, 100);
   }
 
   showCooldownToast(): void {
-    if (this.activeToastId) {
-      // Remove existing toast
-      this.activeToastId = null;
+    if (this.activeToast) {
+      return;
     }
 
-    this.activeToastId = this.generateId();
-    const styleId = this.generateId();
-
-    const toastHtml = `
-      <style id="${styleId}">
-        @keyframes fadeInOut {
-          0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-          20%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        }
-      </style>
-      <div id="${this.activeToastId}" style="
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 16px;
-        font-family: system-ui, -apple-system, sans-serif;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        z-index: 1000;
-        animation: fadeInOut 1s ease-in-out;
-      ">
-        ⏳ Please wait...
-      </div>
+    this.activeToast = document.createElement('div');
+    this.activeToast.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 1000;
+      pointer-events: none;
+      animation: fadeInOut 1s ease-in-out;
     `;
 
+    this.activeToast.innerHTML = `
+      <span style="font-size: 16px;">⏳</span>
+      <span>Please wait...</span>
+    `;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeInOut {
+        0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+        20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    this.overlayContainer.appendChild(this.activeToast);
+
     setTimeout(() => {
-      this.activeToastId = null;
+      if (this.activeToast) {
+        this.overlayContainer.removeChild(this.activeToast);
+        this.activeToast = null;
+      }
+      document.head.removeChild(style);
     }, 1000);
   }
 
   showWinOverlay(color: string): void {
-    if (this.activeOverlayId) {
-      // Remove existing overlay
-      this.activeOverlayId = null;
+    if (this.activeOverlay) {
+      this.overlayContainer.removeChild(this.activeOverlay);
     }
 
-    this.activeOverlayId = this.generateId();
-    this.styleId = this.generateId();
-
-    const overlayHtml = `
-      <style id="${this.styleId}">
-        @keyframes overlayFadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes messageScale {
-          0% { transform: scale(0.5); opacity: 0; }
-          50% { transform: scale(1.1); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-      </style>
-      <div id="${this.activeOverlayId}" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.9);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-        animation: overlayFadeIn 0.3s ease-out;
-      ">
-        <div style="
-          font-size: 48px;
-          font-family: system-ui, -apple-system, sans-serif;
-          font-weight: bold;
-          color: white;
-          text-align: center;
-          animation: messageScale 0.5s ease-out;
-        ">
-          🏆 ${color} wins!
-        </div>
-      </div>
+    this.activeOverlay = document.createElement('div');
+    this.activeOverlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      animation: winOverlayFadeIn 0.3s ease-out;
     `;
 
+    const trophy = document.createElement('div');
+    trophy.style.cssText = `
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: trophyBounce 0.6s ease-out;
+    `;
+    trophy.textContent = '🏆';
+
+    const message = document.createElement('div');
+    message.style.cssText = `
+      font-size: 36px;
+      font-weight: bold;
+      text-align: center;
+      text-transform: capitalize;
+    `;
+    message.textContent = `${color} wins!`;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes winOverlayFadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes trophyBounce {
+        0% { transform: scale(0.3) rotate(-10deg); }
+        50% { transform: scale(1.1) rotate(5deg); }
+        100% { transform: scale(1) rotate(0deg); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    this.activeOverlay.appendChild(trophy);
+    this.activeOverlay.appendChild(message);
+    this.overlayContainer.appendChild(this.activeOverlay);
+
     setTimeout(() => {
-      this.activeOverlayId = null;
-      this.styleId = null;
+      if (this.activeOverlay) {
+        this.overlayContainer.removeChild(this.activeOverlay);
+        this.activeOverlay = null;
+      }
+      document.head.removeChild(style);
     }, 5000);
   }
 
   updateCooldownProgress(progress: number): void {
-    if (!this.cooldownBarId) return;
+    if (!this.cooldownBar) {
+      return;
+    }
 
-    const clampedProgress = Math.max(0, Math.min(100, progress));
-    
-    // Generate CSS to update progress bar width
-    const progressUpdateHtml = `
-      <style>
-        [data-progress-fill="true"] {
-          width: ${clampedProgress}% !important;
-        }
-      </style>
-    `;
+    const progressFill = this.cooldownBar.querySelector('[data-progress-fill="true"]') as HTMLElement;
+    if (progressFill) {
+      const clampedProgress = Math.max(0, Math.min(100, progress));
+      progressFill.style.width = `${clampedProgress}%`;
+      
+      if (clampedProgress === 0) {
+        this.cooldownBar.style.opacity = '0';
+      } else {
+        this.cooldownBar.style.opacity = '1';
+      }
+    }
   }
 
   destroy(): void {
-    this.cooldownBarId = null;
-    this.activeToastId = null;
-    this.activeOverlayId = null;
-    this.styleId = null;
+    this.activeFlashes.clear();
+    
+    if (this.activeToast) {
+      this.overlayContainer.removeChild(this.activeToast);
+      this.activeToast = null;
+    }
+    
+    if (this.activeOverlay) {
+      this.overlayContainer.removeChild(this.activeOverlay);
+      this.activeOverlay = null;
+    }
+    
+    if (this.cooldownBar) {
+      this.cooldownContainer.removeChild(this.cooldownBar);
+      this.cooldownBar = null;
+    }
   }
 }
 

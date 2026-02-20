@@ -11,69 +11,79 @@ export interface GridState {
   cellSize: number;
 }
 
-export interface GridRenderOptions {
-  gridSize: number;
-  onCellClick: (x: number, y: number) => void;
+export interface PaintCommand {
+  x: number;
+  y: number;
+  playerId: string;
 }
 
-export interface CanvasLike {
-  width: number;
-  height: number;
-  style: { cursor: string };
-  addEventListener(type: string, listener: (event: any) => void): void;
-  removeEventListener(type: string, listener: (event: any) => void): void;
-  getBoundingClientRect(): { left: number; top: number };
-  getContext(type: string): CanvasRenderingContext2DLike | null;
-}
-
-export interface CanvasRenderingContext2DLike {
-  clearRect(x: number, y: number, width: number, height: number): void;
-  fillRect(x: number, y: number, width: number, height: number): void;
-  beginPath(): void;
-  moveTo(x: number, y: number): void;
-  lineTo(x: number, y: number): void;
-  stroke(): void;
-  save(): void;
-  restore(): void;
-  fillStyle: string;
-  strokeStyle: string;
-  lineWidth: number;
-  shadowColor: string;
-  shadowBlur: number;
-}
+export type PaintCommandHandler = (command: PaintCommand) => void;
 
 export class GridRenderer {
-  private canvas: CanvasLike | null = null;
-  private ctx: CanvasRenderingContext2DLike | null = null;
-  private gridSize: number;
-  private cellSize: number;
-  private state: GridState;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private gridState: GridState;
   private hoveredCell: { x: number; y: number } | null = null;
-  private onCellClick: (x: number, y: number) => void;
-  private mouseMoveHandler: (event: any) => void;
-  private mouseLeaveHandler: () => void;
-  private clickHandler: (event: any) => void;
+  private onPaintCommand: PaintCommandHandler | null = null;
+  private playerId: string = '';
 
-  constructor(options: GridRenderOptions) {
-    this.gridSize = options.gridSize;
-    this.cellSize = 500 / this.gridSize;
-    this.onCellClick = options.onCellClick;
+  constructor(canvasElement: HTMLCanvasElement, gridSize: number = 50) {
+    this.canvas = canvasElement;
+    this.canvas.width = 500;
+    this.canvas.height = 500;
+    
+    const context = this.canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = context;
 
-    this.state = {
+    this.gridState = {
       cells: new Map(),
-      gridSize: this.gridSize,
-      cellSize: this.cellSize
+      gridSize,
+      cellSize: 500 / gridSize
     };
 
-    this.mouseMoveHandler = (event: any) => {
-      if (!this.canvas) return;
-      const rect = this.canvas.getBoundingClientRect();
-      const x = Math.floor((event.clientX - rect.left) / this.cellSize);
-      const y = Math.floor((event.clientY - rect.top) / this.cellSize);
+    this.setupEventListeners();
+    this.render();
+  }
 
-      if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
-        if (!this.hoveredCell || this.hoveredCell.x !== x || this.hoveredCell.y !== y) {
-          this.hoveredCell = { x, y };
+  public setPlayerId(playerId: string): void {
+    this.playerId = playerId;
+  }
+
+  public setPaintCommandHandler(handler: PaintCommandHandler): void {
+    this.onPaintCommand = handler;
+  }
+
+  public updateCell(x: number, y: number, ownerId: string | null, teamColor: string | null): void {
+    const key = `${x},${y}`;
+    this.gridState.cells.set(key, { x, y, ownerId, teamColor });
+    this.render();
+  }
+
+  public updateGrid(cells: GridCell[]): void {
+    this.gridState.cells.clear();
+    for (const cell of cells) {
+      const key = `${cell.x},${cell.y}`;
+      this.gridState.cells.set(key, cell);
+    }
+    this.render();
+  }
+
+  private setupEventListeners(): void {
+    this.canvas.addEventListener('mousemove', (event) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      const cellX = Math.floor(mouseX / this.gridState.cellSize);
+      const cellY = Math.floor(mouseY / this.gridState.cellSize);
+      
+      if (cellX >= 0 && cellX < this.gridState.gridSize && 
+          cellY >= 0 && cellY < this.gridState.gridSize) {
+        if (!this.hoveredCell || this.hoveredCell.x !== cellX || this.hoveredCell.y !== cellY) {
+          this.hoveredCell = { x: cellX, y: cellY };
           this.render();
         }
       } else {
@@ -82,163 +92,96 @@ export class GridRenderer {
           this.render();
         }
       }
-    };
+    });
 
-    this.mouseLeaveHandler = () => {
+    this.canvas.addEventListener('mouseleave', () => {
       if (this.hoveredCell) {
         this.hoveredCell = null;
         this.render();
       }
-    };
+    });
 
-    this.clickHandler = (event: any) => {
-      if (!this.canvas) return;
+    this.canvas.addEventListener('click', (event) => {
       const rect = this.canvas.getBoundingClientRect();
-      const x = Math.floor((event.clientX - rect.left) / this.cellSize);
-      const y = Math.floor((event.clientY - rect.top) / this.cellSize);
-
-      if (x >= 0 && x < this.gridSize && y >= 0 && y < this.gridSize) {
-        this.onCellClick(x, y);
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      const cellX = Math.floor(mouseX / this.gridState.cellSize);
+      const cellY = Math.floor(mouseY / this.gridState.cellSize);
+      
+      if (cellX >= 0 && cellX < this.gridState.gridSize && 
+          cellY >= 0 && cellY < this.gridState.gridSize) {
+        if (this.onPaintCommand) {
+          this.onPaintCommand({
+            x: cellX,
+            y: cellY,
+            playerId: this.playerId
+          });
+        }
       }
-    };
-  }
-
-  public setCanvas(canvas: CanvasLike): void {
-    this.canvas = canvas;
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Failed to get 2D rendering context');
-    }
-    this.ctx = ctx;
-    this.setupCanvas();
-    this.attachEventListeners();
-  }
-
-  private setupCanvas(): void {
-    if (!this.canvas) return;
-    this.canvas.width = 500;
-    this.canvas.height = 500;
-    this.canvas.style.cursor = 'pointer';
-  }
-
-  private attachEventListeners(): void {
-    if (!this.canvas) return;
-    this.canvas.addEventListener('mousemove', this.mouseMoveHandler);
-    this.canvas.addEventListener('mouseleave', this.mouseLeaveHandler);
-    this.canvas.addEventListener('click', this.clickHandler);
-  }
-
-  public updateCell(x: number, y: number, ownerId: string | null, teamColor: string | null): void {
-    const key = `${x},${y}`;
-    this.state.cells.set(key, { x, y, ownerId, teamColor });
-    this.render();
-  }
-
-  public updateGrid(cells: GridCell[]): void {
-    this.state.cells.clear();
-    for (const cell of cells) {
-      const key = `${cell.x},${cell.y}`;
-      this.state.cells.set(key, cell);
-    }
-    this.render();
+    });
   }
 
   private render(): void {
-    if (!this.ctx) return;
-    this.ctx.clearRect(0, 0, 500, 500);
-
-    // Render all cells
-    for (let x = 0; x < this.gridSize; x++) {
-      for (let y = 0; y < this.gridSize; y++) {
-        this.renderCell(x, y);
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    const { gridSize, cellSize } = this.gridState;
+    
+    for (let x = 0; x < gridSize; x++) {
+      for (let y = 0; y < gridSize; y++) {
+        const pixelX = x * cellSize;
+        const pixelY = y * cellSize;
+        
+        const cellKey = `${x},${y}`;
+        const cell = this.gridState.cells.get(cellKey);
+        
+        if (cell && cell.ownerId && cell.teamColor) {
+          // Render owned cell with team color and glow
+          this.ctx.fillStyle = cell.teamColor;
+          this.ctx.fillRect(pixelX, pixelY, cellSize, cellSize);
+          
+          // Add subtle glow effect
+          this.ctx.shadowColor = cell.teamColor;
+          this.ctx.shadowBlur = 8;
+          this.ctx.fillRect(pixelX + 1, pixelY + 1, cellSize - 2, cellSize - 2);
+          this.ctx.shadowBlur = 0;
+        } else {
+          // Render empty cell as dark gray
+          this.ctx.fillStyle = '#2a2a3e';
+          this.ctx.fillRect(pixelX, pixelY, cellSize, cellSize);
+        }
+        
+        // Add hover highlight
+        if (this.hoveredCell && this.hoveredCell.x === x && this.hoveredCell.y === y) {
+          this.ctx.strokeStyle = '#ffffff';
+          this.ctx.lineWidth = 2;
+          this.ctx.strokeRect(pixelX + 1, pixelY + 1, cellSize - 2, cellSize - 2);
+        }
+        
+        // Draw grid lines
+        this.ctx.strokeStyle = '#1a1a2e';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(pixelX, pixelY, cellSize, cellSize);
       }
-    }
-
-    // Render grid lines
-    this.renderGridLines();
-  }
-
-  private renderCell(x: number, y: number): void {
-    if (!this.ctx) return;
-    const key = `${x},${y}`;
-    const cell = this.state.cells.get(key);
-    const pixelX = x * this.cellSize;
-    const pixelY = y * this.cellSize;
-
-    // Base cell color
-    if (cell && cell.ownerId && cell.teamColor) {
-      // Owned cell with team color and glow effect
-      this.ctx.fillStyle = cell.teamColor;
-      this.ctx.fillRect(pixelX, pixelY, this.cellSize, this.cellSize);
-
-      // Add glow effect
-      this.ctx.save();
-      this.ctx.shadowColor = cell.teamColor;
-      this.ctx.shadowBlur = 8;
-      this.ctx.fillStyle = cell.teamColor;
-      this.ctx.fillRect(pixelX + 2, pixelY + 2, this.cellSize - 4, this.cellSize - 4);
-      this.ctx.restore();
-    } else {
-      // Empty cell - dark gray
-      this.ctx.fillStyle = '#2a2a3e';
-      this.ctx.fillRect(pixelX, pixelY, this.cellSize, this.cellSize);
-    }
-
-    // Hover highlight
-    if (this.hoveredCell && this.hoveredCell.x === x && this.hoveredCell.y === y) {
-      this.ctx.save();
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      this.ctx.fillRect(pixelX, pixelY, this.cellSize, this.cellSize);
-      this.ctx.restore();
-    }
-  }
-
-  private renderGridLines(): void {
-    if (!this.ctx) return;
-    this.ctx.strokeStyle = '#1a1a2e';
-    this.ctx.lineWidth = 1;
-
-    // Vertical lines
-    for (let x = 0; x <= this.gridSize; x++) {
-      const pixelX = x * this.cellSize;
-      this.ctx.beginPath();
-      this.ctx.moveTo(pixelX, 0);
-      this.ctx.lineTo(pixelX, 500);
-      this.ctx.stroke();
-    }
-
-    // Horizontal lines
-    for (let y = 0; y <= this.gridSize; y++) {
-      const pixelY = y * this.cellSize;
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, pixelY);
-      this.ctx.lineTo(500, pixelY);
-      this.ctx.stroke();
-    }
-  }
-
-  public getCanvas(): CanvasLike | null {
-    return this.canvas;
-  }
-
-  public destroy(): void {
-    if (this.canvas) {
-      this.canvas.removeEventListener('mousemove', this.mouseMoveHandler);
-      this.canvas.removeEventListener('mouseleave', this.mouseLeaveHandler);
-      this.canvas.removeEventListener('click', this.clickHandler);
     }
   }
 }
 
-export function createGridRenderer(gridSize: number, onCellClick: (x: number, y: number) => void): GridRenderer {
-  return new GridRenderer({
-    gridSize,
-    onCellClick
-  });
+export function createGridCanvas(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = 500;
+  canvas.height = 500;
+  canvas.style.border = '1px solid #444';
+  canvas.style.cursor = 'crosshair';
+  return canvas;
 }
 
 export function generateGridHTML(containerId: string): string {
-  return `<div id="${containerId}" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;"><canvas width="500" height="500" style="cursor: pointer;"></canvas></div>`;
+  return `
+    <div id="${containerId}" style="display: flex; justify-content: center; align-items: center; padding: 20px;">
+      <canvas id="game-grid" width="500" height="500" style="border: 1px solid #444; cursor: crosshair; background-color: #1a1a2e;"></canvas>
+    </div>
+  `;
 }
 
 /** @internal Phoenix VCS traceability — do not remove. */
