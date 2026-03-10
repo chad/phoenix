@@ -82,8 +82,32 @@ export { OpenAIProvider } from './llm/openai.js';
 export { resolveProvider, describeAvailability } from './llm/resolve.js';
 export { buildPrompt, SYSTEM_PROMPT } from './llm/prompt.js';
 
+// Evaluations (durable behavioral truth surface — survives regeneration)
+export type {
+  Evaluation, EvaluationBinding, EvaluationOrigin,
+  EvaluationCoverage, EvaluationGap,
+} from './models/evaluation.js';
+
+// Pace Layers & Conservation
+export type { PaceLayer, PaceLayerMetadata, PaceLayerViolation } from './models/pace-layer.js';
+export { defaultPaceLayerMetadata, inferPaceLayer, isPaceAppropriate, detectLayerCrossing } from './models/pace-layer.js';
+
+// Conceptual Mass
+export type { ConceptualMassReport } from './models/conceptual-mass.js';
+export { computeConceptualMass, interactionPotential, checkRatchet, MASS_THRESHOLDS } from './models/conceptual-mass.js';
+
+// Negative Knowledge (the system's immune memory)
+export type { NegativeKnowledge, NegativeKnowledgeKind } from './models/negative-knowledge.js';
+export { hasRelevantNegativeKnowledge } from './models/negative-knowledge.js';
+
+// Replacement Audit
+export type { AuditResult, AuditDimension, AuditBlocker, ReadinessLevel } from './audit.js';
+export { auditIU, auditAll } from './audit.js';
+
 // Stores
 export { ContentStore } from './store/content-store.js';
 export { SpecStore } from './store/spec-store.js';
 export { CanonicalStore } from './store/canonical-store.js';
 export { EvidenceStore } from './store/evidence-store.js';
+export { EvaluationStore } from './store/evaluation-store.js';
+export { NegativeKnowledgeStore } from './store/negative-knowledge-store.js';

@@ -56,6 +56,13 @@ import { collectInspectData, renderInspectHTML, serveInspect } from './inspect.j
 // LLM
 import { resolveProvider, describeAvailability } from './llm/resolve.js';
 
+// Audit & Fowler gaps
+import { auditIU, auditAll } from './audit.js';
+import type { AuditResult, ReadinessLevel } from './audit.js';
+import { EvaluationStore } from './store/evaluation-store.js';
+import { NegativeKnowledgeStore } from './store/negative-knowledge-store.js';
+import type { PaceLayerMetadata } from './models/pace-layer.js';
+
 // Models
 import type { Clause } from './models/clause.js';
 import { DiffType } from './models/clause.js';
@@ -1249,6 +1256,124 @@ async function cmdInspect(args: string[]): Promise<void> {
   await new Promise(() => {});
 }
 
+// ─── Replacement Audit (Fowler Ch. 4) ────────────────────────────────────────
+
+function cmdAudit(args: string[]): void {
+  const { phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  const evalStore = new EvaluationStore(phoenixDir);
+  const nkStore = new NegativeKnowledgeStore(phoenixDir);
+
+  if (ius.length === 0) {
+    console.log(yellow('⚠ No Implementation Units found. Run `phoenix plan` first.'));
+    return;
+  }
+
+  // Build coverage map
+  const evalCoverages = new Map<string, any>();
+  for (const iu of ius) {
+    evalCoverages.set(iu.iu_id, evalStore.coverage(iu));
+  }
+
+  // Load pace layers (from iu metadata or defaults)
+  const paceLayers = new Map<string, PaceLayerMetadata>();
+  // TODO: load from .phoenix/pace-layers.json when populated
+
+  const nk = nkStore.getActive();
+  const previousMasses = new Map<string, number>();
+  // TODO: load from previous manifest cycle
+
+  // Filter by --iu if specified
+  const iuArg = args.find(a => a.startsWith('--iu='));
+  const targetIUs = iuArg
+    ? ius.filter(iu => iu.iu_id === iuArg.slice(5) || iu.name === iuArg.slice(5))
+    : ius;
+
+  const results = auditAll(targetIUs, evalCoverages, paceLayers, nk, previousMasses);
+
+  console.log();
+  console.log(bold('🔥 Phoenix Replacement Audit'));
+  console.log(dim('  "Could I replace this implementation entirely and have its dependents not notice?"'));
+  console.log();
+
+  // Summary counts
+  const readinessCounts: Record<ReadinessLevel, number> = {
+    regenerable: 0, evaluable: 0, observable: 0, opaque: 0,
+  };
+  for (const r of results) readinessCounts[r.readiness]++;
+
+  console.log(
+    `  ${green(`● ${readinessCounts.regenerable} regenerable`)}  ` +
+    `${blue(`◐ ${readinessCounts.evaluable} evaluable`)}  ` +
+    `${yellow(`○ ${readinessCounts.observable} observable`)}  ` +
+    `${red(`◌ ${readinessCounts.opaque} opaque`)}`
+  );
+  console.log();
+
+  // Per-IU details
+  for (const result of results) {
+    const readinessIcon = readinessToIcon(result.readiness);
+    const scoreColor = result.score >= 75 ? green : result.score >= 50 ? yellow : red;
+
+    console.log(`  ${readinessIcon} ${bold(result.iu_name)} ${dim(`(${result.iu_id})`)} — ${scoreColor(`${result.score}/100`)} ${dim(result.readiness)}`);
+
+    // Dimension summary
+    const dims = [
+      result.boundary_clarity,
+      result.evaluation_coverage,
+      result.blast_radius,
+      result.deletion_safety,
+      result.pace_layer,
+      result.conceptual_mass,
+      result.negative_knowledge,
+    ];
+    for (const d of dims) {
+      const icon = d.status === 'good' ? green('✓') : d.status === 'warning' ? yellow('⚠') : red('✖');
+      console.log(`    ${icon} ${dim(d.name + ':')} ${d.detail}`);
+    }
+
+    // Blockers
+    if (result.blockers.length > 0) {
+      console.log(`    ${red('Blockers:')}`);
+      for (const b of result.blockers) {
+        const sev = b.severity === 'error' ? red('✖') : yellow('⚠');
+        console.log(`      ${sev} ${b.message}`);
+        console.log(`        ${dim('→ ' + b.recommended_action)}`);
+      }
+    }
+
+    // Recommendations
+    if (result.recommendations.length > 0) {
+      console.log(`    ${cyan('Recommendations:')}`);
+      for (const r of result.recommendations) {
+        console.log(`      ${dim('→')} ${r}`);
+      }
+    }
+
+    console.log();
+  }
+
+  // Overall verdict
+  const totalScore = results.length > 0
+    ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length)
+    : 0;
+  const totalBlockers = results.reduce((sum, r) => sum + r.blockers.length, 0);
+
+  console.log(dim('  ─────────────────────────────────────────'));
+  console.log(`  ${bold('Overall:')} ${totalScore}/100 avg score, ${totalBlockers} blocker(s)`);
+  console.log(`  ${dim('Trust > cleverness.')}`);
+  console.log();
+}
+
+function readinessToIcon(readiness: ReadinessLevel): string {
+  switch (readiness) {
+    case 'regenerable': return green('●');
+    case 'evaluable': return blue('◐');
+    case 'observable': return yellow('○');
+    case 'opaque': return red('◌');
+  }
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -1284,6 +1409,7 @@ ${bold('Verification:')}
   ${cyan('drift')}                 Check generated files for drift
   ${cyan('evaluate')} [--iu=<id>] Evaluate evidence against policy
   ${cyan('cascade')}               Show cascade failure effects
+  ${cyan('audit')} [--iu=<id>]    Replacement audit — readiness per IU
 
 ${bold('Inspection:')}
   ${cyan('inspect')} [--port=N]    Interactive pipeline visualisation (opens browser)
@@ -1347,6 +1473,9 @@ async function main(): Promise<void> {
       break;
     case 'cascade':
       cmdCascade();
+      break;
+    case 'audit':
+      cmdAudit(commandArgs);
       break;
     case 'inspect':
       await cmdInspect(commandArgs);
