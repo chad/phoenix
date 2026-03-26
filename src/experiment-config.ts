@@ -8,7 +8,7 @@
 export const CONFIG = {
   // ─── resolution.ts ────────────────────────────────────────────────────────
   MAX_DEGREE: 8,
-  MIN_SHARED_TAGS: 2,
+  MIN_SHARED_TAGS: 1,
   JACCARD_DEDUP_THRESHOLD: 0.7,
   FINGERPRINT_PREFIX_COUNT: 8,
   DOC_FREQ_CUTOFF: 0.5,
