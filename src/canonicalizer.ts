@@ -15,6 +15,7 @@ import { sha256 } from './semhash.js';
 import { normalizeText } from './normalizer.js';
 import { segmentSentences } from './sentence-segmenter.js';
 import { resolveGraph } from './resolution.js';
+import { CONFIG } from './experiment-config.js';
 
 // ─── Domain term whitelist (short tokens to keep) ────────────────────────────
 
@@ -52,58 +53,58 @@ function scoreSentence(text: string, headingContext: CanonicalType | null): { ty
 
   // ── Constraint signals ──
   if (/\b(?:must not|shall not|may not|cannot|can't|disallowed|forbidden|prohibited)\b/i.test(text)) {
-    scores[CanonicalType.CONSTRAINT] += 4;
+    scores[CanonicalType.CONSTRAINT] += CONFIG.CONSTRAINT_NEGATION_WEIGHT;
   }
   if (/\b(?:limited to|maximum|minimum|at most|at least|no more than|no fewer than|up to|ceiling|floor)\b/i.test(text)) {
-    scores[CanonicalType.CONSTRAINT] += 3;
+    scores[CanonicalType.CONSTRAINT] += CONFIG.CONSTRAINT_LIMIT_WEIGHT;
   }
   // Numeric bounds: "5 per minute", "≤ 100", "between 1 and 10"
   if (/\b\d+\s*(?:per|\/)\s*\w+\b/i.test(text) || /[≤≥<>]\s*\d+/.test(text)) {
-    scores[CanonicalType.CONSTRAINT] += 2;
+    scores[CanonicalType.CONSTRAINT] += CONFIG.CONSTRAINT_NUMERIC_WEIGHT;
   }
 
   // ── Invariant signals ──
   if (/\b(?:always|never|at all times|regardless|invariant|guaranteed|must remain|must always|must never)\b/i.test(text)) {
-    scores[CanonicalType.INVARIANT] += 4;
+    scores[CanonicalType.INVARIANT] += CONFIG.INVARIANT_SIGNAL_WEIGHT;
   }
 
   // ── Requirement signals ──
   if (/\b(?:must|shall)\b/i.test(text) && !/\b(?:must not|shall not|must always|must never|must remain)\b/i.test(text)) {
-    scores[CanonicalType.REQUIREMENT] += 2;
+    scores[CanonicalType.REQUIREMENT] += CONFIG.REQUIREMENT_MODAL_WEIGHT;
   }
   if (/\b(?:required|requires?|needs? to|has to|will)\b/i.test(text)) {
-    scores[CanonicalType.REQUIREMENT] += 2;
+    scores[CanonicalType.REQUIREMENT] += CONFIG.REQUIREMENT_KEYWORD_WEIGHT;
   }
   if (/\b(?:support|provide|implement|enable|allow|accept|return|create|delete|update|send|receive|handle|manage|track|store|validate|generate)\b/i.test(text)) {
-    scores[CanonicalType.REQUIREMENT] += 1;
+    scores[CanonicalType.REQUIREMENT] += CONFIG.REQUIREMENT_VERB_WEIGHT;
   }
 
   // ── Definition signals ──
-  if (/\b(?:is defined as|means|refers to|is a|is an)\b/i.test(text) && text.length < 200) {
-    scores[CanonicalType.DEFINITION] += 4;
+  if (/\b(?:is defined as|means|refers to|is a|is an)\b/i.test(text) && text.length < CONFIG.DEFINITION_MAX_LENGTH) {
+    scores[CanonicalType.DEFINITION] += CONFIG.DEFINITION_EXPLICIT_WEIGHT;
   }
   // Colon pattern "Term: definition text" but not enumerations
   if (/^[A-Z][a-zA-Z\s]{2,30}:\s+[A-Z]/.test(text) && !/[:,]\s*$/.test(text)) {
-    scores[CanonicalType.DEFINITION] += 3;
+    scores[CanonicalType.DEFINITION] += CONFIG.DEFINITION_COLON_WEIGHT;
   }
 
   // ── Context signals (no actionable keywords) ──
   if (!hasAnyModal(lower) && !hasAnyKeyword(lower)) {
-    scores[CanonicalType.CONTEXT] += 2;
+    scores[CanonicalType.CONTEXT] += CONFIG.CONTEXT_NO_MODAL_WEIGHT;
   }
   // Short sentence without verb-like keywords
   if (text.split(/\s+/).length < 8 && !hasAnyModal(lower)) {
-    scores[CanonicalType.CONTEXT] += 1;
+    scores[CanonicalType.CONTEXT] += CONFIG.CONTEXT_SHORT_WEIGHT;
   }
 
   // ── Heading context bonus ──
   if (headingContext) {
-    scores[headingContext] += 2;
+    scores[headingContext] += CONFIG.HEADING_CONTEXT_BONUS;
   }
 
   // ── Also give constraint "must" credit since "must" appears in constraints too ──
   if (/\b(?:must|shall)\b/i.test(text)) {
-    scores[CanonicalType.CONSTRAINT] += 1;
+    scores[CanonicalType.CONSTRAINT] += CONFIG.CONSTRAINT_MUST_BONUS;
   }
 
   // Pick winner
@@ -114,10 +115,10 @@ function scoreSentence(text: string, headingContext: CanonicalType | null): { ty
 
   // If nothing scored above 0, it's CONTEXT
   if (winScore === 0) {
-    return { type: CanonicalType.CONTEXT, confidence: 0.3 };
+    return { type: CanonicalType.CONTEXT, confidence: CONFIG.MIN_CONFIDENCE };
   }
 
-  const confidence = Math.max(0.3, Math.min(1.0, (winScore - runnerUp) / Math.max(winScore, 1)));
+  const confidence = Math.max(CONFIG.MIN_CONFIDENCE, Math.min(CONFIG.MAX_CONFIDENCE, (winScore - runnerUp) / Math.max(winScore, 1)));
   return { type: winType, confidence };
 }
 
@@ -181,7 +182,7 @@ function extractFromClause(clause: Clause): { candidates: CandidateNode[]; cover
 
   for (const sentence of sentences) {
     const content = sentence.text.trim();
-    if (!content || content.length < 5) {
+    if (!content || content.length < CONFIG.MIN_EXTRACTION_LENGTH) {
       uncovered.push({ text: content, reason: 'too_short' });
       continue;
     }
@@ -260,7 +261,7 @@ export function extractTerms(text: string): string[] {
 
   // Add hyphenated compounds
   for (const h of hyphenated) {
-    if (h.length >= 3) terms.add(h);
+    if (h.length >= CONFIG.MIN_TERM_LENGTH) terms.add(h);
   }
 
   // Add individual words
@@ -273,7 +274,7 @@ export function extractTerms(text: string): string[] {
       continue;
     }
     // Keep words > 2 chars
-    if (w.length > 2 && !w.includes('-')) {
+    if (w.length > CONFIG.MIN_WORD_LENGTH && !w.includes('-')) {
       terms.add(w);
     }
   }

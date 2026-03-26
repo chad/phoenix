@@ -11,9 +11,7 @@
 import type { Clause } from './models/clause.js';
 import type { CanonicalNode } from './models/canonical.js';
 import { sha256 } from './semhash.js';
-
-/** Minimum confidence for a node to be included in warm context */
-const MIN_CONFIDENCE = 0.3;
+import { CONFIG } from './experiment-config.js';
 
 /**
  * Compute warm context hash for a clause, incorporating canonical context.
@@ -31,7 +29,7 @@ export function contextSemhashWarm(
   // Find canonical nodes sourced from this clause
   const relatedNodes = canonicalNodes.filter(
     n => n.source_clause_ids.includes(clause.clause_id)
-      && (n.confidence ?? 1.0) >= MIN_CONFIDENCE
+      && (n.confidence ?? 1.0) >= CONFIG.WARM_MIN_CONFIDENCE
   );
 
   // Collect linked canon IDs — only from typed edges (not 'relates_to')

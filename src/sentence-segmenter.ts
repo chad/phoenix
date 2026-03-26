@@ -8,6 +8,8 @@
  * - Lines with sequence indicators (→, ->) are kept atomic
  */
 
+import { CONFIG } from './experiment-config.js';
+
 /** A segmented sentence with its position index */
 export interface Sentence {
   text: string;
@@ -52,7 +54,7 @@ export function segmentSentences(rawText: string): Sentence[] {
         proseBuffer = '';
       }
       const content = listMatch[1].trim();
-      if (content.length >= 3) {
+      if (content.length >= CONFIG.MIN_LIST_ITEM_LENGTH) {
         // Split compound modals within list items
         const subs = splitCompoundModals(content);
         for (const sub of subs) {
@@ -82,7 +84,7 @@ function flushProse(text: string, sentences: Sentence[], startIdx: number): void
   let idx = startIdx;
   for (const s of raw) {
     const trimmed = s.trim();
-    if (trimmed.length < 3) continue;
+    if (trimmed.length < CONFIG.MIN_PROSE_SENTENCE_LENGTH) continue;
     // Split compound modals
     const subs = splitCompoundModals(trimmed);
     for (const sub of subs) {
@@ -96,7 +98,7 @@ function flushProse(text: string, sentences: Sentence[], startIdx: number): void
  */
 function splitProseIntoSentences(text: string): string[] {
   // Don't split if it's short enough to be one sentence
-  if (text.length < 80) return [text];
+  if (text.length < CONFIG.PROSE_SPLIT_THRESHOLD) return [text];
 
   const results: string[] = [];
   // Split on '. ', '! ', '? ' followed by uppercase letter
@@ -128,7 +130,7 @@ function splitCompoundModals(text: string): string[] {
   // Check for semicolons with modals on both sides
   const semiParts = text.split(/\s*;\s*/);
   if (semiParts.length > 1 && semiParts.every(p => hasModal(p))) {
-    return semiParts.filter(p => p.length >= 3);
+    return semiParts.filter(p => p.length >= CONFIG.MIN_SPLIT_PART_LENGTH);
   }
 
   // Check for " and " + modal or " and " separating complete modal clauses
@@ -137,7 +139,7 @@ function splitCompoundModals(text: string): string[] {
   if (andMatch && andMatch.index !== undefined) {
     const left = text.slice(0, andMatch.index).trim();
     const right = text.slice(andMatch.index + andMatch[0].length).trim();
-    if (left.length >= 3 && right.length >= 3 && hasModal(left)) {
+    if (left.length >= CONFIG.MIN_SPLIT_PART_LENGTH && right.length >= CONFIG.MIN_SPLIT_PART_LENGTH && hasModal(left)) {
       return [left, right];
     }
   }

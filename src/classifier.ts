@@ -15,6 +15,7 @@ import type { CanonicalNode } from './models/canonical.js';
 import type { ClassificationSignals, ChangeClassification } from './models/classification.js';
 import { ChangeClass } from './models/classification.js';
 import { extractTerms } from './canonicalizer.js';
+import { CONFIG } from './experiment-config.js';
 
 /**
  * Classify a single clause diff.
@@ -132,7 +133,7 @@ export function classifyChange(
   }
 
   // Compute confidence and classify
-  if (normDiff < 0.1 && termDelta < 0.2) {
+  if (normDiff < CONFIG.CLASS_A_NORM_DIFF && termDelta < CONFIG.CLASS_A_TERM_DELTA) {
     // Very small change, high confidence it's trivial
     return {
       change_class: ChangeClass.A,
@@ -156,7 +157,7 @@ export function classifyChange(
   }
 
   // Local semantic change
-  if (normDiff < 0.5 && termDelta < 0.5) {
+  if (normDiff < CONFIG.CLASS_B_NORM_DIFF && termDelta < CONFIG.CLASS_B_TERM_DELTA) {
     return {
       change_class: ChangeClass.B,
       confidence: 0.8,
@@ -167,9 +168,9 @@ export function classifyChange(
   }
 
   // High uncertainty — but check anchor overlap first
-  if (normDiff > 0.7 || termDelta > 0.7) {
+  if (normDiff > CONFIG.CLASS_D_HIGH_CHANGE || termDelta > CONFIG.CLASS_D_HIGH_CHANGE) {
     // If anchors match, the concepts are the same despite heavy rewording → B not D
-    if (anchorMatch > 0.5) {
+    if (anchorMatch > CONFIG.ANCHOR_MATCH_THRESHOLD) {
       return {
         change_class: ChangeClass.B,
         confidence: 0.65,

@@ -15,12 +15,7 @@ import type { Clause } from './models/clause.js';
 import type { EdgeType } from './models/canonical.js';
 import { CanonicalType } from './models/canonical.js';
 import { sha256 } from './semhash.js';
-
-/** Maximum outgoing edges per node (excluding 'duplicates') */
-const MAX_DEGREE = 8;
-
-/** Minimum shared tags for a link (at least 1 must be non-trivial) */
-const MIN_SHARED_TAGS = 2;
+import { CONFIG } from './experiment-config.js';
 
 // ─── Main entry point ────────────────────────────────────────────────────────
 
@@ -106,7 +101,7 @@ function deduplicateNodes(nodes: CanonicalNode[]): CanonicalNode[] {
       for (let j = i + 1; j < group.length; j++) {
         if (used.has(j)) continue;
         const sim = tokenJaccard(primary.statement, group[j].statement);
-        if (sim > 0.7 && areTypesCompatible(primary.type, group[j].type)) {
+        if (sim > CONFIG.JACCARD_DEDUP_THRESHOLD && areTypesCompatible(primary.type, group[j].type)) {
           // Merge: keep higher confidence node as primary
           used.add(j);
           for (const s of group[j].source_clause_ids) mergedSources.add(s);
@@ -132,8 +127,7 @@ function statementFingerprint(statement: string): string {
   // Coarse fingerprint: sorted 3-char token prefixes
   const tokens = statement.toLowerCase().split(/\s+/).filter(t => t.length > 2);
   const prefixes = tokens.map(t => t.slice(0, 3)).sort();
-  // Use first 8 prefixes as bucket key
-  return prefixes.slice(0, 8).join('|');
+  return prefixes.slice(0, CONFIG.FINGERPRINT_PREFIX_COUNT).join('|');
 }
 
 function tokenJaccard(a: string, b: string): number {
@@ -189,7 +183,7 @@ function inferTypedEdges(nodes: CanonicalNode[], idf: Map<string, number>): void
   // IDF for a tag in 40% of N nodes ≈ log(N / (0.4*N)) + 1 ≈ log(2.5) + 1 ≈ 1.92
   // We use a hard threshold based on document frequency, not percentile.
   const N = nodes.length;
-  const maxDF = Math.max(2, Math.floor(N * 0.4)); // tags in >40% of nodes are trivial
+  const maxDF = Math.max(2, Math.floor(N * CONFIG.DOC_FREQ_CUTOFF));
   const idfThreshold = Math.log((N + 1) / (maxDF + 1)) + 1;
 
   // Generate candidate pairs from inverted index
@@ -215,7 +209,7 @@ function inferTypedEdges(nodes: CanonicalNode[], idf: Map<string, number>): void
   // Create edges for pairs with enough shared tags (at least MIN_SHARED_TAGS total,
   // and at least 1 non-trivial tag)
   for (const { i, j, sharedNonTrivial, sharedTags } of pairScores.values()) {
-    if (sharedTags.length < MIN_SHARED_TAGS || sharedNonTrivial < 1) continue;
+    if (sharedTags.length < CONFIG.MIN_SHARED_TAGS || sharedNonTrivial < 1) continue;
 
     const nodeA = nodes[i];
     const nodeB = nodes[j];
@@ -342,7 +336,7 @@ function enforceMaxDegree(nodes: CanonicalNode[], idf: Map<string, number>): voi
       id => node.link_types?.[id] !== 'duplicates'
     );
 
-    if (edges.length <= MAX_DEGREE) continue;
+    if (edges.length <= CONFIG.MAX_DEGREE) continue;
 
     // Score each edge by shared tag IDF
     const nodeTagSet = new Set(node.tags);
@@ -363,9 +357,8 @@ function enforceMaxDegree(nodes: CanonicalNode[], idf: Map<string, number>): voi
       edgeScores.push({ id, score });
     }
 
-    // Keep top MAX_DEGREE edges by score
     edgeScores.sort((a, b) => b.score - a.score);
-    const keep = new Set(edgeScores.slice(0, MAX_DEGREE).map(e => e.id));
+    const keep = new Set(edgeScores.slice(0, CONFIG.MAX_DEGREE).map(e => e.id));
 
     // Also keep all 'duplicates' edges
     for (const id of node.linked_canon_ids) {
