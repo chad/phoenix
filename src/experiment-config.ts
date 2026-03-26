@@ -11,7 +11,7 @@ export const CONFIG = {
   MIN_SHARED_TAGS: 2,
   JACCARD_DEDUP_THRESHOLD: 0.7,
   FINGERPRINT_PREFIX_COUNT: 8,
-  DOC_FREQ_CUTOFF: 0.4,
+  DOC_FREQ_CUTOFF: 0.5,
 
   // ─── canonicalizer.ts — scoring weights ───────────────────────────────────
   CONSTRAINT_NEGATION_WEIGHT: 4,
