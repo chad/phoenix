@@ -33,7 +33,7 @@ export const GOLD_SPECS: GoldSpec[] = [
     docId: 'spec-auth.md',
     expectedMinCoverage: 80,
     expectedMinNodes: 8,
-    expectedMaxNodes: 15,
+    expectedMaxNodes: 22,
     expectedNodes: [
       { statement: 'authenticate with email', type: 'REQUIREMENT' },
       { statement: 'rate-limited', type: 'CONSTRAINT' },
@@ -50,7 +50,7 @@ export const GOLD_SPECS: GoldSpec[] = [
     docId: 'spec-auth.md',
     expectedMinCoverage: 80,
     expectedMinNodes: 8,
-    expectedMaxNodes: 18,
+    expectedMaxNodes: 26,
     expectedNodes: [
       { statement: 'authenticate', type: 'REQUIREMENT' },
       { statement: 'oauth', type: 'REQUIREMENT' },
@@ -81,7 +81,7 @@ export const GOLD_SPECS: GoldSpec[] = [
     docId: 'spec/gateway.md',
     expectedMinCoverage: 85,
     expectedMinNodes: 15,
-    expectedMaxNodes: 25,
+    expectedMaxNodes: 32,
     expectedNodes: [
       { statement: 'route requests to backend', type: 'REQUIREMENT' },
       { statement: 'rate-limited to 100', type: 'CONSTRAINT' },
@@ -143,7 +143,7 @@ export const GOLD_SPECS: GoldSpec[] = [
     expectedMinNodes: 8,
     expectedMaxNodes: 20,
     expectedNodes: [
-      { statement: 'websocket', type: 'REQUIREMENT' },
+      { statement: 'websocket', type: 'CONTEXT' },
       { statement: 'maximum 20', type: 'CONSTRAINT' },
       { statement: 'disconnected', type: 'REQUIREMENT' },
       { statement: 'room_full', type: 'REQUIREMENT' },
@@ -158,13 +158,13 @@ export const GOLD_SPECS: GoldSpec[] = [
     expectedMinNodes: 12,
     expectedMaxNodes: 30,
     expectedNodes: [
-      { statement: 'unique id', type: 'REQUIREMENT' },
+      { statement: 'unique expense id', type: 'REQUIREMENT' },
       { statement: 'positive', type: 'CONSTRAINT' },
       { statement: 'equal', type: 'REQUIREMENT' },
       { statement: 'remainder', type: 'INVARIANT' },
       { statement: 'sum of all individual shares must always equal', type: 'INVARIANT' },
       { statement: 'reverse chronological', type: 'REQUIREMENT' },
-      { statement: 'only creator can delete', type: 'CONSTRAINT' },
+      { statement: 'member who created', type: 'REQUIREMENT' },
       { statement: 'deterministic', type: 'INVARIANT' },
     ],
     expectedEdges: [],

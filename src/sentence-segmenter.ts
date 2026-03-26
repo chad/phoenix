@@ -31,8 +31,20 @@ export function segmentSentences(rawText: string): Sentence[] {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Skip headings
-    if (/^#{1,6}\s/.test(trimmed)) continue;
+    // Extract heading text as a sentence (provides section context)
+    const headingMatch = trimmed.match(/^#{1,6}\s+(.*)/);
+    if (headingMatch) {
+      if (proseBuffer) {
+        flushProse(proseBuffer, sentences, idx);
+        idx = sentences.length;
+        proseBuffer = '';
+      }
+      const headingText = headingMatch[1].trim();
+      if (headingText.length >= CONFIG.MIN_LIST_ITEM_LENGTH) {
+        sentences.push({ text: headingText, index: idx++, fromList: false });
+      }
+      continue;
+    }
 
     // Skip empty lines — flush prose buffer
     if (!trimmed) {

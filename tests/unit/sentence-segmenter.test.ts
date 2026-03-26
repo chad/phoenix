@@ -5,11 +5,12 @@ describe('segmentSentences', () => {
   it('splits list items into separate sentences', () => {
     const text = '## Requirements\n\n- Users must log in\n- Sessions must expire\n- Passwords must be hashed';
     const sentences = segmentSentences(text);
-    expect(sentences).toHaveLength(3);
-    expect(sentences[0].text).toContain('Users must log in');
-    expect(sentences[1].text).toContain('Sessions must expire');
-    expect(sentences[2].text).toContain('Passwords must be hashed');
-    expect(sentences.every(s => s.fromList)).toBe(true);
+    expect(sentences).toHaveLength(4); // heading + 3 list items
+    expect(sentences[0].text).toBe('Requirements');
+    expect(sentences[1].text).toContain('Users must log in');
+    expect(sentences[2].text).toContain('Sessions must expire');
+    expect(sentences[3].text).toContain('Passwords must be hashed');
+    expect(sentences.slice(1).every(s => s.fromList)).toBe(true);
   });
 
   it('splits prose into sentences', () => {
@@ -32,10 +33,12 @@ describe('segmentSentences', () => {
     expect(sentences.length).toBe(2);
   });
 
-  it('skips headings', () => {
+  it('extracts heading text without # markers', () => {
     const text = '# Title\n\n## Section\n\nContent here.';
     const sentences = segmentSentences(text);
     expect(sentences.every(s => !s.text.startsWith('#'))).toBe(true);
+    expect(sentences.some(s => s.text === 'Title')).toBe(true);
+    expect(sentences.some(s => s.text === 'Section')).toBe(true);
   });
 
   it('skips very short content', () => {

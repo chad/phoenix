@@ -254,7 +254,7 @@ function inferEdgeType(from: CanonicalNode, to: CanonicalNode): EdgeType {
 
     // If one node's tags are largely a subset of the other's, the smaller
     // one refines a broader concept — that's a refinement relationship
-    if (smaller > 0 && shared / smaller >= 0.5) return 'refines';
+    if (smaller > 0 && shared / smaller >= CONFIG.SAME_TYPE_REFINE_THRESHOLD) return 'refines';
   }
 
   return 'relates_to';
@@ -290,37 +290,38 @@ function inferHierarchy(nodes: CanonicalNode[], clauseMap: Map<string, Clause>):
   }
 
   for (const docNodes of byDoc.values()) {
-    // Find CONTEXT nodes and their section depth
-    const contextNodes: { node: CanonicalNode; depth: number; sectionPath: string[] }[] = [];
-    const nonContextNodes: { node: CanonicalNode; depth: number; sectionPath: string[] }[] = [];
+    // Build entries with section depth for all nodes
+    const entries: { node: CanonicalNode; depth: number; sectionPath: string[] }[] = [];
 
     for (const node of docNodes) {
       const clause = clauseMap.get(node.source_clause_ids[0]);
       if (!clause) continue;
-      const depth = clause.section_path.length;
-      const entry = { node, depth, sectionPath: clause.section_path };
-
-      if (node.type === CanonicalType.CONTEXT) {
-        contextNodes.push(entry);
-      } else {
-        nonContextNodes.push(entry);
-      }
+      entries.push({ node, depth: clause.section_path.length, sectionPath: clause.section_path });
     }
 
-    // For each non-context node, find the nearest context parent
-    // (same doc, shallower or equal depth, matching section prefix)
-    for (const child of nonContextNodes) {
+    // For each node, find the nearest parent at a shallower section depth.
+    // Prefer CONTEXT parents, but fall back to any type if no CONTEXT exists.
+    for (const child of entries) {
+      if (child.depth === 0) continue; // top-level nodes have no parent
+
       let bestParent: CanonicalNode | null = null;
       let bestDepth = -1;
+      let bestIsContext = false;
 
-      for (const parent of contextNodes) {
-        if (parent.depth < child.depth && parent.depth > bestDepth) {
-          // Check section path prefix match
-          const prefixMatch = parent.sectionPath.every((seg, i) => child.sectionPath[i] === seg);
-          if (prefixMatch) {
-            bestParent = parent.node;
-            bestDepth = parent.depth;
-          }
+      for (const candidate of entries) {
+        if (candidate.node.canon_id === child.node.canon_id) continue;
+        if (candidate.depth >= child.depth) continue;
+        if (candidate.depth <= bestDepth) continue;
+
+        const prefixMatch = candidate.sectionPath.every((seg, i) => child.sectionPath[i] === seg);
+        if (!prefixMatch) continue;
+
+        const isContext = candidate.node.type === CanonicalType.CONTEXT;
+        // Prefer CONTEXT parents at the same depth, but accept any type
+        if (candidate.depth > bestDepth || (isContext && !bestIsContext)) {
+          bestParent = candidate.node;
+          bestDepth = candidate.depth;
+          bestIsContext = isContext;
         }
       }
 
