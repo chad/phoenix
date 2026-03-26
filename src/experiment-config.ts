@@ -12,7 +12,7 @@ export const CONFIG = {
   JACCARD_DEDUP_THRESHOLD: 0.7,
   FINGERPRINT_PREFIX_COUNT: 8,
   DOC_FREQ_CUTOFF: 0.5,
-  SAME_TYPE_REFINE_THRESHOLD: 0.2,
+  SAME_TYPE_REFINE_THRESHOLD: 0.15,
 
   // ─── canonicalizer.ts — scoring weights ───────────────────────────────────
   CONSTRAINT_NEGATION_WEIGHT: 4,
