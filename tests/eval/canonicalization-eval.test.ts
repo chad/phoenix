@@ -19,6 +19,7 @@ import { parseSpec } from '../../src/spec-parser.js';
 import { extractCanonicalNodes, extractCandidates } from '../../src/canonicalizer.js';
 import { GOLD_SPECS, type GoldSpec, type GoldNode, type GoldEdge } from './gold-standard.js';
 import type { CanonicalNode } from '../../src/models/canonical.js';
+import { CONFIG } from '../../src/experiment-config.js';
 
 const ROOT = resolve(__dirname, '../../');
 
@@ -130,8 +131,8 @@ describe('Canonicalization Evaluation', () => {
         expect(metrics.typeAccuracy).toBeGreaterThanOrEqual(0.6);
       });
 
-      it('max degree ≤ 8', () => {
-        expect(metrics.maxDegree).toBeLessThanOrEqual(8);
+      it(`max degree ≤ ${CONFIG.MAX_DEGREE}`, () => {
+        expect(metrics.maxDegree).toBeLessThanOrEqual(CONFIG.MAX_DEGREE);
       });
 
       it('hierarchy coverage ≥ 40%', () => {

@@ -227,21 +227,35 @@ function inferTypedEdges(nodes: CanonicalNode[], idf: Map<string, number>): void
 }
 
 function inferEdgeType(from: CanonicalNode, to: CanonicalNode): EdgeType {
-  // Constraint → Requirement = constrains
-  if (from.type === CanonicalType.CONSTRAINT && to.type === CanonicalType.REQUIREMENT) return 'constrains';
-  if (from.type === CanonicalType.REQUIREMENT && to.type === CanonicalType.CONSTRAINT) return 'constrains';
+  const types = new Set([from.type, to.type]);
 
-  // Invariant → Requirement = invariant_of
-  if (from.type === CanonicalType.INVARIANT && to.type === CanonicalType.REQUIREMENT) return 'invariant_of';
-  if (from.type === CanonicalType.REQUIREMENT && to.type === CanonicalType.INVARIANT) return 'invariant_of';
+  // Definition ↔ anything = defines
+  if (types.has(CanonicalType.DEFINITION)) return 'defines';
 
-  // Definition → anything = defines
-  if (from.type === CanonicalType.DEFINITION) return 'defines';
-  if (to.type === CanonicalType.DEFINITION) return 'defines';
+  // Constraint ↔ Requirement = constrains
+  if (types.has(CanonicalType.CONSTRAINT) && types.has(CanonicalType.REQUIREMENT)) return 'constrains';
 
-  // Context → Requirement = refines
-  if (from.type === CanonicalType.CONTEXT && to.type === CanonicalType.REQUIREMENT) return 'refines';
-  if (from.type === CanonicalType.REQUIREMENT && to.type === CanonicalType.CONTEXT) return 'refines';
+  // Invariant ↔ Requirement = invariant_of
+  if (types.has(CanonicalType.INVARIANT) && types.has(CanonicalType.REQUIREMENT)) return 'invariant_of';
+
+  // Invariant ↔ Constraint = constrains (invariants constrain constraints)
+  if (types.has(CanonicalType.INVARIANT) && types.has(CanonicalType.CONSTRAINT)) return 'constrains';
+
+  // Context ↔ any non-context = refines (context provides framing)
+  if (types.has(CanonicalType.CONTEXT) && types.size > 1) return 'refines';
+
+  // Same-type pairs: use tag overlap to distinguish refines vs relates_to
+  if (from.type === to.type) {
+    const fromTags = new Set(from.tags);
+    const toTags = new Set(to.tags);
+    let shared = 0;
+    for (const t of fromTags) if (toTags.has(t)) shared++;
+    const smaller = Math.min(fromTags.size, toTags.size);
+
+    // If one node's tags are largely a subset of the other's, the smaller
+    // one refines a broader concept — that's a refinement relationship
+    if (smaller > 0 && shared / smaller >= 0.5) return 'refines';
+  }
 
   return 'relates_to';
 }
