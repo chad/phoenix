@@ -7,8 +7,9 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 
-import * as canonPipeline from './canon-pipeline.js';
-import * as shadowMode from './shadow-mode.js';
+import * as canonicalNodeExtraction from './canonical-node-extraction.js';
+import * as pipelineIdentity from './pipeline-identity.js';
+import * as shadowCanonicalization from './shadow-canonicalization.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 
@@ -22,8 +23,9 @@ const _svcMetrics = {
 // ─── Module Registry ─────────────────────────────────────────────────────────
 
 const _svcModules = {
-  'canon-pipeline': canonPipeline,
-  'shadow-mode': shadowMode,
+  'canonical-node-extraction': canonicalNodeExtraction,
+  'pipeline-identity': pipelineIdentity,
+  'shadow-canonicalization': shadowCanonicalization,
 };
 
 // ─── Router ──────────────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 }
 
 export function startServer(port?: number): { server: ReturnType<typeof createServer>; port: number; ready: Promise<void> } {
-  const requestedPort = port ?? parseInt(process.env.CANONICALIZATION_PORT ?? process.env.PORT ?? '3002', 10);
+  const requestedPort = port ?? parseInt(process.env.CANONICALIZATION_PORT ?? process.env.PORT ?? '3000', 10);
   const server = createServer(handleRequest);
   let actualPort = requestedPort;
 

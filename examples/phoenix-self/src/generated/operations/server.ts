@@ -7,9 +7,9 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 
+import * as bootstrapFlow from './bootstrap-flow.js';
 import * as compaction from './compaction.js';
-import * as diagnostics from './diagnostics.js';
-import * as bootstrap from './bootstrap.js';
+import * as diagnosticsSeverityModel from './diagnostics-severity-model.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 
@@ -23,9 +23,9 @@ const _svcMetrics = {
 // ─── Module Registry ─────────────────────────────────────────────────────────
 
 const _svcModules = {
+  'bootstrap-flow': bootstrapFlow,
   'compaction': compaction,
-  'diagnostics': diagnostics,
-  'bootstrap': bootstrap,
+  'diagnostics-severity-model': diagnosticsSeverityModel,
 };
 
 // ─── Router ──────────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 }
 
 export function startServer(port?: number): { server: ReturnType<typeof createServer>; port: number; ready: Promise<void> } {
-  const requestedPort = port ?? parseInt(process.env.OPERATIONS_PORT ?? process.env.PORT ?? '3005', 10);
+  const requestedPort = port ?? parseInt(process.env.OPERATIONS_PORT ?? process.env.PORT ?? '3004', 10);
   const server = createServer(handleRequest);
   let actualPort = requestedPort;
 

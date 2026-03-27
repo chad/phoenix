@@ -27,6 +27,19 @@ A REST API for managing todo lists and items, with categories and basic stats.
 
 - GET /todos/stats must return a JSON object with: total (total todo count), completed (completed count), incomplete (incomplete count), by_category (array of {category_name, count} ordered by count descending)
 
+## Web Interface
+
+- GET / must serve a single-page HTML application with inline CSS and JavaScript
+- The page must display a header with the title "Todos" and a stats summary showing total, completed, and incomplete counts
+- The page must display a form to create new todos with a text input for title and a dropdown to select a category (populated from GET /categories)
+- The page must display all todos as a list, each showing the title, category name as a colored badge, and a checkbox for completed status
+- Clicking the checkbox must toggle the todo's completed status via PATCH /todos/:id
+- Each todo must have a delete button that removes it via DELETE /todos/:id
+- The page must display a category management section where users can add new categories with a name and color picker, and delete empty categories
+- The page must include filter buttons: All, Active (incomplete), Completed
+- The page must refresh the todo list and stats after every create, update, or delete action
+- The design must be clean and modern with a centered layout, max-width 640px, system-ui font, subtle shadows, and a light color scheme
+
 ## Error Handling
 
 - All error responses must be JSON with an "error" field

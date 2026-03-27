@@ -7,8 +7,9 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 
-import * as graphStore from './graph-store.js';
-import * as botRouter from './bot-router.js';
+import * as botIntegration from './bot-integration.js';
+import * as brownfieldProgressiveWrapping from './brownfield-progressive-wrapping.js';
+import * as coreGraphModel from './core-graph-model.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 
@@ -22,8 +23,9 @@ const _svcMetrics = {
 // ─── Module Registry ─────────────────────────────────────────────────────────
 
 const _svcModules = {
-  'graph-store': graphStore,
-  'bot-router': botRouter,
+  'bot-integration': botIntegration,
+  'brownfield-progressive-wrapping': brownfieldProgressiveWrapping,
+  'core-graph-model': coreGraphModel,
 };
 
 // ─── Router ──────────────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 }
 
 export function startServer(port?: number): { server: ReturnType<typeof createServer>; port: number; ready: Promise<void> } {
-  const requestedPort = port ?? parseInt(process.env.PLATFORM_PORT ?? process.env.PORT ?? '3006', 10);
+  const requestedPort = port ?? parseInt(process.env.PLATFORM_PORT ?? process.env.PORT ?? '3005', 10);
   const server = createServer(handleRequest);
   let actualPort = requestedPort;
 

@@ -64,10 +64,10 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
         const msg = err instanceof Error ? err.message : String(err);
         ctx.onProgress?.(iu, 'error', msg);
         // Fall back to stub on LLM failure
-        content = generateModule(iu);
+        content = ctx.architecture ? generateArchStub(iu) : generateModule(iu);
       }
     } else {
-      content = generateModule(iu);
+      content = ctx?.architecture ? generateArchStub(iu) : generateModule(iu);
     }
 
     files.set(outputPath, content);
@@ -264,6 +264,29 @@ function cleanCodeResponse(raw: string): string {
 }
 
 // ─── Module Generation ───────────────────────────────────────────────────────
+
+/**
+ * Generate a minimal Hono router stub for architecture mode.
+ * Ensures fallback code still produces a valid default-export router.
+ */
+function generateArchStub(iu: ImplementationUnit): string {
+  return `import { Hono } from 'hono';
+
+const router = new Hono();
+
+router.get('/', (c) => c.json({ stub: true, module: '${iu.name}', message: 'Not yet implemented' }));
+
+export default router;
+
+/** @internal Phoenix VCS traceability — do not remove. */
+export const _phoenix = {
+  iu_id: '${iu.iu_id}',
+  name: '${iu.name}',
+  risk_tier: '${iu.risk_tier}',
+  canon_ids: [${iu.source_canon_ids.length} as const],
+} as const;
+`;
+}
 
 /**
  * Generate a natural TypeScript module from an IU contract.

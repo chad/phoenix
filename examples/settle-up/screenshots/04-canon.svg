@@ -1,0 +1,258 @@
+<svg class="rich-terminal" viewBox="0 0 1360 1270.0" xmlns="http://www.w3.org/2000/svg">
+    <!-- Generated with Rich https://www.textualize.io -->
+    <style>
+
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Regular"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Regular.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Regular.woff") format("woff");
+        font-style: normal;
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: "Fira Code";
+        src: local("FiraCode-Bold"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff2/FiraCode-Bold.woff2") format("woff2"),
+                url("https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/woff/FiraCode-Bold.woff") format("woff");
+        font-style: bold;
+        font-weight: 700;
+    }
+
+    .terminal-699299816-matrix {
+        font-family: Fira Code, monospace;
+        font-size: 20px;
+        line-height: 24.4px;
+        font-variant-east-asian: full-width;
+    }
+
+    .terminal-699299816-title {
+        font-size: 18px;
+        font-weight: bold;
+        font-family: arial;
+    }
+
+    .terminal-699299816-r1 { fill: #c5c8c6;font-weight: bold }
+.terminal-699299816-r2 { fill: #c5c8c6 }
+.terminal-699299816-r3 { fill: #868887 }
+.terminal-699299816-r4 { fill: #98a84b;font-weight: bold }
+.terminal-699299816-r5 { fill: #608ab1;font-weight: bold }
+    </style>
+
+    <defs>
+    <clipPath id="terminal-699299816-clip-terminal">
+      <rect x="0" y="0" width="1341.0" height="1219.0" />
+    </clipPath>
+    <clipPath id="terminal-699299816-line-0">
+    <rect x="0" y="1.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-1">
+    <rect x="0" y="25.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-2">
+    <rect x="0" y="50.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-3">
+    <rect x="0" y="74.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-4">
+    <rect x="0" y="99.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-5">
+    <rect x="0" y="123.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-6">
+    <rect x="0" y="147.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-7">
+    <rect x="0" y="172.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-8">
+    <rect x="0" y="196.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-9">
+    <rect x="0" y="221.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-10">
+    <rect x="0" y="245.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-11">
+    <rect x="0" y="269.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-12">
+    <rect x="0" y="294.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-13">
+    <rect x="0" y="318.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-14">
+    <rect x="0" y="343.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-15">
+    <rect x="0" y="367.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-16">
+    <rect x="0" y="391.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-17">
+    <rect x="0" y="416.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-18">
+    <rect x="0" y="440.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-19">
+    <rect x="0" y="465.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-20">
+    <rect x="0" y="489.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-21">
+    <rect x="0" y="513.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-22">
+    <rect x="0" y="538.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-23">
+    <rect x="0" y="562.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-24">
+    <rect x="0" y="587.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-25">
+    <rect x="0" y="611.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-26">
+    <rect x="0" y="635.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-27">
+    <rect x="0" y="660.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-28">
+    <rect x="0" y="684.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-29">
+    <rect x="0" y="709.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-30">
+    <rect x="0" y="733.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-31">
+    <rect x="0" y="757.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-32">
+    <rect x="0" y="782.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-33">
+    <rect x="0" y="806.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-34">
+    <rect x="0" y="831.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-35">
+    <rect x="0" y="855.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-36">
+    <rect x="0" y="879.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-37">
+    <rect x="0" y="904.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-38">
+    <rect x="0" y="928.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-39">
+    <rect x="0" y="953.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-40">
+    <rect x="0" y="977.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-41">
+    <rect x="0" y="1001.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-42">
+    <rect x="0" y="1026.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-43">
+    <rect x="0" y="1050.7" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-44">
+    <rect x="0" y="1075.1" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-45">
+    <rect x="0" y="1099.5" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-46">
+    <rect x="0" y="1123.9" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-47">
+    <rect x="0" y="1148.3" width="1342" height="24.65"/>
+            </clipPath>
+<clipPath id="terminal-699299816-line-48">
+    <rect x="0" y="1172.7" width="1342" height="24.65"/>
+            </clipPath>
+    </defs>
+
+    <rect fill="#292929" stroke="rgba(255,255,255,0.35)" stroke-width="1" x="1" y="1" width="1358" height="1268" rx="8"/><text class="terminal-699299816-title" fill="#c5c8c6" text-anchor="middle" x="679" y="27">phoenix&#160;—&#160;04-canon</text>
+            <g transform="translate(26,22)">
+            <circle cx="0" cy="0" r="7" fill="#ff5f57"/>
+            <circle cx="22" cy="0" r="7" fill="#febc2e"/>
+            <circle cx="44" cy="0" r="7" fill="#28c840"/>
+            </g>
+        
+    <g transform="translate(9, 41)" clip-path="url(#terminal-699299816-clip-terminal)">
+    
+    <g class="terminal-699299816-matrix">
+    <text class="terminal-699299816-r1" x="0" y="20" textLength="207.4" clip-path="url(#terminal-699299816-line-0)">📐&#160;Canonical&#160;Graph</text><text class="terminal-699299816-r2" x="1342" y="20" textLength="12.2" clip-path="url(#terminal-699299816-line-0)">
+</text><text class="terminal-699299816-r2" x="1342" y="44.4" textLength="12.2" clip-path="url(#terminal-699299816-line-1)">
+</text><text class="terminal-699299816-r3" x="24.4" y="68.8" textLength="97.6" clip-path="url(#terminal-699299816-line-2)">66&#160;nodes</text><text class="terminal-699299816-r2" x="1342" y="68.8" textLength="12.2" clip-path="url(#terminal-699299816-line-2)">
+</text><text class="terminal-699299816-r2" x="1342" y="93.2" textLength="12.2" clip-path="url(#terminal-699299816-line-3)">
+</text><text class="terminal-699299816-r4" x="24.4" y="117.6" textLength="134.2" clip-path="url(#terminal-699299816-line-4)">REQUIREMENT</text><text class="terminal-699299816-r2" x="158.6" y="117.6" textLength="61" clip-path="url(#terminal-699299816-line-4)">&#160;(38)</text><text class="terminal-699299816-r2" x="1342" y="117.6" textLength="12.2" clip-path="url(#terminal-699299816-line-4)">
+</text><text class="terminal-699299816-r3" x="48.8" y="142" textLength="97.6" clip-path="url(#terminal-699299816-line-5)">18acbfd7</text><text class="terminal-699299816-r2" x="146.4" y="142" textLength="1000.4" clip-path="url(#terminal-699299816-line-5)">&#160;The&#160;system&#160;creates&#160;a&#160;new&#160;group&#160;when&#160;receiving&#160;a&#160;POST&#160;request&#160;to&#160;/groups&#160;endpoint…</text><text class="terminal-699299816-r3" x="1146.8" y="142" textLength="122" clip-path="url(#terminal-699299816-line-5)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="142" textLength="12.2" clip-path="url(#terminal-699299816-line-5)">
+</text><text class="terminal-699299816-r3" x="48.8" y="166.4" textLength="97.6" clip-path="url(#terminal-699299816-line-6)">a3ddb93d</text><text class="terminal-699299816-r2" x="146.4" y="166.4" textLength="1000.4" clip-path="url(#terminal-699299816-line-6)">&#160;The&#160;system&#160;removes&#160;a&#160;member&#160;from&#160;a&#160;group&#160;when&#160;the&#160;DELETE&#160;request&#160;is&#160;made&#160;to&#160;the&#160;…</text><text class="terminal-699299816-r3" x="1146.8" y="166.4" textLength="122" clip-path="url(#terminal-699299816-line-6)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="166.4" textLength="12.2" clip-path="url(#terminal-699299816-line-6)">
+</text><text class="terminal-699299816-r3" x="48.8" y="190.8" textLength="97.6" clip-path="url(#terminal-699299816-line-7)">da331d82</text><text class="terminal-699299816-r2" x="146.4" y="190.8" textLength="1000.4" clip-path="url(#terminal-699299816-line-7)">&#160;The&#160;system&#160;deletes&#160;an&#160;expense&#160;when&#160;receiving&#160;a&#160;DELETE&#160;request&#160;to&#160;the&#160;endpoint&#160;/g…</text><text class="terminal-699299816-r2" x="1342" y="190.8" textLength="12.2" clip-path="url(#terminal-699299816-line-7)">
+</text><text class="terminal-699299816-r3" x="48.8" y="215.2" textLength="97.6" clip-path="url(#terminal-699299816-line-8)">0d4cc82d</text><text class="terminal-699299816-r2" x="146.4" y="215.2" textLength="1000.4" clip-path="url(#terminal-699299816-line-8)">&#160;The&#160;system&#160;returns&#160;structured&#160;JSON&#160;errors&#160;containing&#160;a&#160;code&#160;and&#160;human-readable&#160;m…</text><text class="terminal-699299816-r3" x="1146.8" y="215.2" textLength="122" clip-path="url(#terminal-699299816-line-8)">&#160;←&#160;1&#160;links</text><text class="terminal-699299816-r2" x="1342" y="215.2" textLength="12.2" clip-path="url(#terminal-699299816-line-8)">
+</text><text class="terminal-699299816-r3" x="48.8" y="239.6" textLength="97.6" clip-path="url(#terminal-699299816-line-9)">6c46bbcd</text><text class="terminal-699299816-r2" x="146.4" y="239.6" textLength="841.8" clip-path="url(#terminal-699299816-line-9)">&#160;The&#160;system&#160;returns&#160;a&#160;404&#160;error&#160;when&#160;the&#160;group&#160;identifier&#160;is&#160;invalid.</text><text class="terminal-699299816-r3" x="988.2" y="239.6" textLength="122" clip-path="url(#terminal-699299816-line-9)">&#160;←&#160;3&#160;links</text><text class="terminal-699299816-r2" x="1342" y="239.6" textLength="12.2" clip-path="url(#terminal-699299816-line-9)">
+</text><text class="terminal-699299816-r3" x="48.8" y="264" textLength="97.6" clip-path="url(#terminal-699299816-line-10)">ee462524</text><text class="terminal-699299816-r2" x="146.4" y="264" textLength="1000.4" clip-path="url(#terminal-699299816-line-10)">&#160;The&#160;system&#160;returns&#160;a&#160;403&#160;error&#160;code&#160;when&#160;an&#160;invalid&#160;member&#160;who&#160;is&#160;not&#160;in&#160;the&#160;gro…</text><text class="terminal-699299816-r3" x="1146.8" y="264" textLength="122" clip-path="url(#terminal-699299816-line-10)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="264" textLength="12.2" clip-path="url(#terminal-699299816-line-10)">
+</text><text class="terminal-699299816-r3" x="48.8" y="288.4" textLength="97.6" clip-path="url(#terminal-699299816-line-11)">08265f58</text><text class="terminal-699299816-r2" x="146.4" y="288.4" textLength="1000.4" clip-path="url(#terminal-699299816-line-11)">&#160;The&#160;system&#160;returns&#160;HTTP&#160;status&#160;code&#160;400&#160;when&#160;expense&#160;data&#160;contains&#160;negative&#160;amou…</text><text class="terminal-699299816-r3" x="1146.8" y="288.4" textLength="122" clip-path="url(#terminal-699299816-line-11)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="288.4" textLength="12.2" clip-path="url(#terminal-699299816-line-11)">
+</text><text class="terminal-699299816-r3" x="48.8" y="312.8" textLength="97.6" clip-path="url(#terminal-699299816-line-12)">3668917d</text><text class="terminal-699299816-r2" x="146.4" y="312.8" textLength="1000.4" clip-path="url(#terminal-699299816-line-12)">&#160;The&#160;system&#160;returns&#160;HTTP&#160;status&#160;code&#160;409&#160;when&#160;a&#160;user&#160;attempts&#160;to&#160;remove&#160;a&#160;member&#160;…</text><text class="terminal-699299816-r3" x="1146.8" y="312.8" textLength="122" clip-path="url(#terminal-699299816-line-12)">&#160;←&#160;3&#160;links</text><text class="terminal-699299816-r2" x="1342" y="312.8" textLength="12.2" clip-path="url(#terminal-699299816-line-12)">
+</text><text class="terminal-699299816-r3" x="48.8" y="337.2" textLength="97.6" clip-path="url(#terminal-699299816-line-13)">a67ba11b</text><text class="terminal-699299816-r2" x="146.4" y="337.2" textLength="1000.4" clip-path="url(#terminal-699299816-line-13)">&#160;The&#160;system&#160;shall&#160;format&#160;all&#160;responses&#160;using&#160;JSON&#160;with&#160;a&#160;consistent&#160;envelope&#160;stru…</text><text class="terminal-699299816-r3" x="1146.8" y="337.2" textLength="122" clip-path="url(#terminal-699299816-line-13)">&#160;←&#160;1&#160;links</text><text class="terminal-699299816-r2" x="1342" y="337.2" textLength="12.2" clip-path="url(#terminal-699299816-line-13)">
+</text><text class="terminal-699299816-r3" x="48.8" y="361.6" textLength="97.6" clip-path="url(#terminal-699299816-line-14)">ac74e67a</text><text class="terminal-699299816-r2" x="146.4" y="361.6" textLength="1000.4" clip-path="url(#terminal-699299816-line-14)">&#160;The&#160;system&#160;shall&#160;support&#160;pagination&#160;on&#160;list&#160;endpoints&#160;using&#160;limit&#160;and&#160;offset&#160;que…</text><text class="terminal-699299816-r2" x="1342" y="361.6" textLength="12.2" clip-path="url(#terminal-699299816-line-14)">
+</text><text class="terminal-699299816-r3" x="48.8" y="386" textLength="97.6" clip-path="url(#terminal-699299816-line-15)">ad1325fa</text><text class="terminal-699299816-r2" x="146.4" y="386" textLength="1000.4" clip-path="url(#terminal-699299816-line-15)">&#160;The&#160;system&#160;represents&#160;monetary&#160;amounts&#160;in&#160;responses&#160;as&#160;integer&#160;cents&#160;to&#160;avoid&#160;fl…</text><text class="terminal-699299816-r2" x="1342" y="386" textLength="12.2" clip-path="url(#terminal-699299816-line-15)">
+</text><text class="terminal-699299816-r3" x="48.8" y="410.4" textLength="97.6" clip-path="url(#terminal-699299816-line-16)">88f49aaa</text><text class="terminal-699299816-r2" x="146.4" y="410.4" textLength="1000.4" clip-path="url(#terminal-699299816-line-16)">&#160;The&#160;system&#160;shall&#160;assign&#160;a&#160;unique&#160;expense&#160;identifier,&#160;description,&#160;amount,&#160;and&#160;da…</text><text class="terminal-699299816-r3" x="1146.8" y="410.4" textLength="122" clip-path="url(#terminal-699299816-line-16)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="410.4" textLength="12.2" clip-path="url(#terminal-699299816-line-16)">
+</text><text class="terminal-699299816-r3" x="48.8" y="434.8" textLength="97.6" clip-path="url(#terminal-699299816-line-17)">3112f12c</text><text class="terminal-699299816-r2" x="146.4" y="434.8" textLength="1000.4" clip-path="url(#terminal-699299816-line-17)">&#160;The&#160;system&#160;shall&#160;require&#160;each&#160;expense&#160;to&#160;reference&#160;exactly&#160;one&#160;payer&#160;by&#160;member&#160;i…</text><text class="terminal-699299816-r3" x="1146.8" y="434.8" textLength="122" clip-path="url(#terminal-699299816-line-17)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="434.8" textLength="12.2" clip-path="url(#terminal-699299816-line-17)">
+</text><text class="terminal-699299816-r3" x="48.8" y="459.2" textLength="97.6" clip-path="url(#terminal-699299816-line-18)">b1704011</text><text class="terminal-699299816-r2" x="146.4" y="459.2" textLength="1000.4" clip-path="url(#terminal-699299816-line-18)">&#160;The&#160;system&#160;shall&#160;require&#160;an&#160;expense&#160;to&#160;reference&#160;one&#160;or&#160;more&#160;participants&#160;by&#160;mem…</text><text class="terminal-699299816-r3" x="1146.8" y="459.2" textLength="122" clip-path="url(#terminal-699299816-line-18)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="459.2" textLength="12.2" clip-path="url(#terminal-699299816-line-18)">
+</text><text class="terminal-699299816-r3" x="48.8" y="483.6" textLength="97.6" clip-path="url(#terminal-699299816-line-19)">ada76261</text><text class="terminal-699299816-r2" x="146.4" y="483.6" textLength="793" clip-path="url(#terminal-699299816-line-19)">&#160;The&#160;system&#160;shall&#160;verify&#160;that&#160;the&#160;payer&#160;is&#160;a&#160;member&#160;of&#160;the&#160;group.</text><text class="terminal-699299816-r3" x="939.4" y="483.6" textLength="122" clip-path="url(#terminal-699299816-line-19)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="483.6" textLength="12.2" clip-path="url(#terminal-699299816-line-19)">
+</text><text class="terminal-699299816-r3" x="48.8" y="508" textLength="97.6" clip-path="url(#terminal-699299816-line-20)">c73974bd</text><text class="terminal-699299816-r2" x="146.4" y="508" textLength="878.4" clip-path="url(#terminal-699299816-line-20)">&#160;The&#160;system&#160;shall&#160;verify&#160;that&#160;all&#160;participants&#160;are&#160;members&#160;of&#160;the&#160;group.</text><text class="terminal-699299816-r3" x="1024.8" y="508" textLength="122" clip-path="url(#terminal-699299816-line-20)">&#160;←&#160;2&#160;links</text><text class="terminal-699299816-r2" x="1342" y="508" textLength="12.2" clip-path="url(#terminal-699299816-line-20)">
+</text><text class="terminal-699299816-r3" x="48.8" y="532.4" textLength="97.6" clip-path="url(#terminal-699299816-line-21)">eb904a0c</text><text class="terminal-699299816-r2" x="146.4" y="532.4" textLength="744.2" clip-path="url(#terminal-699299816-line-21)">&#160;The&#160;system&#160;splits&#160;an&#160;expense&#160;by&#160;percentages&#160;that&#160;sum&#160;to&#160;100.</text><text class="terminal-699299816-r3" x="890.6" y="532.4" textLength="122" clip-path="url(#terminal-699299816-line-21)">&#160;←&#160;4&#160;links</text><text class="terminal-699299816-r2" x="1342" y="532.4" textLength="12.2" clip-path="url(#terminal-699299816-line-21)">
+</text><text class="terminal-699299816-r3" x="48.8" y="556.8" textLength="97.6" clip-path="url(#terminal-699299816-line-22)">a680be04</text><text class="terminal-699299816-r2" x="146.4" y="556.8" textLength="1000.4" clip-path="url(#terminal-699299816-line-22)">&#160;The&#160;system&#160;shall&#160;display&#160;all&#160;expenses&#160;in&#160;a&#160;group&#160;in&#160;reverse&#160;chronological&#160;order&#160;…</text><text class="terminal-699299816-r3" x="1146.8" y="556.8" textLength="122" clip-path="url(#terminal-699299816-line-22)">&#160;←&#160;3&#160;links</text><text class="terminal-699299816-r2" x="1342" y="556.8" textLength="12.2" clip-path="url(#terminal-699299816-line-22)">
+</text><text class="terminal-699299816-r3" x="48.8" y="581.2" textLength="97.6" clip-path="url(#terminal-699299816-line-23)">7f00ee36</text><text class="terminal-699299816-r2" x="146.4" y="581.2" textLength="890.6" clip-path="url(#terminal-699299816-line-23)">&#160;The&#160;system&#160;filters&#160;expenses&#160;by&#160;payer,&#160;by&#160;participant,&#160;and&#160;by&#160;date&#160;range.</text><text class="terminal-699299816-r3" x="1037" y="581.2" textLength="122" clip-path="url(#terminal-699299816-line-23)">&#160;←&#160;2&#160;links</text><text class="terminal-699299816-r2" x="1342" y="581.2" textLength="12.2" clip-path="url(#terminal-699299816-line-23)">
+</text><text class="terminal-699299816-r3" x="48.8" y="605.6" textLength="97.6" clip-path="url(#terminal-699299816-line-24)">e9e4ab72</text><text class="terminal-699299816-r2" x="146.4" y="605.6" textLength="939.4" clip-path="url(#terminal-699299816-line-24)">&#160;The&#160;system&#160;shall&#160;record&#160;the&#160;creator&#160;and&#160;creation&#160;timestamp&#160;for&#160;each&#160;expense.</text><text class="terminal-699299816-r3" x="1085.8" y="605.6" textLength="122" clip-path="url(#terminal-699299816-line-24)">&#160;←&#160;4&#160;links</text><text class="terminal-699299816-r2" x="1342" y="605.6" textLength="12.2" clip-path="url(#terminal-699299816-line-24)">
+</text><text class="terminal-699299816-r3" x="48.8" y="630" textLength="97.6" clip-path="url(#terminal-699299816-line-25)">4d5f3377</text><text class="terminal-699299816-r2" x="146.4" y="630" textLength="1000.4" clip-path="url(#terminal-699299816-line-25)">&#160;The&#160;system&#160;deletes&#160;an&#160;expense&#160;and&#160;reverses&#160;the&#160;expense&#160;effect&#160;on&#160;all&#160;member&#160;bala…</text><text class="terminal-699299816-r3" x="1146.8" y="630" textLength="122" clip-path="url(#terminal-699299816-line-25)">&#160;←&#160;5&#160;links</text><text class="terminal-699299816-r2" x="1342" y="630" textLength="12.2" clip-path="url(#terminal-699299816-line-25)">
+</text><text class="terminal-699299816-r3" x="48.8" y="654.4" textLength="97.6" clip-path="url(#terminal-699299816-line-26)">191a9d5d</text><text class="terminal-699299816-r2" x="146.4" y="654.4" textLength="890.6" clip-path="url(#terminal-699299816-line-26)">&#160;The&#160;system&#160;computes&#160;each&#160;member&#x27;s&#160;balance&#160;from&#160;the&#160;full&#160;expense&#160;history.</text><text class="terminal-699299816-r3" x="1037" y="654.4" textLength="122" clip-path="url(#terminal-699299816-line-26)">&#160;←&#160;3&#160;links</text><text class="terminal-699299816-r2" x="1342" y="654.4" textLength="12.2" clip-path="url(#terminal-699299816-line-26)">
+</text><text class="terminal-699299816-r3" x="48.8" y="678.8" textLength="97.6" clip-path="url(#terminal-699299816-line-27)">5d9de155</text><text class="terminal-699299816-r2" x="146.4" y="678.8" textLength="1000.4" clip-path="url(#terminal-699299816-line-27)">&#160;The&#160;system&#160;recalculates&#160;balances&#160;when&#160;a&#160;user&#160;adds&#160;an&#160;expense&#160;or&#160;when&#160;a&#160;user&#160;dele…</text><text class="terminal-699299816-r3" x="1146.8" y="678.8" textLength="122" clip-path="url(#terminal-699299816-line-27)">&#160;←&#160;2&#160;links</text><text class="terminal-699299816-r2" x="1342" y="678.8" textLength="12.2" clip-path="url(#terminal-699299816-line-27)">
+</text><text class="terminal-699299816-r3" x="48.8" y="703.2" textLength="97.6" clip-path="url(#terminal-699299816-line-28)">78a546df</text><text class="terminal-699299816-r2" x="146.4" y="703.2" textLength="1000.4" clip-path="url(#terminal-699299816-line-28)">&#160;The&#160;system&#160;shall&#160;assign&#160;each&#160;group&#160;a&#160;unique&#160;group&#160;identifier,&#160;a&#160;name,&#160;and&#160;a&#160;curr…</text><text class="terminal-699299816-r3" x="1146.8" y="703.2" textLength="122" clip-path="url(#terminal-699299816-line-28)">&#160;←&#160;4&#160;links</text><text class="terminal-699299816-r2" x="1342" y="703.2" textLength="12.2" clip-path="url(#terminal-699299816-line-28)">
+</text><text class="terminal-699299816-r3" x="48.8" y="727.6" textLength="97.6" clip-path="url(#terminal-699299816-line-29)">2695e9ef</text><text class="terminal-699299816-r2" x="146.4" y="727.6" textLength="817.4" clip-path="url(#terminal-699299816-line-29)">&#160;The&#160;system&#160;shall&#160;record&#160;the&#160;creation&#160;date&#160;when&#160;a&#160;group&#160;is&#160;created.</text><text class="terminal-699299816-r2" x="1342" y="727.6" textLength="12.2" clip-path="url(#terminal-699299816-line-29)">
+</text><text class="terminal-699299816-r3" x="48.8" y="752" textLength="97.6" clip-path="url(#terminal-699299816-line-30)">a184f271</text><text class="terminal-699299816-r2" x="146.4" y="752" textLength="1000.4" clip-path="url(#terminal-699299816-line-30)">&#160;The&#160;system&#160;assigns&#160;a&#160;unique&#160;member&#160;identifier,&#160;a&#160;display&#160;name,&#160;and&#160;an&#160;email&#160;addr…</text><text class="terminal-699299816-r3" x="1146.8" y="752" textLength="122" clip-path="url(#terminal-699299816-line-30)">&#160;←&#160;5&#160;links</text><text class="terminal-699299816-r2" x="1342" y="752" textLength="12.2" clip-path="url(#terminal-699299816-line-30)">
+</text><text class="terminal-699299816-r3" x="48.8" y="776.4" textLength="97.6" clip-path="url(#terminal-699299816-line-31)">2877dbe8</text><text class="terminal-699299816-r2" x="146.4" y="776.4" textLength="1000.4" clip-path="url(#terminal-699299816-line-31)">&#160;The&#160;system&#160;displays&#160;each&#160;member&#x27;s&#160;net&#160;balance&#160;in&#160;the&#160;group&#160;summary&#160;where&#160;positiv…</text><text class="terminal-699299816-r3" x="1146.8" y="776.4" textLength="122" clip-path="url(#terminal-699299816-line-31)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="776.4" textLength="12.2" clip-path="url(#terminal-699299816-line-31)">
+</text><text class="terminal-699299816-r3" x="48.8" y="800.8" textLength="97.6" clip-path="url(#terminal-699299816-line-32)">3cf44cb9</text><text class="terminal-699299816-r2" x="146.4" y="800.8" textLength="1000.4" clip-path="url(#terminal-699299816-line-32)">&#160;The&#160;system&#160;displays&#160;the&#160;total&#160;number&#160;of&#160;expenses&#160;and&#160;total&#160;amount&#160;spent&#160;in&#160;the&#160;g…</text><text class="terminal-699299816-r3" x="1146.8" y="800.8" textLength="122" clip-path="url(#terminal-699299816-line-32)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="800.8" textLength="12.2" clip-path="url(#terminal-699299816-line-32)">
+</text><text class="terminal-699299816-r3" x="48.8" y="825.2" textLength="97.6" clip-path="url(#terminal-699299816-line-33)">f3e6b35b</text><text class="terminal-699299816-r2" x="146.4" y="825.2" textLength="1000.4" clip-path="url(#terminal-699299816-line-33)">&#160;The&#160;settlement&#160;plan&#160;lists&#160;each&#160;required&#160;payment&#160;with&#160;the&#160;payer,&#160;payee,&#160;and&#160;payme…</text><text class="terminal-699299816-r3" x="1146.8" y="825.2" textLength="122" clip-path="url(#terminal-699299816-line-33)">&#160;←&#160;5&#160;links</text><text class="terminal-699299816-r2" x="1342" y="825.2" textLength="12.2" clip-path="url(#terminal-699299816-line-33)">
+</text><text class="terminal-699299816-r3" x="48.8" y="849.6" textLength="97.6" clip-path="url(#terminal-699299816-line-34)">e052d31a</text><text class="terminal-699299816-r2" x="146.4" y="849.6" textLength="1000.4" clip-path="url(#terminal-699299816-line-34)">&#160;The&#160;simplified&#160;settlement&#160;produces&#160;the&#160;same&#160;net&#160;effect&#160;as&#160;paying&#160;each&#160;debt&#160;indiv…</text><text class="terminal-699299816-r3" x="1146.8" y="849.6" textLength="122" clip-path="url(#terminal-699299816-line-34)">&#160;←&#160;2&#160;links</text><text class="terminal-699299816-r2" x="1342" y="849.6" textLength="12.2" clip-path="url(#terminal-699299816-line-34)">
+</text><text class="terminal-699299816-r3" x="48.8" y="874" textLength="97.6" clip-path="url(#terminal-699299816-line-35)">cb1d55ad</text><text class="terminal-699299816-r2" x="146.4" y="874" textLength="756.4" clip-path="url(#terminal-699299816-line-35)">&#160;The&#160;algorithm&#160;handles&#160;cycles&#160;by&#160;reducing&#160;cycles&#160;to&#160;net&#160;flows.</text><text class="terminal-699299816-r3" x="902.8" y="874" textLength="122" clip-path="url(#terminal-699299816-line-35)">&#160;←&#160;1&#160;links</text><text class="terminal-699299816-r2" x="1342" y="874" textLength="12.2" clip-path="url(#terminal-699299816-line-35)">
+</text><text class="terminal-699299816-r3" x="48.8" y="898.4" textLength="97.6" clip-path="url(#terminal-699299816-line-36)">e657daa9</text><text class="terminal-699299816-r2" x="146.4" y="898.4" textLength="1000.4" clip-path="url(#terminal-699299816-line-36)">&#160;The&#160;system&#160;produces&#160;an&#160;empty&#160;settlement&#160;plan&#160;when&#160;a&#160;group&#160;has&#160;all&#160;balances&#160;equal…</text><text class="terminal-699299816-r3" x="1146.8" y="898.4" textLength="122" clip-path="url(#terminal-699299816-line-36)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="898.4" textLength="12.2" clip-path="url(#terminal-699299816-line-36)">
+</text><text class="terminal-699299816-r3" x="48.8" y="922.8" textLength="97.6" clip-path="url(#terminal-699299816-line-37)">3c742c6c</text><text class="terminal-699299816-r2" x="146.4" y="922.8" textLength="976" clip-path="url(#terminal-699299816-line-37)">&#160;The&#160;system&#160;updates&#160;both&#160;members&#x27;&#160;balances&#160;when&#160;the&#160;system&#160;records&#160;a&#160;settlement.</text><text class="terminal-699299816-r3" x="1122.4" y="922.8" textLength="122" clip-path="url(#terminal-699299816-line-37)">&#160;←&#160;3&#160;links</text><text class="terminal-699299816-r2" x="1342" y="922.8" textLength="12.2" clip-path="url(#terminal-699299816-line-37)">
+</text><text class="terminal-699299816-r3" x="48.8" y="947.2" textLength="97.6" clip-path="url(#terminal-699299816-line-38)">c0de3df0</text><text class="terminal-699299816-r2" x="146.4" y="947.2" textLength="1000.4" clip-path="url(#terminal-699299816-line-38)">&#160;The&#160;system&#160;rejects&#160;a&#160;settlement&#160;when&#160;the&#160;settlement&#160;amount&#160;exceeds&#160;the&#160;amount&#160;th…</text><text class="terminal-699299816-r3" x="1146.8" y="947.2" textLength="122" clip-path="url(#terminal-699299816-line-38)">&#160;←&#160;3&#160;links</text><text class="terminal-699299816-r2" x="1342" y="947.2" textLength="12.2" clip-path="url(#terminal-699299816-line-38)">
+</text><text class="terminal-699299816-r3" x="48.8" y="971.6" textLength="97.6" clip-path="url(#terminal-699299816-line-39)">7e4819be</text><text class="terminal-699299816-r2" x="146.4" y="971.6" textLength="866.2" clip-path="url(#terminal-699299816-line-39)">&#160;The&#160;system&#160;tracks&#160;settlements&#160;separately&#160;from&#160;expenses&#160;in&#160;the&#160;history.</text><text class="terminal-699299816-r3" x="1012.6" y="971.6" textLength="122" clip-path="url(#terminal-699299816-line-39)">&#160;←&#160;1&#160;links</text><text class="terminal-699299816-r2" x="1342" y="971.6" textLength="12.2" clip-path="url(#terminal-699299816-line-39)">
+</text><text class="terminal-699299816-r3" x="48.8" y="996" textLength="97.6" clip-path="url(#terminal-699299816-line-40)">739db6ca</text><text class="terminal-699299816-r2" x="146.4" y="996" textLength="1000.4" clip-path="url(#terminal-699299816-line-40)">&#160;The&#160;system&#160;reports&#160;whether&#160;a&#160;group&#160;has&#160;all&#160;balances&#160;at&#160;zero&#160;or&#160;has&#160;outstanding&#160;d…</text><text class="terminal-699299816-r3" x="1146.8" y="996" textLength="122" clip-path="url(#terminal-699299816-line-40)">&#160;←&#160;6&#160;links</text><text class="terminal-699299816-r2" x="1342" y="996" textLength="12.2" clip-path="url(#terminal-699299816-line-40)">
+</text><text class="terminal-699299816-r3" x="48.8" y="1020.4" textLength="97.6" clip-path="url(#terminal-699299816-line-41)">c82774df</text><text class="terminal-699299816-r2" x="146.4" y="1020.4" textLength="1000.4" clip-path="url(#terminal-699299816-line-41)">&#160;The&#160;system&#160;shall&#160;display&#160;to&#160;each&#160;member&#160;the&#160;list&#160;of&#160;people&#160;the&#160;member&#160;owes,&#160;the&#160;…</text><text class="terminal-699299816-r3" x="1146.8" y="1020.4" textLength="122" clip-path="url(#terminal-699299816-line-41)">&#160;←&#160;5&#160;links</text><text class="terminal-699299816-r2" x="1342" y="1020.4" textLength="12.2" clip-path="url(#terminal-699299816-line-41)">
+</text><text class="terminal-699299816-r3" x="48.8" y="1044.8" textLength="97.6" clip-path="url(#terminal-699299816-line-42)">9ec637e1</text><text class="terminal-699299816-r2" x="146.4" y="1044.8" textLength="915" clip-path="url(#terminal-699299816-line-42)">&#160;The&#160;system&#160;displays&#160;the&#160;total&#160;of&#160;all&#160;outstanding&#160;debts&#160;at&#160;the&#160;group&#160;level.</text><text class="terminal-699299816-r3" x="1061.4" y="1044.8" textLength="122" clip-path="url(#terminal-699299816-line-42)">&#160;←&#160;3&#160;links</text><text class="terminal-699299816-r2" x="1342" y="1044.8" textLength="12.2" clip-path="url(#terminal-699299816-line-42)">
+</text><text class="terminal-699299816-r2" x="1342" y="1069.2" textLength="12.2" clip-path="url(#terminal-699299816-line-43)">
+</text><text class="terminal-699299816-r5" x="24.4" y="1093.6" textLength="85.4" clip-path="url(#terminal-699299816-line-44)">CONTEXT</text><text class="terminal-699299816-r2" x="109.8" y="1093.6" textLength="61" clip-path="url(#terminal-699299816-line-44)">&#160;(17)</text><text class="terminal-699299816-r2" x="1342" y="1093.6" textLength="12.2" clip-path="url(#terminal-699299816-line-44)">
+</text><text class="terminal-699299816-r3" x="48.8" y="1118" textLength="97.6" clip-path="url(#terminal-699299816-line-45)">466f68de</text><text class="terminal-699299816-r2" x="146.4" y="1118" textLength="854" clip-path="url(#terminal-699299816-line-45)">&#160;get&#160;/groups/:id&#160;—&#160;get&#160;group&#160;details&#160;including&#160;member&#160;list&#160;and&#160;summary</text><text class="terminal-699299816-r3" x="1000.4" y="1118" textLength="122" clip-path="url(#terminal-699299816-line-45)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="1118" textLength="12.2" clip-path="url(#terminal-699299816-line-45)">
+</text><text class="terminal-699299816-r3" x="48.8" y="1142.4" textLength="97.6" clip-path="url(#terminal-699299816-line-46)">661e9621</text><text class="terminal-699299816-r2" x="146.4" y="1142.4" textLength="622.2" clip-path="url(#terminal-699299816-line-46)">&#160;post&#160;/groups/:id/members&#160;—&#160;add&#160;a&#160;member&#160;to&#160;a&#160;group</text><text class="terminal-699299816-r3" x="768.6" y="1142.4" textLength="122" clip-path="url(#terminal-699299816-line-46)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="1142.4" textLength="12.2" clip-path="url(#terminal-699299816-line-46)">
+</text><text class="terminal-699299816-r3" x="48.8" y="1166.8" textLength="97.6" clip-path="url(#terminal-699299816-line-47)">0eefcc35</text><text class="terminal-699299816-r2" x="146.4" y="1166.8" textLength="1000.4" clip-path="url(#terminal-699299816-line-47)">&#160;post&#160;/groups/:id/expenses&#160;—&#160;add&#160;an&#160;expense&#160;(body:&#160;description,&#160;amount,&#160;payer,&#160;pa…</text><text class="terminal-699299816-r3" x="1146.8" y="1166.8" textLength="122" clip-path="url(#terminal-699299816-line-47)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="1166.8" textLength="12.2" clip-path="url(#terminal-699299816-line-47)">
+</text><text class="terminal-699299816-r3" x="48.8" y="1191.2" textLength="97.6" clip-path="url(#terminal-699299816-line-48)">b2da4cb7</text><text class="terminal-699299816-r2" x="146.4" y="1191.2" textLength="1000.4" clip-path="url(#terminal-699299816-line-48)">&#160;get&#160;/groups/:id/expenses&#160;—&#160;list&#160;expenses&#160;with&#160;optional&#160;filters&#160;(payer,&#160;participa…</text><text class="terminal-699299816-r3" x="1146.8" y="1191.2" textLength="122" clip-path="url(#terminal-699299816-line-48)">&#160;←&#160;4&#160;links</text><text class="terminal-699299816-r2" x="1342" y="1191.2" textLength="12.2" clip-path="url(#terminal-699299816-line-48)">
+</text><text class="terminal-699299816-r3" x="48.8" y="1215.6" textLength="97.6" clip-path="url(#terminal-699299816-line-49)">ad9807e6</text><text class="terminal-699299816-r2" x="146.4" y="1215.6" textLength="768.6" clip-path="url(#terminal-699299816-line-49)">&#160;get&#160;/groups/:id/balances&#160;—&#160;get&#160;all&#160;member&#160;balances&#160;for&#160;a&#160;group</text><text class="terminal-699299816-r3" x="915" y="1215.6" textLength="122" clip-path="url(#terminal-699299816-line-49)">&#160;←&#160;8&#160;links</text><text class="terminal-699299816-r2" x="1342" y="1215.6" textLength="12.2" clip-path="url(#terminal-699299816-line-49)">
+</text>
+    </g>
+    </g>
+</svg>

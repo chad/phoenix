@@ -8,32 +8,46 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { startServer } from '../server.js';
 
-import * as canonPipeline from '../canon-pipeline.js';
-import * as shadowMode from '../shadow-mode.js';
+import * as canonicalNodeExtraction from '../canonical-node-extraction.js';
+import * as pipelineIdentity from '../pipeline-identity.js';
+import * as shadowCanonicalization from '../shadow-canonicalization.js';
 
 describe('Canonicalization modules', () => {
-  describe('Canon Pipeline', () => {
+  describe('Canonical Node Extraction', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(canonPipeline._phoenix).toBeDefined();
-      expect(canonPipeline._phoenix.name).toBe('Canon Pipeline');
-      expect(canonPipeline._phoenix.risk_tier).toBeTruthy();
+      expect(canonicalNodeExtraction._phoenix).toBeDefined();
+      expect(canonicalNodeExtraction._phoenix.name).toBe('Canonical Node Extraction');
+      expect(canonicalNodeExtraction._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(canonPipeline).filter(k => k !== '_phoenix');
+      const exports = Object.keys(canonicalNodeExtraction).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Shadow Mode', () => {
+  describe('Pipeline Identity', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(shadowMode._phoenix).toBeDefined();
-      expect(shadowMode._phoenix.name).toBe('Shadow Mode');
-      expect(shadowMode._phoenix.risk_tier).toBeTruthy();
+      expect(pipelineIdentity._phoenix).toBeDefined();
+      expect(pipelineIdentity._phoenix.name).toBe('Pipeline Identity');
+      expect(pipelineIdentity._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(shadowMode).filter(k => k !== '_phoenix');
+      const exports = Object.keys(pipelineIdentity).filter(k => k !== '_phoenix');
+      expect(exports.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Shadow Canonicalization', () => {
+    it('exports Phoenix traceability metadata', () => {
+      expect(shadowCanonicalization._phoenix).toBeDefined();
+      expect(shadowCanonicalization._phoenix.name).toBe('Shadow Canonicalization');
+      expect(shadowCanonicalization._phoenix.risk_tier).toBeTruthy();
+    });
+
+    it('has exported functions', () => {
+      const exports = Object.keys(shadowCanonicalization).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
@@ -67,7 +81,7 @@ describe('Canonicalization server', () => {
     const res = await fetch(`http://localhost:${instance.port}/modules`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<Record<string, unknown>>;
-    expect(body.length).toBe(2);
+    expect(body.length).toBe(3);
   });
 
   it('GET /unknown returns 404', async () => {

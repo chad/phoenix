@@ -7,9 +7,9 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 
-import * as driftDetector from './drift-detector.js';
-import * as evidenceEngine from './evidence-engine.js';
-import * as cascadePropagator from './cascade-propagator.js';
+import * as cascadingFailureSemantics from './cascading-failure-semantics.js';
+import * as driftDetection from './drift-detection.js';
+import * as evidencePolicyEngine from './evidence-policy-engine.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 
@@ -23,9 +23,9 @@ const _svcMetrics = {
 // ─── Module Registry ─────────────────────────────────────────────────────────
 
 const _svcModules = {
-  'drift-detector': driftDetector,
-  'evidence-engine': evidenceEngine,
-  'cascade-propagator': cascadePropagator,
+  'cascading-failure-semantics': cascadingFailureSemantics,
+  'drift-detection': driftDetection,
+  'evidence-policy-engine': evidencePolicyEngine,
 };
 
 // ─── Router ──────────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 }
 
 export function startServer(port?: number): { server: ReturnType<typeof createServer>; port: number; ready: Promise<void> } {
-  const requestedPort = port ?? parseInt(process.env.INTEGRITY_PORT ?? process.env.PORT ?? '3004', 10);
+  const requestedPort = port ?? parseInt(process.env.INTEGRITY_PORT ?? process.env.PORT ?? '3003', 10);
   const server = createServer(handleRequest);
   let actualPort = requestedPort;
 

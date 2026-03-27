@@ -7,8 +7,10 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 
-import * as iuManager from './iu-manager.js';
-import * as boundaryValidator from './boundary-validator.js';
+import * as architecturalLinter from './architectural-linter.js';
+import * as boundaryPolicySchema from './boundary-policy-schema.js';
+import * as implementationUnitStructure from './implementation-unit-structure.js';
+import * as regenerationEngine from './regeneration-engine.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 
@@ -22,8 +24,10 @@ const _svcMetrics = {
 // ─── Module Registry ─────────────────────────────────────────────────────────
 
 const _svcModules = {
-  'iu-manager': iuManager,
-  'boundary-validator': boundaryValidator,
+  'architectural-linter': architecturalLinter,
+  'boundary-policy-schema': boundaryPolicySchema,
+  'implementation-unit-structure': implementationUnitStructure,
+  'regeneration-engine': regenerationEngine,
 };
 
 // ─── Router ──────────────────────────────────────────────────────────────────
@@ -92,7 +96,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 }
 
 export function startServer(port?: number): { server: ReturnType<typeof createServer>; port: number; ready: Promise<void> } {
-  const requestedPort = port ?? parseInt(process.env.IMPLEMENTATION_PORT ?? process.env.PORT ?? '3003', 10);
+  const requestedPort = port ?? parseInt(process.env.IMPLEMENTATION_PORT ?? process.env.PORT ?? '3001', 10);
   const server = createServer(handleRequest);
   let actualPort = requestedPort;
 

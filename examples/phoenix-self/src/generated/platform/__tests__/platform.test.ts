@@ -8,32 +8,46 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { startServer } from '../server.js';
 
-import * as graphStore from '../graph-store.js';
-import * as botRouter from '../bot-router.js';
+import * as botIntegration from '../bot-integration.js';
+import * as brownfieldProgressiveWrapping from '../brownfield-progressive-wrapping.js';
+import * as coreGraphModel from '../core-graph-model.js';
 
 describe('Platform modules', () => {
-  describe('Graph Store', () => {
+  describe('Bot Integration', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(graphStore._phoenix).toBeDefined();
-      expect(graphStore._phoenix.name).toBe('Graph Store');
-      expect(graphStore._phoenix.risk_tier).toBeTruthy();
+      expect(botIntegration._phoenix).toBeDefined();
+      expect(botIntegration._phoenix.name).toBe('Bot Integration');
+      expect(botIntegration._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(graphStore).filter(k => k !== '_phoenix');
+      const exports = Object.keys(botIntegration).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Bot Router', () => {
+  describe('Brownfield Progressive Wrapping', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(botRouter._phoenix).toBeDefined();
-      expect(botRouter._phoenix.name).toBe('Bot Router');
-      expect(botRouter._phoenix.risk_tier).toBeTruthy();
+      expect(brownfieldProgressiveWrapping._phoenix).toBeDefined();
+      expect(brownfieldProgressiveWrapping._phoenix.name).toBe('Brownfield Progressive Wrapping');
+      expect(brownfieldProgressiveWrapping._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(botRouter).filter(k => k !== '_phoenix');
+      const exports = Object.keys(brownfieldProgressiveWrapping).filter(k => k !== '_phoenix');
+      expect(exports.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Core Graph Model', () => {
+    it('exports Phoenix traceability metadata', () => {
+      expect(coreGraphModel._phoenix).toBeDefined();
+      expect(coreGraphModel._phoenix.name).toBe('Core Graph Model');
+      expect(coreGraphModel._phoenix.risk_tier).toBeTruthy();
+    });
+
+    it('has exported functions', () => {
+      const exports = Object.keys(coreGraphModel).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
@@ -67,7 +81,7 @@ describe('Platform server', () => {
     const res = await fetch(`http://localhost:${instance.port}/modules`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<Record<string, unknown>>;
-    expect(body.length).toBe(2);
+    expect(body.length).toBe(3);
   });
 
   it('GET /unknown returns 404', async () => {

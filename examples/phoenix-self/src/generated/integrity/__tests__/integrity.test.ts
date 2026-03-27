@@ -8,46 +8,46 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { startServer } from '../server.js';
 
-import * as driftDetector from '../drift-detector.js';
-import * as evidenceEngine from '../evidence-engine.js';
-import * as cascadePropagator from '../cascade-propagator.js';
+import * as cascadingFailureSemantics from '../cascading-failure-semantics.js';
+import * as driftDetection from '../drift-detection.js';
+import * as evidencePolicyEngine from '../evidence-policy-engine.js';
 
 describe('Integrity modules', () => {
-  describe('Drift Detector', () => {
+  describe('Cascading Failure Semantics', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(driftDetector._phoenix).toBeDefined();
-      expect(driftDetector._phoenix.name).toBe('Drift Detector');
-      expect(driftDetector._phoenix.risk_tier).toBeTruthy();
+      expect(cascadingFailureSemantics._phoenix).toBeDefined();
+      expect(cascadingFailureSemantics._phoenix.name).toBe('Cascading Failure Semantics');
+      expect(cascadingFailureSemantics._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(driftDetector).filter(k => k !== '_phoenix');
+      const exports = Object.keys(cascadingFailureSemantics).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Evidence Engine', () => {
+  describe('Drift Detection', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(evidenceEngine._phoenix).toBeDefined();
-      expect(evidenceEngine._phoenix.name).toBe('Evidence Engine');
-      expect(evidenceEngine._phoenix.risk_tier).toBeTruthy();
+      expect(driftDetection._phoenix).toBeDefined();
+      expect(driftDetection._phoenix.name).toBe('Drift Detection');
+      expect(driftDetection._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(evidenceEngine).filter(k => k !== '_phoenix');
+      const exports = Object.keys(driftDetection).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Cascade Propagator', () => {
+  describe('Evidence & Policy Engine', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(cascadePropagator._phoenix).toBeDefined();
-      expect(cascadePropagator._phoenix.name).toBe('Cascade Propagator');
-      expect(cascadePropagator._phoenix.risk_tier).toBeTruthy();
+      expect(evidencePolicyEngine._phoenix).toBeDefined();
+      expect(evidencePolicyEngine._phoenix.name).toBe('Evidence & Policy Engine');
+      expect(evidencePolicyEngine._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(cascadePropagator).filter(k => k !== '_phoenix');
+      const exports = Object.keys(evidencePolicyEngine).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });

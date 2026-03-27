@@ -2,3 +2,4 @@ node_modules/
 dist/
 .phoenix/
 *.tsbuildinfo
+examples/settle-up/.phoenix/

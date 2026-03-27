@@ -93,7 +93,10 @@ export function generateScaffold(
         routeImports.push(`import ${modName} from '${importPath}';`);
         // Derive mount path from IU name: "Todos" → "/todos", "Categories" → "/categories"
         const iuName = iu?.name ?? mod.replace('.ts', '');
-        const prefix = '/' + iuName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const lowerName = iuName.toLowerCase();
+        // Web interface / UI modules mount at root
+        const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
+        const prefix = isWebUI ? '' : '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         routeMounts.push(`mount('${prefix}', ${modName});`);
       }
     }

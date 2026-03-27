@@ -8,32 +8,60 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { startServer } from '../server.js';
 
-import * as specParser from '../spec-parser.js';
-import * as changeClassifier from '../change-classifier.js';
+import * as changeClassification from '../change-classification.js';
+import * as clauseExtraction from '../clause-extraction.js';
+import * as dRateTrustLoop from '../d-rate-trust-loop.js';
+import * as semanticHashing from '../semantic-hashing.js';
 
 describe('Ingestion modules', () => {
-  describe('Spec Parser', () => {
+  describe('Change Classification', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(specParser._phoenix).toBeDefined();
-      expect(specParser._phoenix.name).toBe('Spec Parser');
-      expect(specParser._phoenix.risk_tier).toBeTruthy();
+      expect(changeClassification._phoenix).toBeDefined();
+      expect(changeClassification._phoenix.name).toBe('Change Classification');
+      expect(changeClassification._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(specParser).filter(k => k !== '_phoenix');
+      const exports = Object.keys(changeClassification).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Change Classifier', () => {
+  describe('Clause Extraction', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(changeClassifier._phoenix).toBeDefined();
-      expect(changeClassifier._phoenix.name).toBe('Change Classifier');
-      expect(changeClassifier._phoenix.risk_tier).toBeTruthy();
+      expect(clauseExtraction._phoenix).toBeDefined();
+      expect(clauseExtraction._phoenix.name).toBe('Clause Extraction');
+      expect(clauseExtraction._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(changeClassifier).filter(k => k !== '_phoenix');
+      const exports = Object.keys(clauseExtraction).filter(k => k !== '_phoenix');
+      expect(exports.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('D-Rate Trust Loop', () => {
+    it('exports Phoenix traceability metadata', () => {
+      expect(dRateTrustLoop._phoenix).toBeDefined();
+      expect(dRateTrustLoop._phoenix.name).toBe('D-Rate Trust Loop');
+      expect(dRateTrustLoop._phoenix.risk_tier).toBeTruthy();
+    });
+
+    it('has exported functions', () => {
+      const exports = Object.keys(dRateTrustLoop).filter(k => k !== '_phoenix');
+      expect(exports.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Semantic Hashing', () => {
+    it('exports Phoenix traceability metadata', () => {
+      expect(semanticHashing._phoenix).toBeDefined();
+      expect(semanticHashing._phoenix.name).toBe('Semantic Hashing');
+      expect(semanticHashing._phoenix.risk_tier).toBeTruthy();
+    });
+
+    it('has exported functions', () => {
+      const exports = Object.keys(semanticHashing).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
@@ -67,7 +95,7 @@ describe('Ingestion server', () => {
     const res = await fetch(`http://localhost:${instance.port}/modules`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<Record<string, unknown>>;
-    expect(body.length).toBe(2);
+    expect(body.length).toBe(4);
   });
 
   it('GET /unknown returns 404', async () => {

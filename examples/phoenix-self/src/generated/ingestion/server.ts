@@ -7,8 +7,10 @@
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 
-import * as specParser from './spec-parser.js';
-import * as changeClassifier from './change-classifier.js';
+import * as changeClassification from './change-classification.js';
+import * as clauseExtraction from './clause-extraction.js';
+import * as dRateTrustLoop from './d-rate-trust-loop.js';
+import * as semanticHashing from './semantic-hashing.js';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 
@@ -22,8 +24,10 @@ const _svcMetrics = {
 // ─── Module Registry ─────────────────────────────────────────────────────────
 
 const _svcModules = {
-  'spec-parser': specParser,
-  'change-classifier': changeClassifier,
+  'change-classification': changeClassification,
+  'clause-extraction': clauseExtraction,
+  'd-rate-trust-loop': dRateTrustLoop,
+  'semantic-hashing': semanticHashing,
 };
 
 // ─── Router ──────────────────────────────────────────────────────────────────
@@ -92,7 +96,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 }
 
 export function startServer(port?: number): { server: ReturnType<typeof createServer>; port: number; ready: Promise<void> } {
-  const requestedPort = port ?? parseInt(process.env.INGESTION_PORT ?? process.env.PORT ?? '3001', 10);
+  const requestedPort = port ?? parseInt(process.env.INGESTION_PORT ?? process.env.PORT ?? '3002', 10);
   const server = createServer(handleRequest);
   let actualPort = requestedPort;
 

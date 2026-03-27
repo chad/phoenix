@@ -8,11 +8,24 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { startServer } from '../server.js';
 
+import * as bootstrapFlow from '../bootstrap-flow.js';
 import * as compaction from '../compaction.js';
-import * as diagnostics from '../diagnostics.js';
-import * as bootstrap from '../bootstrap.js';
+import * as diagnosticsSeverityModel from '../diagnostics-severity-model.js';
 
 describe('Operations modules', () => {
+  describe('Bootstrap Flow', () => {
+    it('exports Phoenix traceability metadata', () => {
+      expect(bootstrapFlow._phoenix).toBeDefined();
+      expect(bootstrapFlow._phoenix.name).toBe('Bootstrap Flow');
+      expect(bootstrapFlow._phoenix.risk_tier).toBeTruthy();
+    });
+
+    it('has exported functions', () => {
+      const exports = Object.keys(bootstrapFlow).filter(k => k !== '_phoenix');
+      expect(exports.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('Compaction', () => {
     it('exports Phoenix traceability metadata', () => {
       expect(compaction._phoenix).toBeDefined();
@@ -26,28 +39,15 @@ describe('Operations modules', () => {
     });
   });
 
-  describe('Diagnostics', () => {
+  describe('Diagnostics & Severity Model', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(diagnostics._phoenix).toBeDefined();
-      expect(diagnostics._phoenix.name).toBe('Diagnostics');
-      expect(diagnostics._phoenix.risk_tier).toBeTruthy();
+      expect(diagnosticsSeverityModel._phoenix).toBeDefined();
+      expect(diagnosticsSeverityModel._phoenix.name).toBe('Diagnostics & Severity Model');
+      expect(diagnosticsSeverityModel._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(diagnostics).filter(k => k !== '_phoenix');
-      expect(exports.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Bootstrap', () => {
-    it('exports Phoenix traceability metadata', () => {
-      expect(bootstrap._phoenix).toBeDefined();
-      expect(bootstrap._phoenix.name).toBe('Bootstrap');
-      expect(bootstrap._phoenix.risk_tier).toBeTruthy();
-    });
-
-    it('has exported functions', () => {
-      const exports = Object.keys(bootstrap).filter(k => k !== '_phoenix');
+      const exports = Object.keys(diagnosticsSeverityModel).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });

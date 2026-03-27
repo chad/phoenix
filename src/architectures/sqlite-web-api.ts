@@ -130,6 +130,14 @@ import { z } from 'zod';
 - If the spec describes a stats or aggregate endpoint, implement it as a route on the same router.
 - Use SQL aggregate functions (COUNT, SUM, AVG) with GROUP BY.
 - Return the JSON structure EXACTLY as the spec describes, using snake_case keys.
+
+### Web interface / HTML pages
+- If the spec describes a web interface or HTML page, generate a Hono route that returns \`c.html()\` with a complete HTML string.
+- Include ALL CSS and JavaScript inline in the HTML — no external files or build steps.
+- The JavaScript must use fetch() to call the API endpoints (same origin, e.g., fetch('/todos')).
+- After any create/update/delete action, refresh the displayed data by re-fetching.
+- Use modern vanilla JavaScript (no frameworks). Use template literals for HTML generation.
+- The HTML must be a complete document with <!DOCTYPE html>, <head>, and <body>.
 `;
 
 const CODE_EXAMPLES = `

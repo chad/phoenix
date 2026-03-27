@@ -8,32 +8,60 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { startServer } from '../server.js';
 
-import * as iuManager from '../iu-manager.js';
-import * as boundaryValidator from '../boundary-validator.js';
+import * as architecturalLinter from '../architectural-linter.js';
+import * as boundaryPolicySchema from '../boundary-policy-schema.js';
+import * as implementationUnitStructure from '../implementation-unit-structure.js';
+import * as regenerationEngine from '../regeneration-engine.js';
 
 describe('Implementation modules', () => {
-  describe('IU Manager', () => {
+  describe('Architectural Linter', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(iuManager._phoenix).toBeDefined();
-      expect(iuManager._phoenix.name).toBe('IU Manager');
-      expect(iuManager._phoenix.risk_tier).toBeTruthy();
+      expect(architecturalLinter._phoenix).toBeDefined();
+      expect(architecturalLinter._phoenix.name).toBe('Architectural Linter');
+      expect(architecturalLinter._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(iuManager).filter(k => k !== '_phoenix');
+      const exports = Object.keys(architecturalLinter).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Boundary Validator', () => {
+  describe('Boundary Policy Schema', () => {
     it('exports Phoenix traceability metadata', () => {
-      expect(boundaryValidator._phoenix).toBeDefined();
-      expect(boundaryValidator._phoenix.name).toBe('Boundary Validator');
-      expect(boundaryValidator._phoenix.risk_tier).toBeTruthy();
+      expect(boundaryPolicySchema._phoenix).toBeDefined();
+      expect(boundaryPolicySchema._phoenix.name).toBe('Boundary Policy Schema');
+      expect(boundaryPolicySchema._phoenix.risk_tier).toBeTruthy();
     });
 
     it('has exported functions', () => {
-      const exports = Object.keys(boundaryValidator).filter(k => k !== '_phoenix');
+      const exports = Object.keys(boundaryPolicySchema).filter(k => k !== '_phoenix');
+      expect(exports.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Implementation Unit Structure', () => {
+    it('exports Phoenix traceability metadata', () => {
+      expect(implementationUnitStructure._phoenix).toBeDefined();
+      expect(implementationUnitStructure._phoenix.name).toBe('Implementation Unit Structure');
+      expect(implementationUnitStructure._phoenix.risk_tier).toBeTruthy();
+    });
+
+    it('has exported functions', () => {
+      const exports = Object.keys(implementationUnitStructure).filter(k => k !== '_phoenix');
+      expect(exports.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Regeneration Engine', () => {
+    it('exports Phoenix traceability metadata', () => {
+      expect(regenerationEngine._phoenix).toBeDefined();
+      expect(regenerationEngine._phoenix.name).toBe('Regeneration Engine');
+      expect(regenerationEngine._phoenix.risk_tier).toBeTruthy();
+    });
+
+    it('has exported functions', () => {
+      const exports = Object.keys(regenerationEngine).filter(k => k !== '_phoenix');
       expect(exports.length).toBeGreaterThan(0);
     });
   });
@@ -67,7 +95,7 @@ describe('Implementation server', () => {
     const res = await fetch(`http://localhost:${instance.port}/modules`);
     expect(res.status).toBe(200);
     const body = await res.json() as Array<Record<string, unknown>>;
-    expect(body.length).toBe(2);
+    expect(body.length).toBe(4);
   });
 
   it('GET /unknown returns 404', async () => {
