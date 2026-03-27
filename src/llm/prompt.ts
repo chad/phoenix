@@ -113,6 +113,21 @@ export function buildPrompt(
     lines.push('');
   }
 
+  // Related context: DEFINITION and CONTEXT nodes from the same spec not in this IU
+  if (arch) {
+    const otherNodes = canonNodes.filter(n =>
+      !iu.source_canon_ids.includes(n.canon_id) &&
+      (n.type === 'DEFINITION' || n.type === 'CONTEXT')
+    );
+    if (otherNodes.length > 0) {
+      lines.push('## Related Context (from other sections of the same spec)');
+      for (const n of otherNodes) {
+        lines.push(`- [${n.type}] ${n.statement}`);
+      }
+      lines.push('');
+    }
+  }
+
   // Contract
   if (iu.contract.inputs.length > 0) {
     lines.push(`## Inputs: ${iu.contract.inputs.join(', ')}`);

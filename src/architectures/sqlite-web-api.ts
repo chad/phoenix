@@ -89,20 +89,32 @@ const SYSTEM_PROMPT_EXTENSION = `
 
 You are generating a route handler module for a Hono REST API backed by SQLite.
 
-### Rules
-- Each module exports a Hono router instance as the DEFAULT export.
-- Import \`{ Hono }\` from 'hono' for routing.
-- Import \`{ db, registerMigration }\` from '../db.js' for database access.
-- Import \`{ z }\` from 'zod' for request body validation.
-- Use better-sqlite3 synchronous API (db.prepare().run(), .get(), .all()).
-- Register your table schema via registerMigration() at module scope.
+### CRITICAL import rules — follow EXACTLY
+- Import \`{ Hono }\` from 'hono'
+- Import \`{ db, registerMigration }\` from '../../db.js' — the shared database module is TWO levels up from the generated module.
+- Import \`{ z }\` from 'zod'
+- NEVER create your own Database instance. NEVER write \`new Database(...)\` or \`import Database from 'better-sqlite3'\`. The shared db.js provides the single db connection.
+- NEVER define your own Hono class or Database type. Import them from the packages.
+
+### Module structure
+- Export a Hono router instance as the DEFAULT export: \`export default router;\`
+- Register your table schema via \`registerMigration('tablename', 'CREATE TABLE IF NOT EXISTS ...')\` at module scope.
+- Include ALL CRUD routes for the resource in a single module (GET list, GET by id, POST create, PATCH update, DELETE).
+- Use better-sqlite3 synchronous API: db.prepare(sql).run(), .get(), .all()
 - Use parameterized queries ALWAYS — never interpolate user input into SQL.
-- Return proper HTTP status codes: 200 (ok), 201 (created), 204 (no content), 400 (bad request), 404 (not found).
-- Return JSON for all responses. Errors: { error: "message" }.
-- Parse request bodies with c.req.json() and validate with Zod.
-- Use integer primary keys with AUTOINCREMENT for IDs.
-- Include created_at/updated_at timestamps where the spec mentions them.
-- Export the _phoenix metadata constant as required.
+- Parse request bodies with \`await c.req.json()\` and validate with Zod .safeParse().
+
+### Response conventions
+- 200 for successful reads
+- 201 for successful creates (return the created resource)
+- 204 for successful deletes (return c.body(null, 204))
+- 400 for validation errors: \`{ error: "message" }\`
+- 404 for not found: \`{ error: "Not found" }\`
+
+### Data model
+- Use integer primary keys with AUTOINCREMENT.
+- Include a \`completed\` boolean column (as INTEGER 0/1) for task/todo resources when the spec mentions it.
+- Include \`created_at TEXT NOT NULL DEFAULT (datetime('now'))\` for timestamps.
 `;
 
 const CODE_EXAMPLES = `
@@ -113,7 +125,7 @@ const CODE_EXAMPLES = `
 \`\`\`typescript
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { db, registerMigration } from '../db.js';
+import { db, registerMigration } from '../../db.js';
 
 // Register table migration
 registerMigration('notes', \`

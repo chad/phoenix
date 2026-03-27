@@ -4,48 +4,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import create_todo from '../create-todo.js';
-import delete_todo from '../delete-todo.js';
-import error_handling from '../error-handling.js';
-import get_todo from '../get-todo.js';
-import list_todos from '../list-todos.js';
-import update_todo from '../update-todo.js';
+import todos_resource from '../todos-resource.js';
 
 describe('Todos modules', () => {
-  describe('Create Todo', () => {
+  describe('Todos Resource', () => {
     it('exports a Hono router as default', () => {
-      expect(create_todo).toBeDefined();
-      expect(typeof create_todo.fetch).toBe('function');
-    });
-  });
-  describe('Delete Todo', () => {
-    it('exports a Hono router as default', () => {
-      expect(delete_todo).toBeDefined();
-      expect(typeof delete_todo.fetch).toBe('function');
-    });
-  });
-  describe('Error Handling', () => {
-    it('exports a Hono router as default', () => {
-      expect(error_handling).toBeDefined();
-      expect(typeof error_handling.fetch).toBe('function');
-    });
-  });
-  describe('Get Todo', () => {
-    it('exports a Hono router as default', () => {
-      expect(get_todo).toBeDefined();
-      expect(typeof get_todo.fetch).toBe('function');
-    });
-  });
-  describe('List Todos', () => {
-    it('exports a Hono router as default', () => {
-      expect(list_todos).toBeDefined();
-      expect(typeof list_todos.fetch).toBe('function');
-    });
-  });
-  describe('Update Todo', () => {
-    it('exports a Hono router as default', () => {
-      expect(update_todo).toBeDefined();
-      expect(typeof update_todo.fetch).toBe('function');
+      expect(todos_resource).toBeDefined();
+      expect(typeof todos_resource.fetch).toBe('function');
     });
   });
 });

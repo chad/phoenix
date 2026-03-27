@@ -5,9 +5,4 @@
  * Barrel export for all Todos modules.
  */
 
-export * as createTodo from './create-todo.js';
-export * as deleteTodo from './delete-todo.js';
-export * as errorHandling from './error-handling.js';
-export * as getTodo from './get-todo.js';
-export * as listTodos from './list-todos.js';
-export * as updateTodo from './update-todo.js';
+export * as todosResource from './todos-resource.js';
