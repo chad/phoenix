@@ -45,7 +45,7 @@ if (!skipBootstrap) {
   execSync(`node ${CLI} init --arch=sqlite-web-api`, { cwd: TODO_APP, stdio: 'pipe' });
 
   console.log('Bootstrapping (LLM generation)...');
-  execSync(`node ${CLI} bootstrap`, { cwd: TODO_APP, stdio: 'pipe', timeout: 300000 });
+  execSync(`node ${CLI} bootstrap`, { cwd: TODO_APP, stdio: 'pipe', timeout: 600000 });
 
   console.log('Installing dependencies...');
   execSync('npm install', { cwd: TODO_APP, stdio: 'pipe', timeout: 60000 });
@@ -107,63 +107,103 @@ async function test(name: string, fn: () => Promise<boolean>): Promise<void> {
   }
 }
 
-console.log('\nRunning CRUD tests:');
+console.log('\nRunning tests:');
 
-// POST /todos — create
-let createdId: number | null = null;
-await test('POST /todos returns 201 with todo', async () => {
-  const res = await fetch(`${BASE}/todos`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'Test todo' }),
+// ─── Categories ─────────────────────────────────────────────────────────────
+
+let catId: number | null = null;
+
+await test('POST /categories creates category', async () => {
+  const res = await fetch(`${BASE}/categories`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Work', color: '#ff0000' }),
   });
   if (res.status !== 201) return false;
   const body = await res.json() as Record<string, unknown>;
-  createdId = body.id as number;
-  return typeof body.id === 'number' && body.title === 'Test todo' && 'created_at' in body;
+  catId = body.id as number;
+  return body.name === 'Work' && typeof body.id === 'number';
 });
 
-// POST /todos — validation
-await test('POST /todos rejects empty title with 400', async () => {
-  const res = await fetch(`${BASE}/todos`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: '' }),
+await test('POST /categories rejects empty name', async () => {
+  const res = await fetch(`${BASE}/categories`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: '' }),
   });
-  if (res.status !== 400) return false;
-  const body = await res.json() as Record<string, unknown>;
-  return typeof body.error === 'string';
+  return res.status === 400;
 });
 
-// GET /todos — list
-await test('GET /todos returns array with created todo', async () => {
-  const res = await fetch(`${BASE}/todos`);
+await test('GET /categories returns array', async () => {
+  const res = await fetch(`${BASE}/categories`);
   if (res.status !== 200) return false;
   const body = await res.json() as unknown[];
   return Array.isArray(body) && body.length >= 1;
 });
 
-// GET /todos/:id — get one
-await test('GET /todos/:id returns the todo', async () => {
-  if (!createdId) return false;
-  const res = await fetch(`${BASE}/todos/${createdId}`);
+// ─── Todos with categories ──────────────────────────────────────────────────
+
+let todoId: number | null = null;
+
+await test('POST /todos creates todo with category', async () => {
+  const res = await fetch(`${BASE}/todos`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Finish report', category_id: catId }),
+  });
+  if (res.status !== 201) return false;
+  const body = await res.json() as Record<string, unknown>;
+  todoId = body.id as number;
+  return body.title === 'Finish report' && typeof body.id === 'number';
+});
+
+await test('POST /todos creates todo without category', async () => {
+  const res = await fetch(`${BASE}/todos`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Buy milk' }),
+  });
+  return res.status === 201;
+});
+
+await test('POST /todos rejects invalid category_id', async () => {
+  const res = await fetch(`${BASE}/todos`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Bad category', category_id: 9999 }),
+  });
+  return res.status === 400;
+});
+
+await test('POST /todos rejects empty title', async () => {
+  const res = await fetch(`${BASE}/todos`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: '' }),
+  });
+  return res.status === 400;
+});
+
+await test('GET /todos returns todos with category_name', async () => {
+  const res = await fetch(`${BASE}/todos`);
+  if (res.status !== 200) return false;
+  const body = await res.json() as Array<Record<string, unknown>>;
+  const withCat = body.find(t => t.title === 'Finish report');
+  return withCat?.category_name === 'Work';
+});
+
+await test('GET /todos/:id returns todo with category_name', async () => {
+  if (!todoId) return false;
+  const res = await fetch(`${BASE}/todos/${todoId}`);
   if (res.status !== 200) return false;
   const body = await res.json() as Record<string, unknown>;
-  return body.title === 'Test todo';
+  return body.category_name === 'Work';
 });
 
-// GET /todos/999 — 404
 await test('GET /todos/999 returns 404', async () => {
-  const res = await fetch(`${BASE}/todos/999`);
-  return res.status === 404;
+  return (await fetch(`${BASE}/todos/999`)).status === 404;
 });
 
-// PATCH /todos/:id — update
-await test('PATCH /todos/:id updates completed', async () => {
-  if (!createdId) return false;
-  const res = await fetch(`${BASE}/todos/${createdId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+// ─── Filtering ──────────────────────────────────────────────────────────────
+
+await test('PATCH /todos/:id marks completed', async () => {
+  if (!todoId) return false;
+  const res = await fetch(`${BASE}/todos/${todoId}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ completed: 1 }),
   });
   if (res.status !== 200) return false;
@@ -171,45 +211,71 @@ await test('PATCH /todos/:id updates completed', async () => {
   return body.completed === 1;
 });
 
-// PATCH /todos/:id — update title
-await test('PATCH /todos/:id updates title', async () => {
-  if (!createdId) return false;
-  const res = await fetch(`${BASE}/todos/${createdId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'Updated title' }),
-  });
+await test('GET /todos?completed=1 filters completed', async () => {
+  const res = await fetch(`${BASE}/todos?completed=1`);
+  if (res.status !== 200) return false;
+  const body = await res.json() as Array<Record<string, unknown>>;
+  return body.length >= 1 && body.every(t => t.completed === 1);
+});
+
+await test('GET /todos?completed=0 filters incomplete', async () => {
+  const res = await fetch(`${BASE}/todos?completed=0`);
+  if (res.status !== 200) return false;
+  const body = await res.json() as Array<Record<string, unknown>>;
+  return body.length >= 1 && body.every(t => t.completed === 0);
+});
+
+await test('GET /todos?category_id=N filters by category', async () => {
+  if (!catId) return false;
+  const res = await fetch(`${BASE}/todos?category_id=${catId}`);
+  if (res.status !== 200) return false;
+  const body = await res.json() as Array<Record<string, unknown>>;
+  return body.length >= 1;
+});
+
+// ─── Stats ──────────────────────────────────────────────────────────────────
+
+await test('GET /stats returns counts', async () => {
+  const res = await fetch(`${BASE}/stats`);
   if (res.status !== 200) return false;
   const body = await res.json() as Record<string, unknown>;
-  return body.title === 'Updated title';
+  return typeof body.total === 'number' && typeof body.completed === 'number' && typeof body.incomplete === 'number';
 });
 
-// Create another to delete
-let deleteId: number | null = null;
-await test('POST /todos creates second todo for deletion', async () => {
-  const res = await fetch(`${BASE}/todos`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'Delete me' }),
-  });
-  if (res.status !== 201) return false;
+await test('GET /stats includes by_category', async () => {
+  const res = await fetch(`${BASE}/stats`);
+  if (res.status !== 200) return false;
   const body = await res.json() as Record<string, unknown>;
-  deleteId = body.id as number;
-  return true;
+  const byCat = body.by_category as Array<Record<string, unknown>> | undefined;
+  return Array.isArray(byCat) && byCat.length >= 1 && typeof byCat[0].category_name === 'string';
 });
 
-// DELETE /todos/:id
+// ─── Delete ─────────────────────────────────────────────────────────────────
+
 await test('DELETE /todos/:id returns 204', async () => {
-  if (!deleteId) return false;
-  const res = await fetch(`${BASE}/todos/${deleteId}`, { method: 'DELETE' });
-  return res.status === 204;
+  if (!todoId) return false;
+  return (await fetch(`${BASE}/todos/${todoId}`, { method: 'DELETE' })).status === 204;
 });
 
-// Verify deletion
-await test('GET /todos/:id returns 404 after delete', async () => {
-  if (!deleteId) return false;
-  const res = await fetch(`${BASE}/todos/${deleteId}`);
-  return res.status === 404;
+await test('DELETE /categories/:id with todos returns 400', async () => {
+  // "Buy milk" has no category, but create one with a category to test
+  const res = await fetch(`${BASE}/categories`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Temp' }),
+  });
+  const cat = await res.json() as Record<string, unknown>;
+  await fetch(`${BASE}/todos`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Temp todo', category_id: cat.id }),
+  });
+  const delRes = await fetch(`${BASE}/categories/${cat.id}`, { method: 'DELETE' });
+  return delRes.status === 400;
+});
+
+await test('DELETE /categories/:id without todos returns 204', async () => {
+  if (!catId) return false;
+  // catId's todos were already deleted
+  return (await fetch(`${BASE}/categories/${catId}`, { method: 'DELETE' })).status === 204;
 });
 
 // ─── Step 4: Score ──────────────────────────────────────────────────────────

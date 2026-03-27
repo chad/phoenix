@@ -89,12 +89,20 @@ const SYSTEM_PROMPT_EXTENSION = `
 
 You are generating a route handler module for a Hono REST API backed by SQLite.
 
-### CRITICAL import rules — follow EXACTLY
-- Import \`{ Hono }\` from 'hono'
-- Import \`{ db, registerMigration }\` from '../../db.js' — the shared database module is TWO levels up from the generated module.
-- Import \`{ z }\` from 'zod'
-- NEVER create your own Database instance. NEVER write \`new Database(...)\` or \`import Database from 'better-sqlite3'\`. The shared db.js provides the single db connection.
-- NEVER define your own Hono class or Database type. Import them from the packages.
+### CRITICAL import rules — follow EXACTLY, no exceptions
+
+Your file MUST start with these EXACT three import lines:
+\`\`\`
+import { Hono } from 'hono';
+import { db, registerMigration } from '../../db.js';
+import { z } from 'zod';
+\`\`\`
+
+### FORBIDDEN — these will cause the build to fail
+- FORBIDDEN: \`import Database from 'better-sqlite3'\` — NEVER import better-sqlite3 directly
+- FORBIDDEN: \`new Database(...)\` — NEVER create a database instance
+- FORBIDDEN: \`const db = ...\` — the db variable comes from the import above
+- Use ONLY the \`db\` import from \`../../db.js\` for ALL database operations
 
 ### Module structure
 - Export a Hono router instance as the DEFAULT export: \`export default router;\`

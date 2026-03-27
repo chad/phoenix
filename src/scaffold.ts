@@ -85,12 +85,15 @@ export function generateScaffold(
     const routeImports: string[] = [];
     const routeMounts: string[] = [];
     for (const svc of services) {
-      for (const mod of svc.modules) {
+      for (let i = 0; i < svc.modules.length; i++) {
+        const mod = svc.modules[i];
+        const iu = svc.ius[i];
         const modName = mod.replace('.ts', '').replace(/-/g, '_').replace(/[^a-zA-Z0-9_]/g, '_');
         const importPath = `./generated/${svc.dir}/${mod.replace('.ts', '.js')}`;
         routeImports.push(`import ${modName} from '${importPath}';`);
-        // Use the service dir as the route prefix
-        const prefix = `/${svc.dir}`;
+        // Derive mount path from IU name: "Todos" → "/todos", "Categories" → "/categories"
+        const iuName = iu?.name ?? mod.replace('.ts', '');
+        const prefix = '/' + iuName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         routeMounts.push(`mount('${prefix}', ${modName});`);
       }
     }
