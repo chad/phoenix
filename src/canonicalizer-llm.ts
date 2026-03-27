@@ -171,6 +171,75 @@ function parseNormalizerResponse(raw: string): string | null {
   return null;
 }
 
+// ─── LLM-as-Reclassifier ─────────────────────────────────────────────────────
+
+/**
+ * Reclassify candidates using LLM. Keeps original statement, only changes type.
+ * Preserves recall (no rewording) while improving type accuracy.
+ */
+export async function reclassifyCandidatesLLM(
+  clauses: Clause[],
+  llm: LLMProvider,
+): Promise<CanonicalNode[]> {
+  const { candidates } = extractCandidates(clauses);
+  if (!llm || candidates.length === 0) {
+    return resolveGraph(candidates, clauses);
+  }
+
+  const reclassified: CandidateNode[] = [];
+  for (const c of candidates) {
+    // Only reclassify low-confidence non-CONTEXT nodes
+    if (c.type === CanonicalType.CONTEXT || c.confidence > 0.5) {
+      reclassified.push(c);
+      continue;
+    }
+
+    try {
+      const prompt = `Classify this statement:\n"${c.statement}"`;
+      const response = await llm.generate(prompt, {
+        system: CONFIG.LLM_RECLASSIFIER_SYSTEM,
+        temperature: CONFIG.LLM_RECLASSIFIER_TEMPERATURE,
+        maxTokens: CONFIG.LLM_RECLASSIFIER_MAX_TOKENS,
+      });
+
+      const newType = parseReclassifierResponse(response);
+      if (newType) {
+        reclassified.push({ ...c, type: newType, extraction_method: 'llm' });
+      } else {
+        reclassified.push(c);
+      }
+    } catch {
+      reclassified.push(c);
+    }
+  }
+
+  return resolveGraph(reclassified, clauses);
+}
+
+function parseReclassifierResponse(raw: string): CanonicalType | null {
+  const text = raw.trim();
+  try {
+    const objStart = text.indexOf('{');
+    const objEnd = text.lastIndexOf('}');
+    if (objStart !== -1 && objEnd !== -1) {
+      const parsed = JSON.parse(text.slice(objStart, objEnd + 1));
+      if (typeof parsed.type === 'string') {
+        return parseCanonType(parsed.type);
+      }
+    }
+  } catch {
+    // Try to match type directly from text
+  }
+
+  // Fallback: look for a type keyword in the response
+  const upper = text.toUpperCase();
+  for (const t of ['INVARIANT', 'CONSTRAINT', 'DEFINITION', 'REQUIREMENT', 'CONTEXT']) {
+    if (upper.includes(t)) return parseCanonType(t);
+  }
+
+  return null;
+}
+
 // ─── LLM-as-Extractor (behind --llm-extract flag) ───────────────────────────
 
 // Extractor system prompt loaded from CONFIG

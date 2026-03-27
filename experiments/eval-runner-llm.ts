@@ -13,7 +13,7 @@
 import { readFileSync, appendFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseSpec } from '../src/spec-parser.js';
-import { extractCanonicalNodesLLM, extractWithLLMFull } from '../src/canonicalizer-llm.js';
+import { extractCanonicalNodesLLM, extractWithLLMFull, reclassifyCandidatesLLM } from '../src/canonicalizer-llm.js';
 import { extractCandidates } from '../src/canonicalizer.js';
 import { resolveProvider } from '../src/llm/resolve.js';
 import { GOLD_SPECS, type GoldSpec } from '../tests/eval/gold-standard.js';
@@ -43,6 +43,8 @@ async function loadAndExtract(spec: GoldSpec) {
   let nodes: CanonicalNode[];
   if (CONFIG.LLM_MODE === 'extractor') {
     nodes = await extractWithLLMFull(clauses, llm!);
+  } else if (CONFIG.LLM_MODE === 'reclassifier') {
+    nodes = await reclassifyCandidatesLLM(clauses, llm!);
   } else {
     nodes = await extractCanonicalNodesLLM(clauses, llm, {
       selfConsistencyK: CONFIG.LLM_SELF_CONSISTENCY_K,

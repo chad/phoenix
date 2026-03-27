@@ -45,16 +45,33 @@ export const CONFIG = {
   WARM_MIN_CONFIDENCE: 0.3,
 
   // ─── canonicalizer-llm.ts ─────────────────────────────────────────────────
-  LLM_MODE: 'normalizer' as 'normalizer' | 'extractor',
+  LLM_MODE: 'reclassifier' as 'normalizer' | 'extractor' | 'reclassifier',
   LLM_MODEL: 'claude-sonnet-4-20250514',
   LLM_NORMALIZER_TEMPERATURE: 0,
   LLM_NORMALIZER_MAX_TOKENS: 150,
   LLM_NORMALIZER_SYSTEM: `You are a requirements engineer. Rewrite the given statement in canonical form.
-Rules: one clear sentence, present tense, active voice, no pronouns, no ambiguity.
+Rules:
+- One clear sentence, present tense, active voice, no pronouns, no ambiguity.
+- PRESERVE all technical terms, domain vocabulary, proper nouns, acronyms, and specific values exactly as written.
+- PRESERVE key verbs and their objects (e.g., keep "authenticate with email" not "handle email authentication").
+- Minimize rewording — only fix grammar, voice, and clarity. Do NOT paraphrase.
 Output ONLY a JSON object: {"statement": "..."}
 No markdown, no explanation.`,
   LLM_SELF_CONSISTENCY_K: 1,
   LLM_CONSISTENCY_TEMPERATURE: 0.3,
+  LLM_RECLASSIFIER_SYSTEM: `Classify this specification statement into exactly one type.
+
+Types:
+- REQUIREMENT: Any statement where the system "must", "shall", or "will" do something. This includes actions, capabilities, behaviors, AND enforcement of rules. If a sentence says "X must Y" and Y is an action (validate, reject, compute, send, store, track, create, delete, update, lock, report, etc.), it is a REQUIREMENT, even if it involves limits or conditions. Most spec statements are REQUIREMENT.
+- CONSTRAINT: ONLY for explicit prohibitions ("must not", "cannot", "forbidden") or pure numeric/size limits stated WITHOUT an action verb ("limited to 100 characters", "maximum 20 connections", "at most 5 per minute"). If a "must" sentence includes an action verb, it is NOT a constraint.
+- INVARIANT: ONLY for statements using "always", "never", "at all times", "guaranteed", or "must remain". These describe properties that hold across ALL system states.
+- DEFINITION: ONLY for statements that define what a term means ("X is defined as Y", "X means Y", "X: description").
+- CONTEXT: Background/framing text with no modal verbs and no actionable content.
+
+Output ONLY a JSON object: {"type": "REQUIREMENT"}
+No markdown, no explanation.`,
+  LLM_RECLASSIFIER_TEMPERATURE: 0,
+  LLM_RECLASSIFIER_MAX_TOKENS: 20,
   LLM_EXTRACTOR_TEMPERATURE: 0.1,
   LLM_EXTRACTOR_MAX_TOKENS: 4096,
   LLM_EXTRACTOR_BATCH_SIZE: 20,
