@@ -45,7 +45,7 @@ if (!skipBootstrap) {
   execSync(`node ${CLI} init --arch=sqlite-web-api`, { cwd: TODO_APP, stdio: 'pipe' });
 
   console.log('Bootstrapping (LLM generation)...');
-  execSync(`node ${CLI} bootstrap`, { cwd: TODO_APP, stdio: 'pipe', timeout: 600000 });
+  execSync(`node ${CLI} bootstrap`, { cwd: TODO_APP, stdio: 'pipe', timeout: 900000 });
 
   console.log('Installing dependencies...');
   execSync('npm install', { cwd: TODO_APP, stdio: 'pipe', timeout: 60000 });
