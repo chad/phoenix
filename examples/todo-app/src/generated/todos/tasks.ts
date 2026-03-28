@@ -11,7 +11,7 @@ registerMigration('tasks', `
     priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('urgent', 'high', 'normal', 'low')),
     due_date TEXT,
     completed INTEGER NOT NULL DEFAULT 0,
-    project_id INTEGER,
+    project_id INTEGER REFERENCES projects(id),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `);
@@ -37,26 +37,30 @@ const router = new Hono();
 
 // List all tasks with filtering and sorting
 router.get('/', (c) => {
-  let sql = 'SELECT * FROM tasks';
+  let sql = `
+    SELECT tasks.*, projects.name as project_name 
+    FROM tasks 
+    LEFT JOIN projects ON tasks.project_id = projects.id
+  `;
   const conditions: string[] = [];
   const params: (string | number)[] = [];
 
   const status = c.req.query('status');
   if (status === 'active') {
-    conditions.push('completed = 0');
+    conditions.push('tasks.completed = 0');
   } else if (status === 'completed') {
-    conditions.push('completed = 1');
+    conditions.push('tasks.completed = 1');
   }
 
   const priority = c.req.query('priority');
   if (priority) {
-    conditions.push('priority = ?');
+    conditions.push('tasks.priority = ?');
     params.push(priority);
   }
 
   const projectId = c.req.query('project_id');
   if (projectId) {
-    conditions.push('project_id = ?');
+    conditions.push('tasks.project_id = ?');
     params.push(Number(projectId));
   }
 
@@ -64,11 +68,12 @@ router.get('/', (c) => {
     sql += ' WHERE ' + conditions.join(' AND ');
   }
 
-  // Sort by urgency and overdue status first, then by created_at
+  // Sort by urgency and overdue status first, then by creation date
   sql += ` ORDER BY 
-    CASE WHEN due_date < date('now') AND completed = 0 THEN 0 ELSE 1 END,
-    CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
-    created_at DESC`;
+    CASE WHEN tasks.due_date < date('now') AND tasks.completed = 0 THEN 0 ELSE 1 END,
+    CASE tasks.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END,
+    tasks.created_at DESC
+  `;
 
   const tasks = db.prepare(sql).all(...params);
   return c.json(tasks);
@@ -76,7 +81,13 @@ router.get('/', (c) => {
 
 // Get single task
 router.get('/:id', (c) => {
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(c.req.param('id'));
+  const task = db.prepare(`
+    SELECT tasks.*, projects.name as project_name 
+    FROM tasks 
+    LEFT JOIN projects ON tasks.project_id = projects.id 
+    WHERE tasks.id = ?
+  `).get(c.req.param('id'));
+  
   if (!task) return c.json({ error: 'Task not found' }, 404);
   return c.json(task);
 });
@@ -97,12 +108,26 @@ router.post('/', async (c) => {
 
   const { title, description, priority, due_date, project_id } = result.data;
 
+  // Validate project exists if provided
+  if (project_id !== undefined && project_id !== null) {
+    const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(project_id);
+    if (!project) {
+      return c.json({ error: 'Project not found' }, 400);
+    }
+  }
+
   const info = db.prepare(`
     INSERT INTO tasks (title, description, priority, due_date, project_id) 
     VALUES (?, ?, ?, ?, ?)
   `).run(title, description, priority, due_date, project_id);
 
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(info.lastInsertRowid);
+  const task = db.prepare(`
+    SELECT tasks.*, projects.name as project_name 
+    FROM tasks 
+    LEFT JOIN projects ON tasks.project_id = projects.id 
+    WHERE tasks.id = ?
+  `).get(info.lastInsertRowid);
+
   return c.json(task, 201);
 });
 
@@ -110,7 +135,9 @@ router.post('/', async (c) => {
 router.patch('/:id', async (c) => {
   const id = c.req.param('id');
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-  if (!existing) return c.json({ error: 'Task not found' }, 404);
+  if (!existing) {
+    return c.json({ error: 'Task not found' }, 404);
+  }
 
   let body;
   try {
@@ -125,7 +152,16 @@ router.patch('/:id', async (c) => {
   }
 
   const updates = result.data;
-  
+
+  // Validate project exists if being updated
+  if (updates.project_id !== undefined && updates.project_id !== null) {
+    const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(updates.project_id);
+    if (!project) {
+      return c.json({ error: 'Project not found' }, 400);
+    }
+  }
+
+  // Apply updates
   if (updates.title !== undefined) {
     db.prepare('UPDATE tasks SET title = ? WHERE id = ?').run(updates.title, id);
   }
@@ -145,7 +181,13 @@ router.patch('/:id', async (c) => {
     db.prepare('UPDATE tasks SET project_id = ? WHERE id = ?').run(updates.project_id, id);
   }
 
-  const updated = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  const updated = db.prepare(`
+    SELECT tasks.*, projects.name as project_name 
+    FROM tasks 
+    LEFT JOIN projects ON tasks.project_id = projects.id 
+    WHERE tasks.id = ?
+  `).get(id);
+
   return c.json(updated);
 });
 
@@ -153,7 +195,9 @@ router.patch('/:id', async (c) => {
 router.delete('/:id', (c) => {
   const id = c.req.param('id');
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-  if (!existing) return c.json({ error: 'Task not found' }, 404);
+  if (!existing) {
+    return c.json({ error: 'Task not found' }, 404);
+  }
 
   db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
   return c.body(null, 204);
@@ -161,6 +205,7 @@ router.delete('/:id', (c) => {
 
 export default router;
 
+/** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
   iu_id: '1628f3b0f6e0816a698cf8b53a7b135c5dc11469a9bca1fa49299db6018b08f7',
   name: 'Tasks',

@@ -144,11 +144,14 @@ import { z } from 'zod';
 
 ### Web interface / HTML pages
 - If the spec describes a web interface or HTML page, generate a Hono route that returns \`c.html()\` with a complete HTML string.
+- The web module ONLY serves HTML at GET /. It must NOT define any API routes.
+- The JavaScript in the HTML must call the OTHER modules' endpoints using their mount paths. For example, if there is a "Tasks" module mounted at /tasks and a "Projects" module mounted at /projects, the JavaScript uses fetch('/tasks'), fetch('/projects'), etc.
+- The mount paths follow the pattern: /lowercase-module-name (e.g., "Tasks" → /tasks, "Quick Stats" → /quick-stats, "Projects" → /projects).
 - Include ALL CSS and JavaScript inline in the HTML — no external files or build steps.
-- The JavaScript must use fetch() to call the API endpoints (same origin, e.g., fetch('/todos')).
 - After any create/update/delete action, refresh the displayed data by re-fetching.
 - Use modern vanilla JavaScript (no frameworks). Use template literals for HTML generation.
 - The HTML must be a complete document with <!DOCTYPE html>, <head>, and <body>.
+- Do NOT prefix API calls with /api/. The endpoints are at the root level: /tasks, /projects, etc.
 `;
 
 const CODE_EXAMPLES = `

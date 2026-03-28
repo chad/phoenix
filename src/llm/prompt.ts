@@ -150,11 +150,22 @@ export function buildPrompt(
   lines.push(`## Risk Tier: ${iu.risk_tier}`);
   lines.push('');
 
-  // Context: sibling modules
+  // Context: sibling modules with mount paths for architecture mode
   if (siblingModules && siblingModules.length > 0) {
-    lines.push(`## Other modules in this service (for context, do NOT import them):`);
-    for (const m of siblingModules) {
-      lines.push(`- ${m}`);
+    if (arch) {
+      lines.push(`## Other API modules (do NOT import them — call their HTTP endpoints from JavaScript):`);
+      for (const m of siblingModules) {
+        const lowerName = m.toLowerCase();
+        const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
+        if (isWebUI) continue; // skip other web modules
+        const mountPath = '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        lines.push(`- "${m}" mounted at ${mountPath} — use fetch('${mountPath}') or fetch('${mountPath}/...') to call it`);
+      }
+    } else {
+      lines.push(`## Other modules in this service (for context, do NOT import them):`);
+      for (const m of siblingModules) {
+        lines.push(`- ${m}`);
+      }
     }
     lines.push('');
   }

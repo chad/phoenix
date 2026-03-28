@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { db, registerMigration } from '../../db.js';
 import { z } from 'zod';
 
-// Register migrations for both tasks and projects tables
+// Register migrations for tasks and projects tables
 registerMigration('projects', `
   CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,30 +66,18 @@ router.get('/tasks', (c) => {
   const params: (string | number)[] = [];
 
   const status = c.req.query('status');
-  if (status === 'active') {
-    conditions.push('tasks.completed = 0');
-  } else if (status === 'completed') {
-    conditions.push('tasks.completed = 1');
-  }
+  if (status === 'active') { conditions.push('tasks.completed = 0'); }
+  else if (status === 'completed') { conditions.push('tasks.completed = 1'); }
 
   const priority = c.req.query('priority');
-  if (priority) {
-    conditions.push('tasks.priority = ?');
-    params.push(priority);
-  }
+  if (priority) { conditions.push('tasks.priority = ?'); params.push(priority); }
 
   const projectId = c.req.query('project_id');
-  if (projectId) {
-    conditions.push('tasks.project_id = ?');
-    params.push(Number(projectId));
-  }
+  if (projectId) { conditions.push('tasks.project_id = ?'); params.push(Number(projectId)); }
 
-  if (conditions.length > 0) {
-    sql += ' WHERE ' + conditions.join(' AND ');
-  }
-
+  if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
+  
   sql += ` ORDER BY 
-    tasks.completed ASC,
     CASE tasks.priority 
       WHEN 'urgent' THEN 0 
       WHEN 'high' THEN 1 
@@ -100,7 +88,6 @@ router.get('/tasks', (c) => {
       WHEN tasks.due_date IS NOT NULL AND tasks.due_date < date('now') AND tasks.completed = 0 THEN 0
       ELSE 1
     END,
-    tasks.due_date ASC NULLS LAST,
     tasks.created_at DESC
   `;
 
@@ -114,45 +101,37 @@ router.get('/tasks/:id', (c) => {
     LEFT JOIN projects ON tasks.project_id = projects.id 
     WHERE tasks.id = ?
   `).get(c.req.param('id'));
-  
   if (!task) return c.json({ error: 'Task not found' }, 404);
   return c.json(task);
 });
 
 router.post('/tasks', async (c) => {
   let body;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON' }, 400);
-  }
-
+  try { body = await c.req.json(); } 
+  catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  
   const result = CreateTaskSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.issues[0].message }, 400);
-  }
-
+  if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+  
   const { title, description, priority, due_date, project_id } = result.data;
-
+  
   if (project_id !== null && project_id !== undefined) {
     const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(project_id);
-    if (!project) {
-      return c.json({ error: 'Project not found' }, 400);
-    }
+    if (!project) return c.json({ error: 'Project not found' }, 400);
   }
-
+  
   const info = db.prepare(`
     INSERT INTO tasks (title, description, priority, due_date, project_id) 
     VALUES (?, ?, ?, ?, ?)
   `).run(title, description, priority, due_date, project_id);
-
+  
   const task = db.prepare(`
     SELECT tasks.*, projects.name as project_name, projects.color as project_color
     FROM tasks 
     LEFT JOIN projects ON tasks.project_id = projects.id 
     WHERE tasks.id = ?
   `).get(info.lastInsertRowid);
-
+  
   return c.json(task, 201);
 });
 
@@ -160,54 +139,35 @@ router.patch('/tasks/:id', async (c) => {
   const id = c.req.param('id');
   const existing = db.prepare('SELECT id FROM tasks WHERE id = ?').get(id);
   if (!existing) return c.json({ error: 'Task not found' }, 404);
-
+  
   let body;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON' }, 400);
-  }
-
+  try { body = await c.req.json(); } 
+  catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  
   const result = UpdateTaskSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.issues[0].message }, 400);
-  }
-
+  if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+  
   const updates = result.data;
-
+  
   if (updates.project_id !== undefined && updates.project_id !== null) {
     const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(updates.project_id);
-    if (!project) {
-      return c.json({ error: 'Project not found' }, 400);
-    }
+    if (!project) return c.json({ error: 'Project not found' }, 400);
   }
-
-  if (updates.title !== undefined) {
-    db.prepare('UPDATE tasks SET title = ?, updated_at = datetime("now") WHERE id = ?').run(updates.title, id);
-  }
-  if (updates.description !== undefined) {
-    db.prepare('UPDATE tasks SET description = ?, updated_at = datetime("now") WHERE id = ?').run(updates.description, id);
-  }
-  if (updates.priority !== undefined) {
-    db.prepare('UPDATE tasks SET priority = ?, updated_at = datetime("now") WHERE id = ?').run(updates.priority, id);
-  }
-  if (updates.due_date !== undefined) {
-    db.prepare('UPDATE tasks SET due_date = ?, updated_at = datetime("now") WHERE id = ?').run(updates.due_date, id);
-  }
-  if (updates.completed !== undefined) {
-    db.prepare('UPDATE tasks SET completed = ?, updated_at = datetime("now") WHERE id = ?').run(updates.completed, id);
-  }
-  if (updates.project_id !== undefined) {
-    db.prepare('UPDATE tasks SET project_id = ?, updated_at = datetime("now") WHERE id = ?').run(updates.project_id, id);
-  }
-
+  
+  if (updates.title !== undefined) db.prepare('UPDATE tasks SET title = ?, updated_at = datetime("now") WHERE id = ?').run(updates.title, id);
+  if (updates.description !== undefined) db.prepare('UPDATE tasks SET description = ?, updated_at = datetime("now") WHERE id = ?').run(updates.description, id);
+  if (updates.priority !== undefined) db.prepare('UPDATE tasks SET priority = ?, updated_at = datetime("now") WHERE id = ?').run(updates.priority, id);
+  if (updates.due_date !== undefined) db.prepare('UPDATE tasks SET due_date = ?, updated_at = datetime("now") WHERE id = ?').run(updates.due_date, id);
+  if (updates.completed !== undefined) db.prepare('UPDATE tasks SET completed = ?, updated_at = datetime("now") WHERE id = ?').run(updates.completed, id);
+  if (updates.project_id !== undefined) db.prepare('UPDATE tasks SET project_id = ?, updated_at = datetime("now") WHERE id = ?').run(updates.project_id, id);
+  
   const updated = db.prepare(`
     SELECT tasks.*, projects.name as project_name, projects.color as project_color
     FROM tasks 
     LEFT JOIN projects ON tasks.project_id = projects.id 
     WHERE tasks.id = ?
   `).get(id);
-
+  
   return c.json(updated);
 });
 
@@ -215,7 +175,7 @@ router.delete('/tasks/:id', (c) => {
   const id = c.req.param('id');
   const existing = db.prepare('SELECT id FROM tasks WHERE id = ?').get(id);
   if (!existing) return c.json({ error: 'Task not found' }, 404);
-
+  
   db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
   return c.body(null, 204);
 });
@@ -224,60 +184,51 @@ router.delete('/tasks/:id', (c) => {
 router.get('/projects', (c) => {
   const projects = db.prepare(`
     SELECT projects.*, 
-           COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count,
-           COUNT(tasks.id) as total_task_count
+           COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count
     FROM projects 
     LEFT JOIN tasks ON projects.id = tasks.project_id 
     GROUP BY projects.id 
     ORDER BY projects.created_at DESC
   `).all();
-  
   return c.json(projects);
 });
 
 router.get('/projects/:id', (c) => {
   const project = db.prepare(`
     SELECT projects.*, 
-           COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count,
-           COUNT(tasks.id) as total_task_count
+           COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count
     FROM projects 
     LEFT JOIN tasks ON projects.id = tasks.project_id 
     WHERE projects.id = ?
     GROUP BY projects.id
   `).get(c.req.param('id'));
-  
   if (!project) return c.json({ error: 'Project not found' }, 404);
   return c.json(project);
 });
 
 router.post('/projects', async (c) => {
   let body;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON' }, 400);
-  }
-
+  try { body = await c.req.json(); } 
+  catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  
   const result = CreateProjectSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.issues[0].message }, 400);
-  }
-
+  if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+  
   const { name, color } = result.data;
-
+  
   try {
     const info = db.prepare('INSERT INTO projects (name, color) VALUES (?, ?)').run(name, color);
     const project = db.prepare(`
       SELECT projects.*, 
-             0 as active_task_count,
-             0 as total_task_count
+             COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count
       FROM projects 
+      LEFT JOIN tasks ON projects.id = tasks.project_id 
       WHERE projects.id = ?
+      GROUP BY projects.id
     `).get(info.lastInsertRowid);
-    
     return c.json(project, 201);
-  } catch (error: any) {
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as any).code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return c.json({ error: 'Project name already exists' }, 400);
     }
     throw error;
@@ -288,42 +239,32 @@ router.patch('/projects/:id', async (c) => {
   const id = c.req.param('id');
   const existing = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
   if (!existing) return c.json({ error: 'Project not found' }, 404);
-
+  
   let body;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON' }, 400);
-  }
-
+  try { body = await c.req.json(); } 
+  catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  
   const result = UpdateProjectSchema.safeParse(body);
-  if (!result.success) {
-    return c.json({ error: result.error.issues[0].message }, 400);
-  }
-
+  if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+  
   const updates = result.data;
-
+  
   try {
-    if (updates.name !== undefined) {
-      db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(updates.name, id);
-    }
-    if (updates.color !== undefined) {
-      db.prepare('UPDATE projects SET color = ? WHERE id = ?').run(updates.color, id);
-    }
-
+    if (updates.name !== undefined) db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(updates.name, id);
+    if (updates.color !== undefined) db.prepare('UPDATE projects SET color = ? WHERE id = ?').run(updates.color, id);
+    
     const updated = db.prepare(`
       SELECT projects.*, 
-             COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count,
-             COUNT(tasks.id) as total_task_count
+             COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count
       FROM projects 
       LEFT JOIN tasks ON projects.id = tasks.project_id 
       WHERE projects.id = ?
       GROUP BY projects.id
     `).get(id);
-
+    
     return c.json(updated);
-  } catch (error: any) {
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as any).code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return c.json({ error: 'Project name already exists' }, 400);
     }
     throw error;
@@ -334,13 +275,12 @@ router.delete('/projects/:id', (c) => {
   const id = c.req.param('id');
   const existing = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
   if (!existing) return c.json({ error: 'Project not found' }, 404);
-
-  // Check for dependent tasks
-  const taskCount = db.prepare('SELECT COUNT(*) as count FROM tasks WHERE project_id = ?').get(id) as { count: number };
-  if (taskCount.count > 0) {
+  
+  const dependentTasks = db.prepare('SELECT COUNT(*) as count FROM tasks WHERE project_id = ?').get(id) as { count: number };
+  if (dependentTasks.count > 0) {
     return c.json({ error: 'Cannot delete project with existing tasks' }, 400);
   }
-
+  
   db.prepare('DELETE FROM projects WHERE id = ?').run(id);
   return c.body(null, 204);
 });

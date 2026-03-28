@@ -2,11 +2,11 @@ import { Hono } from 'hono';
 import { db, registerMigration } from '../../db.js';
 import { z } from 'zod';
 
-// Register migrations for tables this module reads from
+// Register table migrations for tasks and projects
 registerMigration('projects', `
   CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
     color TEXT NOT NULL DEFAULT '#3b82f6',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
@@ -16,7 +16,7 @@ registerMigration('tasks', `
   CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
     priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('urgent', 'high', 'normal', 'low')),
     due_date TEXT,
     completed INTEGER NOT NULL DEFAULT 0,
@@ -27,20 +27,16 @@ registerMigration('tasks', `
 
 const router = new Hono();
 
-// Get quick stats summary
+// Get stats summary
 router.get('/', (c) => {
-  // Total tasks
   const totalTasks = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number };
   
-  // Completed tasks
   const completedTasks = db.prepare('SELECT COUNT(*) as count FROM tasks WHERE completed = 1').get() as { count: number };
   
-  // Overdue tasks (due date is past and not completed)
   const overdueTasks = db.prepare('SELECT COUNT(*) as count FROM tasks WHERE due_date < date("now") AND completed = 0').get() as { count: number };
   
-  // Calculate completion percentage
   const completionPercentage = totalTasks.count > 0 
-    ? Math.round((completedTasks.count / totalTasks.count) * 100) 
+    ? Math.round((completedTasks.count / totalTasks.count) * 100)
     : 0;
 
   return c.json({

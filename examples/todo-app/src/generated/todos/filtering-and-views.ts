@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { db, registerMigration } from '../../db.js';
 import { z } from 'zod';
 
-// Register migrations for tables this module touches
+// Register table migrations for tasks and projects
 registerMigration('projects', `
   CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,7 +16,7 @@ registerMigration('tasks', `
   CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
-    description TEXT DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
     priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('urgent', 'high', 'normal', 'low')),
     due_date TEXT,
     completed INTEGER NOT NULL DEFAULT 0,
@@ -25,10 +25,28 @@ registerMigration('tasks', `
   )
 `);
 
+const FilterSchema = z.object({
+  status: z.enum(['all', 'active', 'completed']).optional(),
+  project_id: z.string().optional(),
+  priority: z.enum(['urgent', 'high', 'normal', 'low']).optional(),
+});
+
 const router = new Hono();
 
-// Get filtered tasks with combined filters
-router.get('/tasks', (c) => {
+// Get filtered tasks with current filter state
+router.get('/', (c) => {
+  const filterResult = FilterSchema.safeParse({
+    status: c.req.query('status'),
+    project_id: c.req.query('project_id'),
+    priority: c.req.query('priority'),
+  });
+
+  if (!filterResult.success) {
+    return c.json({ error: 'Invalid filter parameters' }, 400);
+  }
+
+  const filters = filterResult.data;
+  
   let sql = `
     SELECT 
       tasks.*,
@@ -46,90 +64,86 @@ router.get('/tasks', (c) => {
   const conditions: string[] = [];
   const params: (string | number)[] = [];
 
-  // Filter by completion status
-  const status = c.req.query('status');
-  if (status === 'active') {
+  // Status filter
+  if (filters.status === 'active') {
     conditions.push('tasks.completed = 0');
-  } else if (status === 'completed') {
+  } else if (filters.status === 'completed') {
     conditions.push('tasks.completed = 1');
   }
 
-  // Filter by project
-  const projectId = c.req.query('project_id');
-  if (projectId !== undefined) {
-    if (projectId === 'inbox') {
+  // Project filter
+  if (filters.project_id) {
+    if (filters.project_id === 'inbox') {
       conditions.push('tasks.project_id IS NULL');
     } else {
       conditions.push('tasks.project_id = ?');
-      params.push(Number(projectId));
+      params.push(Number(filters.project_id));
     }
   }
 
-  // Filter by priority
-  const priority = c.req.query('priority');
-  if (priority && ['urgent', 'high', 'normal', 'low'].includes(priority)) {
+  // Priority filter
+  if (filters.priority) {
     conditions.push('tasks.priority = ?');
-    params.push(priority);
+    params.push(filters.priority);
   }
 
   if (conditions.length > 0) {
     sql += ' WHERE ' + conditions.join(' AND ');
   }
 
-  // Sort by urgency and overdue status first
+  // Sort by urgency and overdue status
   sql += ` ORDER BY 
+    tasks.completed ASC,
     is_overdue DESC,
     CASE tasks.priority 
       WHEN 'urgent' THEN 0 
       WHEN 'high' THEN 1 
       WHEN 'normal' THEN 2 
       WHEN 'low' THEN 3 
-    END,
+    END ASC,
+    tasks.due_date ASC NULLS LAST,
     tasks.created_at DESC
   `;
 
   const tasks = db.prepare(sql).all(...params);
-  
-  // Build current filter state
-  const filterState = {
-    status: status || 'all',
-    project_id: projectId || null,
-    priority: priority || null,
-    active_filters: [] as string[]
-  };
 
-  if (status && status !== 'all') {
-    filterState.active_filters.push(`Status: ${status}`);
+  // Build current filter state description
+  const filterState: string[] = [];
+  
+  if (filters.status && filters.status !== 'all') {
+    filterState.push(`Status: ${filters.status}`);
   }
-  if (projectId) {
-    if (projectId === 'inbox') {
-      filterState.active_filters.push('Project: Inbox');
+  
+  if (filters.project_id) {
+    if (filters.project_id === 'inbox') {
+      filterState.push('Project: Inbox');
     } else {
-      const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(projectId) as { name: string } | undefined;
+      const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(Number(filters.project_id)) as { name: string } | undefined;
       if (project) {
-        filterState.active_filters.push(`Project: ${project.name}`);
+        filterState.push(`Project: ${project.name}`);
       }
     }
   }
-  if (priority) {
-    filterState.active_filters.push(`Priority: ${priority}`);
+  
+  if (filters.priority) {
+    filterState.push(`Priority: ${filters.priority}`);
   }
 
   return c.json({
     tasks,
-    filter_state: filterState
+    filter_state: {
+      active_filters: filters,
+      description: filterState.length > 0 ? filterState.join(', ') : 'All tasks',
+      count: Array.isArray(tasks) ? tasks.length : 0
+    }
   });
 });
 
-// Get filter options for dropdowns
-router.get('/filter-options', (c) => {
+// Get available filter options
+router.get('/options', (c) => {
   const projects = db.prepare('SELECT id, name, color FROM projects ORDER BY name').all();
   const priorities = ['urgent', 'high', 'normal', 'low'];
-  const statuses = [
-    { value: 'all', label: 'All' },
-    { value: 'active', label: 'Active' },
-    { value: 'completed', label: 'Completed' }
-  ];
+  const statuses = ['all', 'active', 'completed'];
 
   return c.json({
     projects: [
@@ -141,34 +155,12 @@ router.get('/filter-options', (c) => {
   });
 });
 
-// Get tasks count by filter combinations (for stats)
-router.get('/filter-stats', (c) => {
-  const stats = {
-    total: db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number },
-    active: db.prepare('SELECT COUNT(*) as count FROM tasks WHERE completed = 0').get() as { count: number },
-    completed: db.prepare('SELECT COUNT(*) as count FROM tasks WHERE completed = 1').get() as { count: number },
-    overdue: db.prepare('SELECT COUNT(*) as count FROM tasks WHERE due_date < date("now") AND completed = 0').get() as { count: number },
-    by_priority: db.prepare(`
-      SELECT 
-        priority,
-        COUNT(*) as count,
-        COUNT(CASE WHEN completed = 0 THEN 1 END) as active_count
-      FROM tasks 
-      GROUP BY priority
-    `).all(),
-    by_project: db.prepare(`
-      SELECT 
-        COALESCE(projects.name, 'Inbox') as project_name,
-        COALESCE(projects.id, 'inbox') as project_id,
-        COUNT(*) as count,
-        COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_count
-      FROM tasks 
-      LEFT JOIN projects ON tasks.project_id = projects.id
-      GROUP BY tasks.project_id, projects.name
-    `).all()
-  };
-
-  return c.json(stats);
+// Clear all filters
+router.delete('/filters', (c) => {
+  return c.json({
+    message: 'Filters cleared',
+    redirect_url: '/'
+  });
 });
 
 export default router;

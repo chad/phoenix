@@ -41,18 +41,12 @@ const router = new Hono();
 router.get('/', (c) => {
   const projects = db.prepare(`
     SELECT 
-      projects.*,
-      COALESCE(task_counts.active_count, 0) as active_task_count
-    FROM projects
-    LEFT JOIN (
-      SELECT 
-        project_id,
-        COUNT(*) as active_count
-      FROM tasks 
-      WHERE completed = 0
-      GROUP BY project_id
-    ) task_counts ON projects.id = task_counts.project_id
-    ORDER BY projects.created_at DESC
+      p.*,
+      COALESCE(COUNT(CASE WHEN t.completed = 0 THEN 1 END), 0) as active_task_count
+    FROM projects p
+    LEFT JOIN tasks t ON p.id = t.project_id
+    GROUP BY p.id, p.name, p.color, p.created_at
+    ORDER BY p.name
   `).all();
   return c.json(projects);
 });
@@ -61,20 +55,13 @@ router.get('/', (c) => {
 router.get('/:id', (c) => {
   const project = db.prepare(`
     SELECT 
-      projects.*,
-      COALESCE(task_counts.active_count, 0) as active_task_count
-    FROM projects
-    LEFT JOIN (
-      SELECT 
-        project_id,
-        COUNT(*) as active_count
-      FROM tasks 
-      WHERE completed = 0
-      GROUP BY project_id
-    ) task_counts ON projects.id = task_counts.project_id
-    WHERE projects.id = ?
+      p.*,
+      COALESCE(COUNT(CASE WHEN t.completed = 0 THEN 1 END), 0) as active_task_count
+    FROM projects p
+    LEFT JOIN tasks t ON p.id = t.project_id
+    WHERE p.id = ?
+    GROUP BY p.id, p.name, p.color, p.created_at
   `).get(c.req.param('id'));
-  
   if (!project) return c.json({ error: 'Project not found' }, 404);
   return c.json(project);
 });
@@ -99,14 +86,14 @@ router.post('/', async (c) => {
     const info = db.prepare('INSERT INTO projects (name, color) VALUES (?, ?)').run(name, color);
     const project = db.prepare(`
       SELECT 
-        projects.*,
+        p.*,
         0 as active_task_count
-      FROM projects
-      WHERE projects.id = ?
+      FROM projects p
+      WHERE p.id = ?
     `).get(info.lastInsertRowid);
     return c.json(project, 201);
   } catch (error: any) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return c.json({ error: 'Project name already exists' }, 400);
     }
     throw error;
@@ -143,23 +130,16 @@ router.patch('/:id', async (c) => {
     
     const updated = db.prepare(`
       SELECT 
-        projects.*,
-        COALESCE(task_counts.active_count, 0) as active_task_count
-      FROM projects
-      LEFT JOIN (
-        SELECT 
-          project_id,
-          COUNT(*) as active_count
-        FROM tasks 
-        WHERE completed = 0
-        GROUP BY project_id
-      ) task_counts ON projects.id = task_counts.project_id
-      WHERE projects.id = ?
+        p.*,
+        COALESCE(COUNT(CASE WHEN t.completed = 0 THEN 1 END), 0) as active_task_count
+      FROM projects p
+      LEFT JOIN tasks t ON p.id = t.project_id
+      WHERE p.id = ?
+      GROUP BY p.id, p.name, p.color, p.created_at
     `).get(id);
-    
     return c.json(updated);
   } catch (error: any) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return c.json({ error: 'Project name already exists' }, 400);
     }
     throw error;
