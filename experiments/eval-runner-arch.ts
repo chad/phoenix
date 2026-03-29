@@ -31,7 +31,7 @@ if (!skipBootstrap) {
   execSync('npm run build', { cwd: ROOT, stdio: 'pipe' });
 
   console.log('Cleaning todo-app...');
-  for (const d of ['src/generated', 'src/server.ts', 'src/app.ts', 'src/db.ts', '.phoenix', 'data']) {
+  for (const d of ['src', '.phoenix', 'data', 'dist']) {
     const p = resolve(TODO_APP, d);
     if (existsSync(p)) rmSync(p, { recursive: true, force: true });
   }
@@ -111,29 +111,29 @@ console.log('\nRunning tests:');
 
 // ─── Categories ─────────────────────────────────────────────────────────────
 
-let catId: number | null = null;
+let projId: number | null = null;
 
-await test('POST /categories creates category', async () => {
-  const res = await fetch(`${BASE}/categories`, {
+await test('POST /projects creates project', async () => {
+  const res = await fetch(`${BASE}/projects`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: 'Work', color: '#ff0000' }),
   });
   if (res.status !== 201) return false;
   const body = await res.json() as Record<string, unknown>;
-  catId = body.id as number;
+  projId = body.id as number;
   return body.name === 'Work' && typeof body.id === 'number';
 });
 
-await test('POST /categories rejects empty name', async () => {
-  const res = await fetch(`${BASE}/categories`, {
+await test('POST /projects rejects empty name', async () => {
+  const res = await fetch(`${BASE}/projects`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: '' }),
   });
   return res.status === 400;
 });
 
-await test('GET /categories returns array', async () => {
-  const res = await fetch(`${BASE}/categories`);
+await test('GET /projects returns array', async () => {
+  const res = await fetch(`${BASE}/projects`);
   if (res.status !== 200) return false;
   const body = await res.json() as unknown[];
   return Array.isArray(body) && body.length >= 1;
@@ -144,9 +144,9 @@ await test('GET /categories returns array', async () => {
 let todoId: number | null = null;
 
 await test('POST /todos creates todo with category', async () => {
-  const res = await fetch(`${BASE}/todos`, {
+  const res = await fetch(`${BASE}/tasks`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'Finish report', category_id: catId }),
+    body: JSON.stringify({ title: 'Finish report', project_id: projId }),
   });
   if (res.status !== 201) return false;
   const body = await res.json() as Record<string, unknown>;
@@ -155,54 +155,54 @@ await test('POST /todos creates todo with category', async () => {
 });
 
 await test('POST /todos creates todo without category', async () => {
-  const res = await fetch(`${BASE}/todos`, {
+  const res = await fetch(`${BASE}/tasks`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: 'Buy milk' }),
   });
   return res.status === 201;
 });
 
-await test('POST /todos rejects invalid category_id', async () => {
-  const res = await fetch(`${BASE}/todos`, {
+await test('POST /todos rejects invalid project_id', async () => {
+  const res = await fetch(`${BASE}/tasks`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'Bad category', category_id: 9999 }),
+    body: JSON.stringify({ title: 'Bad category', project_id: 9999 }),
   });
   return res.status === 400;
 });
 
 await test('POST /todos rejects empty title', async () => {
-  const res = await fetch(`${BASE}/todos`, {
+  const res = await fetch(`${BASE}/tasks`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: '' }),
   });
   return res.status === 400;
 });
 
-await test('GET /todos returns todos with category_name', async () => {
-  const res = await fetch(`${BASE}/todos`);
+await test('GET /todos returns todos with project_name', async () => {
+  const res = await fetch(`${BASE}/tasks`);
   if (res.status !== 200) return false;
   const body = await res.json() as Array<Record<string, unknown>>;
   const withCat = body.find(t => t.title === 'Finish report');
-  return withCat?.category_name === 'Work';
+  return withCat?.project_name === 'Work';
 });
 
-await test('GET /todos/:id returns todo with category_name', async () => {
+await test('GET /todos/:id returns todo with project_name', async () => {
   if (!todoId) return false;
-  const res = await fetch(`${BASE}/todos/${todoId}`);
+  const res = await fetch(`${BASE}/tasks/${todoId}`);
   if (res.status !== 200) return false;
   const body = await res.json() as Record<string, unknown>;
-  return body.category_name === 'Work';
+  return body.project_name === 'Work';
 });
 
 await test('GET /todos/999 returns 404', async () => {
-  return (await fetch(`${BASE}/todos/999`)).status === 404;
+  return (await fetch(`${BASE}/tasks/999`)).status === 404;
 });
 
 // ─── Filtering ──────────────────────────────────────────────────────────────
 
 await test('PATCH /todos/:id marks completed', async () => {
   if (!todoId) return false;
-  const res = await fetch(`${BASE}/todos/${todoId}`, {
+  const res = await fetch(`${BASE}/tasks/${todoId}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ completed: 1 }),
   });
@@ -212,22 +212,22 @@ await test('PATCH /todos/:id marks completed', async () => {
 });
 
 await test('GET /todos?completed=1 filters completed', async () => {
-  const res = await fetch(`${BASE}/todos?completed=1`);
+  const res = await fetch(`${BASE}/tasks?completed=1`);
   if (res.status !== 200) return false;
   const body = await res.json() as Array<Record<string, unknown>>;
   return body.length >= 1 && body.every(t => t.completed === 1);
 });
 
 await test('GET /todos?completed=0 filters incomplete', async () => {
-  const res = await fetch(`${BASE}/todos?completed=0`);
+  const res = await fetch(`${BASE}/tasks?completed=0`);
   if (res.status !== 200) return false;
   const body = await res.json() as Array<Record<string, unknown>>;
   return body.length >= 1 && body.every(t => t.completed === 0);
 });
 
-await test('GET /todos?category_id=N filters by category', async () => {
-  if (!catId) return false;
-  const res = await fetch(`${BASE}/todos?category_id=${catId}`);
+await test('GET /todos?project_id=N filters by category', async () => {
+  if (!projId) return false;
+  const res = await fetch(`${BASE}/tasks?project_id=${projId}`);
   if (res.status !== 200) return false;
   const body = await res.json() as Array<Record<string, unknown>>;
   return body.length >= 1;
@@ -236,46 +236,46 @@ await test('GET /todos?category_id=N filters by category', async () => {
 // ─── Stats ──────────────────────────────────────────────────────────────────
 
 await test('GET /stats returns counts', async () => {
-  const res = await fetch(`${BASE}/todos/stats`);
+  const res = await fetch(`${BASE}/tasks/stats`);
   if (res.status !== 200) return false;
   const body = await res.json() as Record<string, unknown>;
   return typeof body.total === 'number' && typeof body.completed === 'number' && typeof body.incomplete === 'number';
 });
 
 await test('GET /stats includes by_category', async () => {
-  const res = await fetch(`${BASE}/todos/stats`);
+  const res = await fetch(`${BASE}/tasks/stats`);
   if (res.status !== 200) return false;
   const body = await res.json() as Record<string, unknown>;
   const byCat = body.by_category as Array<Record<string, unknown>> | undefined;
-  return Array.isArray(byCat) && byCat.length >= 1 && typeof byCat[0].category_name === 'string';
+  return Array.isArray(byCat) && byCat.length >= 1 && typeof byCat[0].project_name === 'string';
 });
 
 // ─── Delete ─────────────────────────────────────────────────────────────────
 
 await test('DELETE /todos/:id returns 204', async () => {
   if (!todoId) return false;
-  return (await fetch(`${BASE}/todos/${todoId}`, { method: 'DELETE' })).status === 204;
+  return (await fetch(`${BASE}/tasks/${todoId}`, { method: 'DELETE' })).status === 204;
 });
 
-await test('DELETE /categories/:id with todos returns 400', async () => {
+await test('DELETE /projects/:id with todos returns 400', async () => {
   // "Buy milk" has no category, but create one with a category to test
-  const res = await fetch(`${BASE}/categories`, {
+  const res = await fetch(`${BASE}/projects`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: 'Temp' }),
   });
   const cat = await res.json() as Record<string, unknown>;
-  await fetch(`${BASE}/todos`, {
+  await fetch(`${BASE}/tasks`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'Temp todo', category_id: cat.id }),
+    body: JSON.stringify({ title: 'Temp todo', project_id: cat.id }),
   });
-  const delRes = await fetch(`${BASE}/categories/${cat.id}`, { method: 'DELETE' });
+  const delRes = await fetch(`${BASE}/projects/${cat.id}`, { method: 'DELETE' });
   return delRes.status === 400;
 });
 
-await test('DELETE /categories/:id without todos returns 204', async () => {
-  if (!catId) return false;
-  // catId's todos were already deleted
-  return (await fetch(`${BASE}/categories/${catId}`, { method: 'DELETE' })).status === 204;
+await test('DELETE /projects/:id without todos returns 204', async () => {
+  if (!projId) return false;
+  // projId's todos were already deleted
+  return (await fetch(`${BASE}/projects/${projId}`, { method: 'DELETE' })).status === 204;
 });
 
 // ─── Step 4: Score ──────────────────────────────────────────────────────────

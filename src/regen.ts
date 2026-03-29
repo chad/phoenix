@@ -122,8 +122,13 @@ const MAX_RETRIES = 2;
 
 /**
  * Generate code for an IU using an LLM provider.
- * Includes typecheck-and-retry: if the generated code has TS errors,
- * feed them back to the LLM for a fix attempt.
+ *
+ * Two modes:
+ * - Template mode (when runtime target provides moduleTemplate): LLM fills in
+ *   marked sections only. Structure is guaranteed by the template.
+ * - Freeform mode (no template): LLM generates the entire module.
+ *
+ * Both modes include typecheck-and-retry.
  */
 async function generateWithLLM(
   iu: ImplementationUnit,
@@ -141,12 +146,27 @@ async function generateWithLLM(
 
   const systemPrompt = getSystemPrompt(target);
   const prompt = buildPrompt(iu, canonNodes, siblings, target);
+  const template = target?.runtime.moduleTemplate;
 
-  let code = cleanCodeResponse(await llm.generate(prompt, {
-    system: systemPrompt,
-    temperature: 0.2,
-    maxTokens: 8192,
-  }));
+  let code: string;
+
+  if (template) {
+    // Template mode: LLM fills in sections, we splice into template
+    const raw = await llm.generate(prompt, {
+      system: systemPrompt,
+      temperature: 0.1, // lower temp for more deterministic section filling
+      maxTokens: 8192,
+    });
+
+    code = assembleFromTemplate(template, raw, iu);
+  } else {
+    // Freeform mode
+    code = cleanCodeResponse(await llm.generate(prompt, {
+      system: systemPrompt,
+      temperature: 0.2,
+      maxTokens: 8192,
+    }));
+  }
 
   // Typecheck-and-retry loop
   if (projectRoot && iu.output_files[0]) {
@@ -154,17 +174,108 @@ async function generateWithLLM(
       const errors = typecheckFile(projectRoot, iu.output_files[0], code);
       if (!errors) break; // clean!
 
-      // Feed errors back to LLM
+      // Feed errors back to LLM with the current code
       const fixPrompt = buildFixPrompt(code, errors);
-      code = cleanCodeResponse(await llm.generate(fixPrompt, {
+      const fixResponse = await llm.generate(fixPrompt, {
         system: systemPrompt,
         temperature: 0.1,
         maxTokens: 8192,
-      }));
+      });
+
+      if (template) {
+        code = assembleFromTemplate(template, fixResponse, iu);
+      } else {
+        code = cleanCodeResponse(fixResponse);
+      }
     }
   }
 
   return code;
+}
+
+/**
+ * Repair LLM-generated code using the template as a structural guarantee.
+ *
+ * The LLM generates a full module. This function:
+ * 1. Strips any imports the LLM wrote and replaces with template imports
+ * 2. Ensures `export default router` exists
+ * 3. Ensures `_phoenix` metadata exists
+ * 4. Ensures `const router = new Hono()` exists
+ *
+ * This is more robust than section parsing — accepts whatever the LLM
+ * generates and fixes the structural parts that must be exact.
+ */
+function assembleFromTemplate(template: string, llmResponse: string, iu: ImplementationUnit): string {
+  let code = cleanCodeResponse(llmResponse);
+
+  // Extract the template's fixed header (imports)
+  const templateLines = template.split('\n');
+  const headerEnd = templateLines.findIndex(l => l.includes('__MIGRATIONS__'));
+  const templateHeader = templateLines.slice(0, Math.max(headerEnd, 0)).join('\n');
+
+  // Strip LLM's import lines — we'll use the template's
+  const codeLines = code.split('\n');
+  const bodyLines = codeLines.filter(line => {
+    const trimmed = line.trim();
+    // Remove import statements that the template already provides
+    if (trimmed.startsWith('import ') && (
+      trimmed.includes('hono') ||
+      trimmed.includes('db.js') ||
+      trimmed.includes('better-sqlite3') ||
+      trimmed.includes('zod')
+    )) return false;
+    return true;
+  });
+  let body = bodyLines.join('\n').trim();
+
+  // Remove any duplicate "const router = new Hono()" — template has one, LLM might add another
+  const routerDecls = (body.match(/const router\s*=\s*new Hono\(\)/g) ?? []).length;
+  if (routerDecls > 1) {
+    // Keep only the first occurrence
+    let found = false;
+    body = body.split('\n').filter(line => {
+      if (line.includes('const router') && line.includes('new Hono()')) {
+        if (found) return false;
+        found = true;
+      }
+      return true;
+    }).join('\n');
+  }
+
+  // Remove any "export default router" — we'll add it at the end
+  body = body.replace(/\nexport\s+default\s+router\s*;?\s*/g, '\n');
+
+  // Remove any existing _phoenix export
+  body = body.replace(/\/\*\*[^]*?_phoenix[^]*?\*\/\s*export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
+  body = body.replace(/export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
+
+  // Ensure router declaration exists
+  if (!body.includes('const router') && !body.includes('new Hono()')) {
+    body = 'const router = new Hono();\n\n' + body;
+  }
+
+  // Build the phoenix metadata
+  const phoenixMeta = `/** @internal Phoenix VCS traceability — do not remove. */
+export const _phoenix = {
+  iu_id: '${iu.iu_id}',
+  name: '${iu.name}',
+  risk_tier: '${iu.risk_tier}',
+  canon_ids: [${iu.source_canon_ids.length} as const],
+} as const;`;
+
+  // Fix SQL double-quote issue: SQLite treats "x" as column name, needs 'x' for strings
+  // Replace double-quoted SQL string literals inside .prepare()/.exec() calls
+  body = body.replace(
+    /(?<=(?:prepare|exec)\s*\([^)]*?)\"(now|urgent|high|normal|low|active|completed|true|false)\"/g,
+    "'$1'"
+  );
+  // Also fix in string template literals used for SQL
+  body = body.replace(/datetime\("now"\)/g, "datetime('now')");
+  body = body.replace(/date\("now"\)/g, "date('now')");
+  body = body.replace(/WHEN "(\w+)" THEN/g, "WHEN '$1' THEN");
+
+  // Assemble: template header + LLM body + exports + metadata
+  return `${templateHeader}\n\n${body}\n\nexport default router;\n\n${phoenixMeta}\n`;
 }
 
 const MINIMAL_TSCONFIG = JSON.stringify({

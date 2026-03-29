@@ -57,7 +57,6 @@ export function runMigrations(): void {
 }
 
 export { db };
-export type { Database };
 `;
 
 const APP_FILE = `import { Hono } from 'hono';

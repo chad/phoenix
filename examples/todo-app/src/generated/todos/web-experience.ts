@@ -2,10 +2,13 @@ import { Hono } from 'hono';
 import { db, registerMigration } from '../../db.js';
 import { z } from 'zod';
 
+// ─── Database migrations ────────────────────────────────────────────────────
+
 const router = new Hono();
 
 router.get('/', (c) => {
-  return c.html(`<!DOCTYPE html>
+  return c.html(`
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -32,48 +35,51 @@ router.get('/', (c) => {
         }
         
         .header {
-            background: white;
-            border-radius: 8px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 30px;
         }
         
         .header h1 {
-            margin-bottom: 20px;
             color: #2563eb;
+            margin-bottom: 10px;
         }
         
         .add-task-form {
-            display: grid;
-            gap: 16px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
         }
         
         .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+            flex: 1;
+            min-width: 200px;
         }
         
         .form-group.full-width {
-            grid-column: 1 / -1;
+            flex: 100%;
         }
         
         label {
+            display: block;
+            margin-bottom: 5px;
             font-weight: 500;
-            color: #374151;
+            color: #555;
         }
         
-        input, select, textarea {
+        input, textarea, select {
+            width: 100%;
             padding: 8px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             font-size: 14px;
         }
         
@@ -85,138 +91,90 @@ router.get('/', (c) => {
         .description-toggle {
             background: none;
             border: none;
-            color: #6b7280;
+            color: #2563eb;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px;
             text-decoration: underline;
+            margin-bottom: 10px;
         }
         
-        .description-group {
+        .description-section {
             display: none;
         }
         
-        .description-group.visible {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+        .description-section.expanded {
+            display: block;
         }
         
         .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-        
-        .btn-primary {
-            background-color: #2563eb;
+            background: #2563eb;
             color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
         }
         
-        .btn-primary:hover {
-            background-color: #1d4ed8;
+        .btn:hover {
+            background: #1d4ed8;
         }
         
-        .sidebar {
+        .filters {
             background: white;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        .sidebar h3 {
-            margin-bottom: 16px;
-            color: #374151;
-        }
-        
-        .project-list {
-            list-style: none;
-        }
-        
-        .project-item {
+        .filter-row {
             display: flex;
+            gap: 15px;
             align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        
-        .project-item:hover {
-            background-color: #f3f4f6;
-        }
-        
-        .project-item.active {
-            background-color: #dbeafe;
-            color: #1d4ed8;
-        }
-        
-        .project-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-        
-        .project-count {
-            margin-left: auto;
-            background-color: #e5e7eb;
-            color: #6b7280;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 12px;
-        }
-        
-        .main-content {
-            background: white;
-            border-radius: 8px;
-            padding: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .filters {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            gap: 5px;
         }
         
         .filter-btn {
             padding: 6px 12px;
-            border: 1px solid #d1d5db;
+            border: 1px solid #ddd;
             background: white;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
         }
         
         .filter-btn.active {
-            background-color: #2563eb;
+            background: #2563eb;
             color: white;
             border-color: #2563eb;
         }
         
         .task-list {
-            list-style: none;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .task-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            margin-bottom: 8px;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
             position: relative;
-            transition: all 0.2s;
+            transition: background-color 0.2s;
+        }
+        
+        .task-item:last-child {
+            border-bottom: none;
         }
         
         .task-item:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background-color: #f8f9fa;
         }
         
         .task-item.completed {
@@ -231,28 +189,37 @@ router.get('/', (c) => {
             border-left: 4px solid #dc2626;
         }
         
+        .task-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        
         .task-checkbox {
             width: 18px;
             height: 18px;
             cursor: pointer;
         }
         
-        .task-content {
-            flex: 1;
-            min-width: 0;
-        }
-        
         .task-title {
             font-weight: 500;
-            margin-bottom: 4px;
+            flex: 1;
             cursor: pointer;
         }
         
-        .task-meta {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
+        .task-title.editing {
+            display: none;
+        }
+        
+        .task-title-input {
+            display: none;
+            flex: 1;
+            margin-right: 10px;
+        }
+        
+        .task-title-input.editing {
+            display: block;
         }
         
         .priority-badge {
@@ -260,56 +227,60 @@ router.get('/', (c) => {
             border-radius: 12px;
             font-size: 12px;
             font-weight: 500;
+            text-transform: uppercase;
         }
         
         .priority-urgent {
-            background-color: #fee2e2;
+            background: #fecaca;
             color: #dc2626;
         }
         
         .priority-high {
-            background-color: #fed7aa;
+            background: #fed7aa;
             color: #ea580c;
         }
         
         .priority-normal {
-            background-color: #dbeafe;
+            background: #dbeafe;
             color: #2563eb;
         }
         
         .priority-low {
-            background-color: #f3f4f6;
+            background: #f3f4f6;
             color: #6b7280;
+        }
+        
+        .task-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+            color: #666;
+            align-items: center;
         }
         
         .project-name {
-            font-size: 12px;
-            color: #6b7280;
+            color: #2563eb;
         }
         
         .due-date {
-            font-size: 12px;
-            color: #6b7280;
+            color: #666;
         }
         
-        .overdue-badge {
-            background-color: #dc2626;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 11px;
+        .due-date.overdue {
+            color: #dc2626;
+            font-weight: 500;
         }
         
         .delete-btn {
             position: absolute;
-            right: 12px;
+            right: 20px;
             top: 50%;
             transform: translateY(-50%);
-            background-color: #dc2626;
+            background: #dc2626;
             color: white;
             border: none;
+            padding: 6px 10px;
             border-radius: 4px;
-            padding: 4px 8px;
             cursor: pointer;
             font-size: 12px;
             opacity: 0;
@@ -320,87 +291,29 @@ router.get('/', (c) => {
             opacity: 1;
         }
         
-        .stats {
-            background-color: #f8f9fa;
-            padding: 16px;
-            border-radius: 6px;
-            margin-bottom: 20px;
+        .delete-btn:hover {
+            background: #b91c1c;
         }
         
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 16px;
-        }
-        
-        .stat-item {
+        .empty-state {
             text-align: center;
+            padding: 40px 20px;
+            color: #666;
         }
         
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2563eb;
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
         }
         
-        .stat-label {
-            font-size: 12px;
-            color: #6b7280;
-            text-transform: uppercase;
-        }
-        
-        .edit-form {
-            display: none;
-            grid-template-columns: 1fr auto;
-            gap: 8px;
-            align-items: center;
-        }
-        
-        .edit-form.visible {
-            display: grid;
-        }
-        
-        .edit-form input {
-            padding: 4px 8px;
-            font-size: 14px;
-        }
-        
-        .edit-buttons {
-            display: flex;
-            gap: 4px;
-        }
-        
-        .edit-btn {
-            padding: 4px 8px;
-            border: none;
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 10px 15px;
             border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        
-        .edit-save {
-            background-color: #059669;
-            color: white;
-        }
-        
-        .edit-cancel {
-            background-color: #6b7280;
-            color: white;
-        }
-        
-        @media (max-width: 768px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .filters {
-                flex-direction: column;
-            }
-            
-            .task-meta {
-                flex-direction: column;
-                align-items: flex-start;
-            }
+            margin-bottom: 20px;
+            border: 1px solid #fecaca;
         }
     </style>
 </head>
@@ -408,361 +321,182 @@ router.get('/', (c) => {
     <div class="container">
         <div class="header">
             <h1>Task Manager</h1>
-            <form class="add-task-form" id="addTaskForm">
-                <div class="form-group full-width">
-                    <label for="title">Task Title</label>
-                    <input type="text" id="title" name="title" required>
-                </div>
-                
-                <button type="button" class="description-toggle" onclick="toggleDescription()">
-                    + Add Description
-                </button>
-                
-                <div class="form-group full-width description-group" id="descriptionGroup">
-                    <label for="description">Description</label>
-                    <textarea id="description" name="description"></textarea>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="priority">Priority</label>
-                        <select id="priority" name="priority">
-                            <option value="normal">Normal</option>
-                            <option value="low">Low</option>
-                            <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="project">Project</label>
-                        <select id="project" name="project">
-                            <option value="">Inbox</option>
-                        </select>
-                    </div>
-                </div>
-                
+            <p>Organize your work and life</p>
+        </div>
+        
+        <div id="error-message" class="error" style="display: none;"></div>
+        
+        <form id="add-task-form" class="add-task-form">
+            <div class="form-row">
                 <div class="form-group">
-                    <label for="dueDate">Due Date</label>
-                    <input type="date" id="dueDate" name="dueDate">
+                    <label for="task-title">Task Title *</label>
+                    <input type="text" id="task-title" name="title" required>
                 </div>
-                
-                <button type="submit" class="btn btn-primary">Add Task</button>
-            </form>
-        </div>
-        
-        <div class="sidebar">
-            <h3>Projects</h3>
-            <ul class="project-list" id="projectList">
-                <li class="project-item active" data-project-id="">
-                    <div class="project-dot" style="background-color: #6b7280;"></div>
-                    <span>Inbox</span>
-                    <span class="project-count" id="inbox-count">0</span>
-                </li>
-            </ul>
-        </div>
-        
-        <div class="main-content">
-            <div class="stats" id="stats">
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-value" id="totalTasks">0</div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="activeTasks">0</div>
-                        <div class="stat-label">Active</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="completedTasks">0</div>
-                        <div class="stat-label">Completed</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" id="overdueTasks">0</div>
-                        <div class="stat-label">Overdue</div>
-                    </div>
+                <div class="form-group">
+                    <label for="task-priority">Priority</label>
+                    <select id="task-priority" name="priority">
+                        <option value="normal">Normal</option>
+                        <option value="low">Low</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
                 </div>
             </div>
             
-            <div class="filters">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="active">Active</button>
-                <button class="filter-btn" data-filter="completed">Completed</button>
-                
-                <select class="filter-btn" id="priorityFilter">
-                    <option value="">All Priorities</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="high">High</option>
-                    <option value="normal">Normal</option>
-                    <option value="low">Low</option>
-                </select>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="task-project">Project</label>
+                    <select id="task-project" name="project_id">
+                        <option value="">Inbox</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="task-due-date">Due Date</label>
+                    <input type="datetime-local" id="task-due-date" name="due_date">
+                </div>
             </div>
             
-            <ul class="task-list" id="taskList">
-            </ul>
+            <button type="button" class="description-toggle" onclick="toggleDescription()">
+                + Add Description
+            </button>
+            
+            <div id="description-section" class="description-section">
+                <div class="form-group full-width">
+                    <label for="task-description">Description</label>
+                    <textarea id="task-description" name="description" placeholder="Add more details..."></textarea>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn">Add Task</button>
+        </form>
+        
+        <div class="filters">
+            <div class="filter-row">
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-status="all">All</button>
+                    <button class="filter-btn" data-status="active">Active</button>
+                    <button class="filter-btn" data-status="completed">Completed</button>
+                </div>
+                
+                <div class="form-group" style="min-width: 150px;">
+                    <select id="priority-filter">
+                        <option value="">All Priorities</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="high">High</option>
+                        <option value="normal">Normal</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="min-width: 150px;">
+                    <select id="project-filter">
+                        <option value="">All Projects</option>
+                        <option value="null">Inbox</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div id="task-list" class="task-list">
+            <div class="loading">Loading tasks...</div>
         </div>
     </div>
 
     <script>
-        let currentProjectId = '';
-        let currentStatusFilter = 'all';
-        let currentPriorityFilter = '';
-        let projects = [];
         let tasks = [];
+        let projects = [];
+        let currentFilters = {
+            status: 'all',
+            priority: '',
+            project: ''
+        };
 
+        // Initialize the app
+        async function init() {
+            await loadProjects();
+            await loadTasks();
+            setupEventListeners();
+        }
+
+        // Load projects from API
         async function loadProjects() {
             try {
                 const response = await fetch('/projects');
-                projects = await response.json();
-                renderProjects();
-                loadProjectOptions();
+                if (response.ok) {
+                    projects = await response.json();
+                    populateProjectDropdowns();
+                }
             } catch (error) {
                 console.error('Failed to load projects:', error);
             }
         }
 
+        // Load tasks from API
         async function loadTasks() {
             try {
-                let url = '/tasks';
-                const params = new URLSearchParams();
-                
-                if (currentProjectId) {
-                    params.append('project_id', currentProjectId);
-                } else if (currentProjectId === '') {
-                    params.append('project_id', 'null');
-                }
-                
-                if (currentStatusFilter === 'active') {
-                    params.append('completed', '0');
-                } else if (currentStatusFilter === 'completed') {
-                    params.append('completed', '1');
-                }
-                
-                if (currentPriorityFilter) {
-                    params.append('priority', currentPriorityFilter);
-                }
-                
-                if (params.toString()) {
-                    url += '?' + params.toString();
-                }
-                
-                const response = await fetch(url);
-                tasks = await response.json();
-                renderTasks();
-                updateStats();
-                updateProjectCounts();
-            } catch (error) {
-                console.error('Failed to load tasks:', error);
-            }
-        }
-
-        function renderProjects() {
-            const projectList = document.getElementById('projectList');
-            const inboxItem = projectList.querySelector('[data-project-id=""]');
-            
-            // Remove existing project items (keep inbox)
-            const existingProjects = projectList.querySelectorAll('[data-project-id]:not([data-project-id=""])');
-            existingProjects.forEach(item => item.remove());
-            
-            projects.forEach(project => {
-                const li = document.createElement('li');
-                li.className = 'project-item';
-                li.dataset.projectId = project.id;
-                li.innerHTML = \`
-                    <div class="project-dot" style="background-color: \${project.color};"></div>
-                    <span>\${project.name}</span>
-                    <span class="project-count" id="project-\${project.id}-count">0</span>
-                \`;
-                li.addEventListener('click', () => selectProject(project.id));
-                projectList.appendChild(li);
-            });
-        }
-
-        function loadProjectOptions() {
-            const projectSelect = document.getElementById('project');
-            projectSelect.innerHTML = '<option value="">Inbox</option>';
-            
-            projects.forEach(project => {
-                const option = document.createElement('option');
-                option.value = project.id;
-                option.textContent = project.name;
-                projectSelect.appendChild(option);
-            });
-        }
-
-        function selectProject(projectId) {
-            currentProjectId = projectId;
-            
-            // Update active state
-            document.querySelectorAll('.project-item').forEach(item => {
-                item.classList.toggle('active', item.dataset.projectId == projectId);
-            });
-            
-            loadTasks();
-        }
-
-        function renderTasks() {
-            const taskList = document.getElementById('taskList');
-            taskList.innerHTML = '';
-            
-            tasks.forEach(task => {
-                const li = document.createElement('li');
-                li.className = \`task-item \${task.completed ? 'completed' : ''} \${isOverdue(task) ? 'overdue' : ''}\`;
-                
-                const projectName = task.project_name ? \`<span class="project-name">\${task.project_name}</span>\` : '';
-                const dueDate = task.due_date ? \`<span class="due-date">Due: \${formatDate(task.due_date)}</span>\` : '';
-                const overdueBadge = isOverdue(task) ? '<span class="overdue-badge">Overdue</span>' : '';
-                
-                li.innerHTML = \`
-                    <input type="checkbox" class="task-checkbox" \${task.completed ? 'checked' : ''} 
-                           onchange="toggleTask(\${task.id}, this.checked)">
-                    <div class="task-content">
-                        <div class="task-title" onclick="editTask(\${task.id})">\${task.title}</div>
-                        <div class="edit-form" id="edit-\${task.id}">
-                            <input type="text" value="\${task.title}" onkeydown="handleEditKeydown(event, \${task.id})">
-                            <div class="edit-buttons">
-                                <button class="edit-btn edit-save" onclick="saveEdit(\${task.id})">Save</button>
-                                <button class="edit-btn edit-cancel" onclick="cancelEdit(\${task.id})">Cancel</button>
-                            </div>
-                        </div>
-                        <div class="task-meta">
-                            <span class="priority-badge priority-\${task.priority}">\${task.priority}</span>
-                            \${projectName}
-                            \${dueDate}
-                            \${overdueBadge}
-                        </div>
-                    </div>
-                    <button class="delete-btn" onclick="deleteTask(\${task.id})">Delete</button>
-                \`;
-                
-                taskList.appendChild(li);
-            });
-        }
-
-        function isOverdue(task) {
-            if (!task.due_date || task.completed) return false;
-            const today = new Date().toISOString().split('T')[0];
-            return task.due_date < today;
-        }
-
-        function formatDate(dateStr) {
-            return new Date(dateStr).toLocaleDateString();
-        }
-
-        async function toggleTask(taskId, completed) {
-            try {
-                await fetch(\`/tasks/\${taskId}\`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ completed: completed ? 1 : 0 })
-                });
-                loadTasks();
-            } catch (error) {
-                console.error('Failed to toggle task:', error);
-            }
-        }
-
-        async function deleteTask(taskId) {
-            if (!confirm('Are you sure you want to delete this task?')) return;
-            
-            try {
-                await fetch(\`/tasks/\${taskId}\`, { method: 'DELETE' });
-                loadTasks();
-            } catch (error) {
-                console.error('Failed to delete task:', error);
-            }
-        }
-
-        function editTask(taskId) {
-            const titleEl = document.querySelector(\`[onclick="editTask(\${taskId})"]\`);
-            const editForm = document.getElementById(\`edit-\${taskId}\`);
-            
-            titleEl.style.display = 'none';
-            editForm.classList.add('visible');
-            editForm.querySelector('input').focus();
-        }
-
-        function cancelEdit(taskId) {
-            const titleEl = document.querySelector(\`[onclick="editTask(\${taskId})"]\`);
-            const editForm = document.getElementById(\`edit-\${taskId}\`);
-            
-            titleEl.style.display = 'block';
-            editForm.classList.remove('visible');
-        }
-
-        function handleEditKeydown(event, taskId) {
-            if (event.key === 'Enter') {
-                saveEdit(taskId);
-            } else if (event.key === 'Escape') {
-                cancelEdit(taskId);
-            }
-        }
-
-        async function saveEdit(taskId) {
-            const editForm = document.getElementById(\`edit-\${taskId}\`);
-            const newTitle = editForm.querySelector('input').value.trim();
-            
-            if (!newTitle) return;
-            
-            try {
-                await fetch(\`/tasks/\${taskId}\`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: newTitle })
-                });
-                loadTasks();
-            } catch (error) {
-                console.error('Failed to update task:', error);
-            }
-        }
-
-        function updateStats() {
-            const total = tasks.length;
-            const active = tasks.filter(t => !t.completed).length;
-            const completed = tasks.filter(t => t.completed).length;
-            const overdue = tasks.filter(t => isOverdue(t)).length;
-            
-            document.getElementById('totalTasks').textContent = total;
-            document.getElementById('activeTasks').textContent = active;
-            document.getElementById('completedTasks').textContent = completed;
-            document.getElementById('overdueTasks').textContent = overdue;
-        }
-
-        async function updateProjectCounts() {
-            try {
                 const response = await fetch('/tasks');
-                const allTasks = await response.json();
-                
-                // Update inbox count
-                const inboxCount = allTasks.filter(t => !t.project_id && !t.completed).length;
-                document.getElementById('inbox-count').textContent = inboxCount;
-                
-                // Update project counts
-                projects.forEach(project => {
-                    const count = allTasks.filter(t => t.project_id === project.id && !t.completed).length;
-                    const countEl = document.getElementById(\`project-\${project.id}-count\`);
-                    if (countEl) countEl.textContent = count;
-                });
+                if (response.ok) {
+                    tasks = await response.json();
+                    renderTasks();
+                } else {
+                    showError('Failed to load tasks');
+                }
             } catch (error) {
-                console.error('Failed to update project counts:', error);
+                showError('Failed to load tasks: ' + error.message);
             }
         }
 
-        function toggleDescription() {
-            const group = document.getElementById('descriptionGroup');
-            const toggle = document.querySelector('.description-toggle');
+        // Populate project dropdowns
+        function populateProjectDropdowns() {
+            const taskProjectSelect = document.getElementById('task-project');
+            const projectFilterSelect = document.getElementById('project-filter');
             
-            if (group.classList.contains('visible')) {
-                group.classList.remove('visible');
-                toggle.textContent = '+ Add Description';
-            } else {
-                group.classList.add('visible');
-                toggle.textContent = '- Remove Description';
-            }
+            // Clear existing options (except default)
+            taskProjectSelect.innerHTML = '<option value="">Inbox</option>';
+            projectFilterSelect.innerHTML = '<option value="">All Projects</option><option value="null">Inbox</option>';
+            
+            projects.forEach(project => {
+                const option1 = document.createElement('option');
+                option1.value = project.id;
+                option1.textContent = project.name;
+                taskProjectSelect.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = project.id;
+                option2.textContent = project.name;
+                projectFilterSelect.appendChild(option2);
+            });
         }
 
-        // Event listeners
-        document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+        // Setup event listeners
+        function setupEventListeners() {
+            // Add task form
+            document.getElementById('add-task-form').addEventListener('submit', handleAddTask);
+            
+            // Filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentFilters.status = e.target.dataset.status;
+                    renderTasks();
+                });
+            });
+            
+            // Filter dropdowns
+            document.getElementById('priority-filter').addEventListener('change', (e) => {
+                currentFilters.priority = e.target.value;
+                renderTasks();
+            });
+            
+            document.getElementById('project-filter').addEventListener('change', (e) => {
+                currentFilters.project = e.target.value;
+                renderTasks();
+            });
+        }
+
+        // Handle add task form submission
+        async function handleAddTask(e) {
             e.preventDefault();
             
             const formData = new FormData(e.target);
@@ -770,56 +504,273 @@ router.get('/', (c) => {
                 title: formData.get('title'),
                 description: formData.get('description') || '',
                 priority: formData.get('priority'),
-                project_id: formData.get('project') ? parseInt(formData.get('project')) : null,
-                due_date: formData.get('dueDate') || null
+                project_id: formData.get('project_id') ? parseInt(formData.get('project_id')) : null,
+                due_date: formData.get('due_date') || null
             };
             
             try {
-                await fetch('/tasks', {
+                const response = await fetch('/tasks', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(taskData)
                 });
                 
-                e.target.reset();
-                document.getElementById('descriptionGroup').classList.remove('visible');
-                document.querySelector('.description-toggle').textContent = '+ Add Description';
-                loadTasks();
+                if (response.ok) {
+                    const newTask = await response.json();
+                    tasks.unshift(newTask);
+                    renderTasks();
+                    e.target.reset();
+                    hideDescription();
+                    hideError();
+                } else {
+                    const error = await response.json();
+                    showError(error.error || 'Failed to create task');
+                }
             } catch (error) {
-                console.error('Failed to create task:', error);
+                showError('Failed to create task: ' + error.message);
             }
-        });
+        }
 
-        // Filter event listeners
-        document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                currentStatusFilter = btn.dataset.filter;
-                document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                loadTasks();
+        // Toggle task completion
+        async function toggleTaskCompletion(taskId, completed) {
+            try {
+                const response = await fetch('/tasks/' + taskId, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed })
+                });
+                
+                if (response.ok) {
+                    const updatedTask = await response.json();
+                    const index = tasks.findIndex(t => t.id === taskId);
+                    if (index !== -1) {
+                        tasks[index] = updatedTask;
+                        renderTasks();
+                    }
+                } else {
+                    showError('Failed to update task');
+                }
+            } catch (error) {
+                showError('Failed to update task: ' + error.message);
+            }
+        }
+
+        // Delete task
+        async function deleteTask(taskId) {
+            if (!confirm('Are you sure you want to delete this task?')) return;
+            
+            try {
+                const response = await fetch('/tasks/' + taskId, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    tasks = tasks.filter(t => t.id !== taskId);
+                    renderTasks();
+                } else {
+                    showError('Failed to delete task');
+                }
+            } catch (error) {
+                showError('Failed to delete task: ' + error.message);
+            }
+        }
+
+        // Edit task title inline
+        async function editTaskTitle(taskId, newTitle) {
+            if (!newTitle.trim()) return;
+            
+            try {
+                const response = await fetch('/tasks/' + taskId, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: newTitle.trim() })
+                });
+                
+                if (response.ok) {
+                    const updatedTask = await response.json();
+                    const index = tasks.findIndex(t => t.id === taskId);
+                    if (index !== -1) {
+                        tasks[index] = updatedTask;
+                        renderTasks();
+                    }
+                } else {
+                    showError('Failed to update task');
+                }
+            } catch (error) {
+                showError('Failed to update task: ' + error.message);
+            }
+        }
+
+        // Filter tasks based on current filters
+        function getFilteredTasks() {
+            return tasks.filter(task => {
+                // Status filter
+                if (currentFilters.status === 'active' && task.completed) return false;
+                if (currentFilters.status === 'completed' && !task.completed) return false;
+                
+                // Priority filter
+                if (currentFilters.priority && task.priority !== currentFilters.priority) return false;
+                
+                // Project filter
+                if (currentFilters.project) {
+                    if (currentFilters.project === 'null' && task.project_id !== null) return false;
+                    if (currentFilters.project !== 'null' && task.project_id !== parseInt(currentFilters.project)) return false;
+                }
+                
+                return true;
             });
-        });
+        }
 
-        document.getElementById('priorityFilter').addEventListener('change', (e) => {
-            currentPriorityFilter = e.target.value;
-            loadTasks();
-        });
+        // Render tasks
+        function renderTasks() {
+            const taskList = document.getElementById('task-list');
+            const filteredTasks = getFilteredTasks();
+            
+            if (filteredTasks.length === 0) {
+                taskList.innerHTML = '<div class="empty-state">No tasks found</div>';
+                return;
+            }
+            
+            // Sort tasks: incomplete first, then by priority, then by due date
+            const sortedTasks = filteredTasks.sort((a, b) => {
+                if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                
+                const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 };
+                const aPriority = priorityOrder[a.priority] ?? 2;
+                const bPriority = priorityOrder[b.priority] ?? 2;
+                if (aPriority !== bPriority) return aPriority - bPriority;
+                
+                if (a.due_date && b.due_date) {
+                    return new Date(a.due_date) - new Date(b.due_date);
+                }
+                if (a.due_date) return -1;
+                if (b.due_date) return 1;
+                
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+            
+            taskList.innerHTML = sortedTasks.map(task => renderTask(task)).join('');
+        }
 
-        // Inbox click handler
-        document.querySelector('[data-project-id=""]').addEventListener('click', () => selectProject(''));
+        // Render individual task
+        function renderTask(task) {
+            const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !task.completed;
+            const project = projects.find(p => p.id === task.project_id);
+            
+            return '<div class="task-item ' + (task.completed ? 'completed' : '') + ' ' + (isOverdue ? 'overdue' : '') + '" data-task-id="' + task.id + '">' +
+                '<div class="task-header">' +
+                    '<input type="checkbox" class="task-checkbox" ' + (task.completed ? 'checked' : '') + ' onchange="toggleTaskCompletion(' + task.id + ', this.checked)">' +
+                    '<span class="task-title" onclick="startEditTitle(' + task.id + ')">' + escapeHtml(task.title) + '</span>' +
+                    '<input type="text" class="task-title-input" value="' + escapeHtml(task.title) + '" onblur="finishEditTitle(' + task.id + ', this.value)" onkeydown="handleTitleKeydown(event, ' + task.id + ', this.value)">' +
+                    '<span class="priority-badge priority-' + task.priority + '">' + task.priority + '</span>' +
+                '</div>' +
+                '<div class="task-meta">' +
+                    (project ? '<span class="project-name">' + escapeHtml(project.name) + '</span>' : '<span class="project-name">Inbox</span>') +
+                    (task.due_date ? '<span class="due-date ' + (isOverdue ? 'overdue' : '') + '">Due: ' + formatDate(task.due_date) + '</span>' : '') +
+                '</div>' +
+                '<button class="delete-btn" onclick="deleteTask(' + task.id + ')">Delete</button>' +
+            '</div>';
+        }
 
-        // Initial load
-        loadProjects();
-        loadTasks();
+        // Start editing task title
+        function startEditTitle(taskId) {
+            const taskItem = document.querySelector('[data-task-id="' + taskId + '"]');
+            const titleSpan = taskItem.querySelector('.task-title');
+            const titleInput = taskItem.querySelector('.task-title-input');
+            
+            titleSpan.classList.add('editing');
+            titleInput.classList.add('editing');
+            titleInput.focus();
+            titleInput.select();
+        }
+
+        // Finish editing task title
+        function finishEditTitle(taskId, newTitle) {
+            const taskItem = document.querySelector('[data-task-id="' + taskId + '"]');
+            const titleSpan = taskItem.querySelector('.task-title');
+            const titleInput = taskItem.querySelector('.task-title-input');
+            
+            titleSpan.classList.remove('editing');
+            titleInput.classList.remove('editing');
+            
+            const currentTask = tasks.find(t => t.id === taskId);
+            if (newTitle.trim() && newTitle.trim() !== currentTask.title) {
+                editTaskTitle(taskId, newTitle);
+            }
+        }
+
+        // Handle keydown in title input
+        function handleTitleKeydown(event, taskId, newTitle) {
+            if (event.key === 'Enter') {
+                event.target.blur();
+            } else if (event.key === 'Escape') {
+                const currentTask = tasks.find(t => t.id === taskId);
+                event.target.value = currentTask.title;
+                event.target.blur();
+            }
+        }
+
+        // Toggle description section
+        function toggleDescription() {
+            const section = document.getElementById('description-section');
+            const toggle = document.querySelector('.description-toggle');
+            
+            if (section.classList.contains('expanded')) {
+                hideDescription();
+            } else {
+                section.classList.add('expanded');
+                toggle.textContent = '- Hide Description';
+            }
+        }
+
+        // Hide description section
+        function hideDescription() {
+            const section = document.getElementById('description-section');
+            const toggle = document.querySelector('.description-toggle');
+            
+            section.classList.remove('expanded');
+            toggle.textContent = '+ Add Description';
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError() {
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Initialize the app when page loads
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
-</html>`);
+</html>
+  `);
 });
+
+
 
 export default router;
 
+/** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
-  iu_id: '4cf8044124318345f799117c458dd89849b86274c5b49683e030c938686d4fed',
+  iu_id: '335590ecf9457e5b14124f79e4d9399888f58b7aff87edd6a264b6aa6fdc2d48',
   name: 'Web Experience',
   risk_tier: 'high',
   canon_ids: [5 as const],
