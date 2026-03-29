@@ -20,7 +20,7 @@ A personal task manager for organizing work and life. Users manage tasks across 
 - Descriptions must not exceed 5000 characters
 - Priority must always be one of: urgent, high, normal, low
 - Due dates must be valid dates; the system must reject obviously invalid dates
-- Due dates must be either in the present or the future
+- Due dates can be at any time, past, present or future. TODOs added in the past are automatically labeled as archived
 - The system must expose these capabilities as a programmatic interface so external tools can create, read, update, and delete tasks using standard conventions
 
 ## Projects

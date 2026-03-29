@@ -134,7 +134,18 @@ export function classifyChange(
 
   // Compute confidence and classify
   if (normDiff < CONFIG.CLASS_A_NORM_DIFF && termDelta < CONFIG.CLASS_A_TERM_DELTA) {
-    // Very small change, high confidence it's trivial
+    // Check if numeric values changed — that's semantically significant even with small edit distance
+    const beforeNums = (before.normalized_text.match(/\d+/g) ?? []).join(',');
+    const afterNums = (after.normalized_text.match(/\d+/g) ?? []).join(',');
+    if (beforeNums !== afterNums) {
+      return {
+        change_class: ChangeClass.B,
+        confidence: 0.75,
+        signals,
+        clause_id_before: diff.clause_id_before,
+        clause_id_after: diff.clause_id_after,
+      };
+    }
     return {
       change_class: ChangeClass.A,
       confidence: 0.85,
@@ -144,23 +155,23 @@ export function classifyChange(
     };
   }
 
-  if (canonImpact > 0 || contextColdDelta) {
-    // Affects canonical graph or structural context
-    const confidence = canonImpact > 2 ? 0.9 : 0.7;
+  // Local semantic change (small edit distance, moderate term change)
+  if (normDiff < CONFIG.CLASS_B_NORM_DIFF && termDelta < CONFIG.CLASS_B_TERM_DELTA) {
     return {
-      change_class: ChangeClass.C,
-      confidence,
+      change_class: ChangeClass.B,
+      confidence: 0.8,
       signals,
       clause_id_before: diff.clause_id_before,
       clause_id_after: diff.clause_id_after,
     };
   }
 
-  // Local semantic change
-  if (normDiff < CONFIG.CLASS_B_NORM_DIFF && termDelta < CONFIG.CLASS_B_TERM_DELTA) {
+  // Contextual shift: section structure changed OR high canonical impact
+  if (sectionDelta || canonImpact > 2) {
+    const confidence = canonImpact > 2 ? 0.9 : 0.7;
     return {
-      change_class: ChangeClass.B,
-      confidence: 0.8,
+      change_class: ChangeClass.C,
+      confidence,
       signals,
       clause_id_before: diff.clause_id_before,
       clause_id_after: diff.clause_id_after,
