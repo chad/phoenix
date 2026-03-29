@@ -40,7 +40,7 @@ router.get('/', (c) => {
         }
         
         .header h1 {
-            color: #2563eb;
+            color: #2c3e50;
             margin-bottom: 10px;
         }
         
@@ -56,26 +56,23 @@ router.get('/', (c) => {
             display: flex;
             gap: 15px;
             margin-bottom: 15px;
-            flex-wrap: wrap;
+            align-items: flex-start;
         }
         
         .form-group {
             flex: 1;
-            min-width: 200px;
         }
         
-        .form-group.full-width {
-            flex: 100%;
-        }
-        
-        label {
+        .form-group label {
             display: block;
             margin-bottom: 5px;
             font-weight: 500;
             color: #555;
         }
         
-        input, textarea, select {
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid #ddd;
@@ -83,19 +80,18 @@ router.get('/', (c) => {
             font-size: 14px;
         }
         
-        textarea {
+        .form-group textarea {
             resize: vertical;
-            min-height: 80px;
+            min-height: 60px;
         }
         
         .description-toggle {
             background: none;
             border: none;
-            color: #2563eb;
+            color: #007bff;
             cursor: pointer;
             font-size: 14px;
             text-decoration: underline;
-            margin-bottom: 10px;
         }
         
         .description-section {
@@ -107,24 +103,27 @@ router.get('/', (c) => {
         }
         
         .btn {
-            background: #2563eb;
-            color: white;
-            border: none;
             padding: 10px 20px;
+            border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
         }
         
-        .btn:hover {
-            background: #1d4ed8;
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0056b3;
         }
         
         .filters {
             background: white;
             border-radius: 8px;
-            padding: 20px;
+            padding: 15px;
             margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
@@ -151,9 +150,9 @@ router.get('/', (c) => {
         }
         
         .filter-btn.active {
-            background: #2563eb;
+            background-color: #007bff;
             color: white;
-            border-color: #2563eb;
+            border-color: #007bff;
         }
         
         .task-list {
@@ -163,10 +162,10 @@ router.get('/', (c) => {
         }
         
         .task-item {
-            padding: 15px 20px;
+            padding: 15px;
             border-bottom: 1px solid #eee;
             position: relative;
-            transition: background-color 0.2s;
+            cursor: pointer;
         }
         
         .task-item:last-child {
@@ -186,7 +185,7 @@ router.get('/', (c) => {
         }
         
         .task-item.overdue {
-            border-left: 4px solid #dc2626;
+            border-left: 4px solid #dc3545;
         }
         
         .task-header {
@@ -205,21 +204,6 @@ router.get('/', (c) => {
         .task-title {
             font-weight: 500;
             flex: 1;
-            cursor: pointer;
-        }
-        
-        .task-title.editing {
-            display: none;
-        }
-        
-        .task-title-input {
-            display: none;
-            flex: 1;
-            margin-right: 10px;
-        }
-        
-        .task-title-input.editing {
-            display: block;
         }
         
         .priority-badge {
@@ -231,23 +215,23 @@ router.get('/', (c) => {
         }
         
         .priority-urgent {
-            background: #fecaca;
-            color: #dc2626;
+            background-color: #dc3545;
+            color: white;
         }
         
         .priority-high {
-            background: #fed7aa;
-            color: #ea580c;
+            background-color: #fd7e14;
+            color: white;
         }
         
         .priority-normal {
-            background: #dbeafe;
-            color: #2563eb;
+            background-color: #007bff;
+            color: white;
         }
         
         .priority-low {
-            background: #f3f4f6;
-            color: #6b7280;
+            background-color: #6c757d;
+            color: white;
         }
         
         .task-meta {
@@ -255,32 +239,19 @@ router.get('/', (c) => {
             gap: 15px;
             font-size: 14px;
             color: #666;
-            align-items: center;
-        }
-        
-        .project-name {
-            color: #2563eb;
-        }
-        
-        .due-date {
-            color: #666;
-        }
-        
-        .due-date.overdue {
-            color: #dc2626;
-            font-weight: 500;
+            margin-left: 28px;
         }
         
         .delete-btn {
             position: absolute;
-            right: 20px;
+            right: 15px;
             top: 50%;
             transform: translateY(-50%);
-            background: #dc2626;
+            background: #dc3545;
             color: white;
             border: none;
-            padding: 6px 10px;
             border-radius: 4px;
+            padding: 5px 10px;
             cursor: pointer;
             font-size: 12px;
             opacity: 0;
@@ -292,12 +263,21 @@ router.get('/', (c) => {
         }
         
         .delete-btn:hover {
-            background: #b91c1c;
+            background: #c82333;
+        }
+        
+        .overdue-badge {
+            background-color: #dc3545;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
         }
         
         .empty-state {
             text-align: center;
-            padding: 40px 20px;
+            padding: 40px;
             color: #666;
         }
         
@@ -306,69 +286,59 @@ router.get('/', (c) => {
             padding: 20px;
             color: #666;
         }
-        
-        .error {
-            background: #fef2f2;
-            color: #dc2626;
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            border: 1px solid #fecaca;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Task Manager</h1>
-            <p>Organize your work and life</p>
         </div>
         
-        <div id="error-message" class="error" style="display: none;"></div>
-        
-        <form id="add-task-form" class="add-task-form">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="task-title">Task Title *</label>
-                    <input type="text" id="task-title" name="title" required>
+        <div class="add-task-form">
+            <form id="addTaskForm">
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="title">Task Title</label>
+                        <input type="text" id="title" name="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Priority</label>
+                        <select id="priority" name="priority">
+                            <option value="normal">Normal</option>
+                            <option value="low">Low</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="task-priority">Priority</label>
-                    <select id="task-priority" name="priority">
-                        <option value="normal">Normal</option>
-                        <option value="low">Low</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                    </select>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="project">Project</label>
+                        <select id="project" name="project_id">
+                            <option value="">Inbox</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="dueDate">Due Date</label>
+                        <input type="date" id="dueDate" name="due_date">
+                    </div>
+                    <div class="form-group" style="flex: 0;">
+                        <label>&nbsp;</label>
+                        <button type="button" class="description-toggle" onclick="toggleDescription()">+ Description</button>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="task-project">Project</label>
-                    <select id="task-project" name="project_id">
-                        <option value="">Inbox</option>
-                    </select>
+                
+                <div class="description-section" id="descriptionSection">
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" placeholder="Optional task description..."></textarea>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="task-due-date">Due Date</label>
-                    <input type="datetime-local" id="task-due-date" name="due_date">
-                </div>
-            </div>
-            
-            <button type="button" class="description-toggle" onclick="toggleDescription()">
-                + Add Description
-            </button>
-            
-            <div id="description-section" class="description-section">
-                <div class="form-group full-width">
-                    <label for="task-description">Description</label>
-                    <textarea id="task-description" name="description" placeholder="Add more details..."></textarea>
-                </div>
-            </div>
-            
-            <button type="submit" class="btn">Add Task</button>
-        </form>
+                
+                <button type="submit" class="btn btn-primary">Add Task</button>
+            </form>
+        </div>
         
         <div class="filters">
             <div class="filter-row">
@@ -378,8 +348,8 @@ router.get('/', (c) => {
                     <button class="filter-btn" data-status="completed">Completed</button>
                 </div>
                 
-                <div class="form-group" style="min-width: 150px;">
-                    <select id="priority-filter">
+                <div class="form-group" style="min-width: 120px;">
+                    <select id="priorityFilter">
                         <option value="">All Priorities</option>
                         <option value="urgent">Urgent</option>
                         <option value="high">High</option>
@@ -388,16 +358,15 @@ router.get('/', (c) => {
                     </select>
                 </div>
                 
-                <div class="form-group" style="min-width: 150px;">
-                    <select id="project-filter">
+                <div class="form-group" style="min-width: 120px;">
+                    <select id="projectFilter">
                         <option value="">All Projects</option>
-                        <option value="null">Inbox</option>
                     </select>
                 </div>
             </div>
         </div>
         
-        <div id="task-list" class="task-list">
+        <div class="task-list" id="taskList">
             <div class="loading">Loading tasks...</div>
         </div>
     </div>
@@ -408,98 +377,97 @@ router.get('/', (c) => {
         let currentFilters = {
             status: 'all',
             priority: '',
-            project: ''
+            project_id: ''
         };
 
-        // Initialize the app
-        async function init() {
-            await loadProjects();
-            await loadTasks();
-            setupEventListeners();
-        }
-
-        // Load projects from API
         async function loadProjects() {
             try {
                 const response = await fetch('/projects');
-                if (response.ok) {
-                    projects = await response.json();
-                    populateProjectDropdowns();
-                }
+                projects = await response.json();
+                
+                const projectSelect = document.getElementById('project');
+                const projectFilter = document.getElementById('projectFilter');
+                
+                projectSelect.innerHTML = '<option value="">Inbox</option>';
+                projectFilter.innerHTML = '<option value="">All Projects</option>';
+                
+                projects.forEach(project => {
+                    projectSelect.innerHTML += \`<option value="\${project.id}">\${project.name}</option>\`;
+                    projectFilter.innerHTML += \`<option value="\${project.id}">\${project.name}</option>\`;
+                });
             } catch (error) {
                 console.error('Failed to load projects:', error);
             }
         }
 
-        // Load tasks from API
         async function loadTasks() {
             try {
                 const response = await fetch('/tasks');
-                if (response.ok) {
-                    tasks = await response.json();
-                    renderTasks();
-                } else {
-                    showError('Failed to load tasks');
-                }
+                tasks = await response.json();
+                renderTasks();
             } catch (error) {
-                showError('Failed to load tasks: ' + error.message);
+                console.error('Failed to load tasks:', error);
+                document.getElementById('taskList').innerHTML = '<div class="empty-state">Failed to load tasks</div>';
             }
         }
 
-        // Populate project dropdowns
-        function populateProjectDropdowns() {
-            const taskProjectSelect = document.getElementById('task-project');
-            const projectFilterSelect = document.getElementById('project-filter');
-            
-            // Clear existing options (except default)
-            taskProjectSelect.innerHTML = '<option value="">Inbox</option>';
-            projectFilterSelect.innerHTML = '<option value="">All Projects</option><option value="null">Inbox</option>';
-            
-            projects.forEach(project => {
-                const option1 = document.createElement('option');
-                option1.value = project.id;
-                option1.textContent = project.name;
-                taskProjectSelect.appendChild(option1);
+        function renderTasks() {
+            const filteredTasks = tasks.filter(task => {
+                if (currentFilters.status === 'active' && task.completed) return false;
+                if (currentFilters.status === 'completed' && !task.completed) return false;
+                if (currentFilters.priority && task.priority !== currentFilters.priority) return false;
+                if (currentFilters.project_id && task.project_id != currentFilters.project_id) return false;
+                return true;
+            });
+
+            filteredTasks.sort((a, b) => {
+                const aOverdue = a.due_date && new Date(a.due_date) < new Date();
+                const bOverdue = b.due_date && new Date(b.due_date) < new Date();
+                const aPriorityWeight = { urgent: 4, high: 3, normal: 2, low: 1 }[a.priority] || 2;
+                const bPriorityWeight = { urgent: 4, high: 3, normal: 2, low: 1 }[b.priority] || 2;
                 
-                const option2 = document.createElement('option');
-                option2.value = project.id;
-                option2.textContent = project.name;
-                projectFilterSelect.appendChild(option2);
+                if (aOverdue !== bOverdue) return bOverdue ? 1 : -1;
+                if (aPriorityWeight !== bPriorityWeight) return bPriorityWeight - aPriorityWeight;
+                if (a.due_date && b.due_date) return new Date(a.due_date) - new Date(b.due_date);
+                if (a.due_date && !b.due_date) return -1;
+                if (!a.due_date && b.due_date) return 1;
+                return new Date(b.created_at) - new Date(a.created_at);
             });
+
+            const taskList = document.getElementById('taskList');
+            
+            if (filteredTasks.length === 0) {
+                taskList.innerHTML = '<div class="empty-state">No tasks found</div>';
+                return;
+            }
+
+            taskList.innerHTML = filteredTasks.map(task => {
+                const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !task.completed;
+                const projectName = task.project_id ? (projects.find(p => p.id === task.project_id)?.name || 'Unknown Project') : 'Inbox';
+                
+                return \`
+                    <div class="task-item \${task.completed ? 'completed' : ''} \${isOverdue ? 'overdue' : ''}" data-id="\${task.id}">
+                        <div class="task-header">
+                            <input type="checkbox" class="task-checkbox" \${task.completed ? 'checked' : ''} onchange="toggleTask(\${task.id})">
+                            <div class="task-title">\${task.title}</div>
+                            <div class="priority-badge priority-\${task.priority}">\${task.priority}</div>
+                            \${isOverdue ? '<div class="overdue-badge">Overdue</div>' : ''}
+                        </div>
+                        <div class="task-meta">
+                            <span>Project: \${projectName}</span>
+                            \${task.due_date ? \`<span>Due: \${new Date(task.due_date).toLocaleDateString()}</span>\` : ''}
+                        </div>
+                        \${task.description ? \`<div class="task-meta"><span>\${task.description}</span></div>\` : ''}
+                        <button class="delete-btn" onclick="deleteTask(\${task.id})">Delete</button>
+                    </div>
+                \`;
+            }).join('');
         }
 
-        // Setup event listeners
-        function setupEventListeners() {
-            // Add task form
-            document.getElementById('add-task-form').addEventListener('submit', handleAddTask);
+        async function addTask(event) {
+            event.preventDefault();
             
-            // Filter buttons
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                    e.target.classList.add('active');
-                    currentFilters.status = e.target.dataset.status;
-                    renderTasks();
-                });
-            });
-            
-            // Filter dropdowns
-            document.getElementById('priority-filter').addEventListener('change', (e) => {
-                currentFilters.priority = e.target.value;
-                renderTasks();
-            });
-            
-            document.getElementById('project-filter').addEventListener('change', (e) => {
-                currentFilters.project = e.target.value;
-                renderTasks();
-            });
-        }
-
-        // Handle add task form submission
-        async function handleAddTask(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
+            const formData = new FormData(event.target);
             const taskData = {
                 title: formData.get('title'),
                 description: formData.get('description') || '',
@@ -507,263 +475,122 @@ router.get('/', (c) => {
                 project_id: formData.get('project_id') ? parseInt(formData.get('project_id')) : null,
                 due_date: formData.get('due_date') || null
             };
-            
+
             try {
                 const response = await fetch('/tasks', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(taskData)
                 });
-                
+
                 if (response.ok) {
                     const newTask = await response.json();
-                    tasks.unshift(newTask);
+                    tasks.push(newTask);
                     renderTasks();
-                    e.target.reset();
-                    hideDescription();
-                    hideError();
+                    event.target.reset();
+                    
+                    const descSection = document.getElementById('descriptionSection');
+                    descSection.classList.remove('expanded');
+                    document.querySelector('.description-toggle').textContent = '+ Description';
                 } else {
                     const error = await response.json();
-                    showError(error.error || 'Failed to create task');
+                    alert('Failed to add task: ' + error.error);
                 }
             } catch (error) {
-                showError('Failed to create task: ' + error.message);
+                console.error('Failed to add task:', error);
+                alert('Failed to add task');
             }
         }
 
-        // Toggle task completion
-        async function toggleTaskCompletion(taskId, completed) {
+        async function toggleTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
             try {
-                const response = await fetch('/tasks/' + taskId, {
+                const response = await fetch(\`/tasks/\${taskId}\`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ completed })
+                    body: JSON.stringify({ completed: !task.completed })
                 });
-                
+
                 if (response.ok) {
                     const updatedTask = await response.json();
                     const index = tasks.findIndex(t => t.id === taskId);
-                    if (index !== -1) {
-                        tasks[index] = updatedTask;
-                        renderTasks();
-                    }
+                    tasks[index] = updatedTask;
+                    renderTasks();
                 } else {
-                    showError('Failed to update task');
+                    alert('Failed to update task');
                 }
             } catch (error) {
-                showError('Failed to update task: ' + error.message);
+                console.error('Failed to toggle task:', error);
+                alert('Failed to update task');
             }
         }
 
-        // Delete task
         async function deleteTask(taskId) {
             if (!confirm('Are you sure you want to delete this task?')) return;
-            
+
             try {
-                const response = await fetch('/tasks/' + taskId, {
+                const response = await fetch(\`/tasks/\${taskId}\`, {
                     method: 'DELETE'
                 });
-                
+
                 if (response.ok) {
                     tasks = tasks.filter(t => t.id !== taskId);
                     renderTasks();
                 } else {
-                    showError('Failed to delete task');
+                    alert('Failed to delete task');
                 }
             } catch (error) {
-                showError('Failed to delete task: ' + error.message);
+                console.error('Failed to delete task:', error);
+                alert('Failed to delete task');
             }
         }
 
-        // Edit task title inline
-        async function editTaskTitle(taskId, newTitle) {
-            if (!newTitle.trim()) return;
-            
-            try {
-                const response = await fetch('/tasks/' + taskId, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: newTitle.trim() })
-                });
-                
-                if (response.ok) {
-                    const updatedTask = await response.json();
-                    const index = tasks.findIndex(t => t.id === taskId);
-                    if (index !== -1) {
-                        tasks[index] = updatedTask;
-                        renderTasks();
-                    }
-                } else {
-                    showError('Failed to update task');
-                }
-            } catch (error) {
-                showError('Failed to update task: ' + error.message);
-            }
-        }
-
-        // Filter tasks based on current filters
-        function getFilteredTasks() {
-            return tasks.filter(task => {
-                // Status filter
-                if (currentFilters.status === 'active' && task.completed) return false;
-                if (currentFilters.status === 'completed' && !task.completed) return false;
-                
-                // Priority filter
-                if (currentFilters.priority && task.priority !== currentFilters.priority) return false;
-                
-                // Project filter
-                if (currentFilters.project) {
-                    if (currentFilters.project === 'null' && task.project_id !== null) return false;
-                    if (currentFilters.project !== 'null' && task.project_id !== parseInt(currentFilters.project)) return false;
-                }
-                
-                return true;
-            });
-        }
-
-        // Render tasks
-        function renderTasks() {
-            const taskList = document.getElementById('task-list');
-            const filteredTasks = getFilteredTasks();
-            
-            if (filteredTasks.length === 0) {
-                taskList.innerHTML = '<div class="empty-state">No tasks found</div>';
-                return;
-            }
-            
-            // Sort tasks: incomplete first, then by priority, then by due date
-            const sortedTasks = filteredTasks.sort((a, b) => {
-                if (a.completed !== b.completed) return a.completed ? 1 : -1;
-                
-                const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 };
-                const aPriority = priorityOrder[a.priority] ?? 2;
-                const bPriority = priorityOrder[b.priority] ?? 2;
-                if (aPriority !== bPriority) return aPriority - bPriority;
-                
-                if (a.due_date && b.due_date) {
-                    return new Date(a.due_date) - new Date(b.due_date);
-                }
-                if (a.due_date) return -1;
-                if (b.due_date) return 1;
-                
-                return new Date(b.created_at) - new Date(a.created_at);
-            });
-            
-            taskList.innerHTML = sortedTasks.map(task => renderTask(task)).join('');
-        }
-
-        // Render individual task
-        function renderTask(task) {
-            const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !task.completed;
-            const project = projects.find(p => p.id === task.project_id);
-            
-            return '<div class="task-item ' + (task.completed ? 'completed' : '') + ' ' + (isOverdue ? 'overdue' : '') + '" data-task-id="' + task.id + '">' +
-                '<div class="task-header">' +
-                    '<input type="checkbox" class="task-checkbox" ' + (task.completed ? 'checked' : '') + ' onchange="toggleTaskCompletion(' + task.id + ', this.checked)">' +
-                    '<span class="task-title" onclick="startEditTitle(' + task.id + ')">' + escapeHtml(task.title) + '</span>' +
-                    '<input type="text" class="task-title-input" value="' + escapeHtml(task.title) + '" onblur="finishEditTitle(' + task.id + ', this.value)" onkeydown="handleTitleKeydown(event, ' + task.id + ', this.value)">' +
-                    '<span class="priority-badge priority-' + task.priority + '">' + task.priority + '</span>' +
-                '</div>' +
-                '<div class="task-meta">' +
-                    (project ? '<span class="project-name">' + escapeHtml(project.name) + '</span>' : '<span class="project-name">Inbox</span>') +
-                    (task.due_date ? '<span class="due-date ' + (isOverdue ? 'overdue' : '') + '">Due: ' + formatDate(task.due_date) + '</span>' : '') +
-                '</div>' +
-                '<button class="delete-btn" onclick="deleteTask(' + task.id + ')">Delete</button>' +
-            '</div>';
-        }
-
-        // Start editing task title
-        function startEditTitle(taskId) {
-            const taskItem = document.querySelector('[data-task-id="' + taskId + '"]');
-            const titleSpan = taskItem.querySelector('.task-title');
-            const titleInput = taskItem.querySelector('.task-title-input');
-            
-            titleSpan.classList.add('editing');
-            titleInput.classList.add('editing');
-            titleInput.focus();
-            titleInput.select();
-        }
-
-        // Finish editing task title
-        function finishEditTitle(taskId, newTitle) {
-            const taskItem = document.querySelector('[data-task-id="' + taskId + '"]');
-            const titleSpan = taskItem.querySelector('.task-title');
-            const titleInput = taskItem.querySelector('.task-title-input');
-            
-            titleSpan.classList.remove('editing');
-            titleInput.classList.remove('editing');
-            
-            const currentTask = tasks.find(t => t.id === taskId);
-            if (newTitle.trim() && newTitle.trim() !== currentTask.title) {
-                editTaskTitle(taskId, newTitle);
-            }
-        }
-
-        // Handle keydown in title input
-        function handleTitleKeydown(event, taskId, newTitle) {
-            if (event.key === 'Enter') {
-                event.target.blur();
-            } else if (event.key === 'Escape') {
-                const currentTask = tasks.find(t => t.id === taskId);
-                event.target.value = currentTask.title;
-                event.target.blur();
-            }
-        }
-
-        // Toggle description section
         function toggleDescription() {
-            const section = document.getElementById('description-section');
+            const section = document.getElementById('descriptionSection');
             const toggle = document.querySelector('.description-toggle');
             
             if (section.classList.contains('expanded')) {
-                hideDescription();
+                section.classList.remove('expanded');
+                toggle.textContent = '+ Description';
             } else {
                 section.classList.add('expanded');
-                toggle.textContent = '- Hide Description';
+                toggle.textContent = '- Description';
             }
         }
 
-        // Hide description section
-        function hideDescription() {
-            const section = document.getElementById('description-section');
-            const toggle = document.querySelector('.description-toggle');
-            
-            section.classList.remove('expanded');
-            toggle.textContent = '+ Add Description';
+        function setupFilters() {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFilters.status = btn.dataset.status;
+                    renderTasks();
+                });
+            });
+
+            document.getElementById('priorityFilter').addEventListener('change', (e) => {
+                currentFilters.priority = e.target.value;
+                renderTasks();
+            });
+
+            document.getElementById('projectFilter').addEventListener('change', (e) => {
+                currentFilters.project_id = e.target.value;
+                renderTasks();
+            });
         }
 
-        // Show error message
-        function showError(message) {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        // Hide error message
-        function hideError() {
-            document.getElementById('error-message').style.display = 'none';
-        }
-
-        // Utility functions
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-
-        // Initialize the app when page loads
-        document.addEventListener('DOMContentLoaded', init);
+        document.getElementById('addTaskForm').addEventListener('submit', addTask);
+        setupFilters();
+        loadProjects().then(() => loadTasks());
     </script>
 </body>
 </html>
   `);
 });
 
+/** @internal Phoenix VCS traceability — do not remove. */
 
 
 export default router;

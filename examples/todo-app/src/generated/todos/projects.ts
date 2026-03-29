@@ -15,7 +15,7 @@ registerMigration('projects', `
   )
 `);
 
-// ─── Schemas ─────────────────────────────────────────────────────────────────
+// ─── Schemas ────────────────────────────────────────────────────────────────
 
 const CreateProjectSchema = z.object({
   name: z.string().min(1).max(200),
@@ -27,7 +27,7 @@ const UpdateProjectSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
+// ─── Routes ─────────────────────────────────────────────────────────────────
 
 const router = new Hono();
 
@@ -51,7 +51,7 @@ router.get('/:id', (c) => {
       COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count
     FROM projects 
     LEFT JOIN tasks ON projects.id = tasks.project_id 
-    WHERE projects.id = ? 
+    WHERE projects.id = ?
     GROUP BY projects.id
   `).get(c.req.param('id'));
   if (!project) return c.json({ error: 'Not found' }, 404);
@@ -70,7 +70,7 @@ router.post('/', async (c) => {
       COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count
     FROM projects 
     LEFT JOIN tasks ON projects.id = tasks.project_id 
-    WHERE projects.id = ? 
+    WHERE projects.id = ?
     GROUP BY projects.id
   `).get(info.lastInsertRowid);
   return c.json(project, 201);
@@ -91,7 +91,7 @@ router.patch('/:id', async (c) => {
       COUNT(CASE WHEN tasks.completed = 0 THEN 1 END) as active_task_count
     FROM projects 
     LEFT JOIN tasks ON projects.id = tasks.project_id 
-    WHERE projects.id = ? 
+    WHERE projects.id = ?
     GROUP BY projects.id
   `).get(id);
   return c.json(project);
@@ -120,7 +120,7 @@ export default router;
 
 /** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
-  iu_id: '4144f40fc7c93037f0d2e7445ad0d5911b755792604940786e5ea04a654683b6',
+  iu_id: '85a06deb292fbc006424c2365b05d081f4f92fa2581e04a09ee20cb9f7295067',
   name: 'Projects',
   risk_tier: 'high',
   canon_ids: [6 as const],

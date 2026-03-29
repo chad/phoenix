@@ -263,16 +263,17 @@ export const _phoenix = {
   canon_ids: [${iu.source_canon_ids.length} as const],
 } as const;`;
 
-  // Fix SQL double-quote issue: SQLite treats "x" as column name, needs 'x' for strings
-  // Replace double-quoted SQL string literals inside .prepare()/.exec() calls
-  body = body.replace(
-    /(?<=(?:prepare|exec)\s*\([^)]*?)\"(now|urgent|high|normal|low|active|completed|true|false)\"/g,
-    "'$1'"
-  );
-  // Also fix in string template literals used for SQL
+  // Fix SQL double-quote issue globally: SQLite treats "x" as column name, needs 'x'
+  // Replace ALL double-quoted SQL keywords that should be single-quoted
   body = body.replace(/datetime\("now"\)/g, "datetime('now')");
   body = body.replace(/date\("now"\)/g, "date('now')");
   body = body.replace(/WHEN "(\w+)" THEN/g, "WHEN '$1' THEN");
+  body = body.replace(/DEFAULT "([^"]+)"/g, "DEFAULT '$1'");
+  body = body.replace(/< datetime\("now"\)/g, "< datetime('now')");
+  body = body.replace(/< date\("now"\)/g, "< date('now')");
+  // Catch any remaining datetime/date with double quotes
+  body = body.replace(/datetime\s*\(\s*"now"\s*\)/g, "datetime('now')");
+  body = body.replace(/date\s*\(\s*"now"\s*\)/g, "date('now')");
 
   // Assemble: template header + LLM body + exports + metadata
   return `${templateHeader}\n\n${body}\n\nexport default router;\n\n${phoenixMeta}\n`;

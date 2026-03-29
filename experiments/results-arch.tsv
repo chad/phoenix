@@ -12,3 +12,6 @@ timestamp	score	passed	total	failures
 2026-03-29T15:27:25.833Z	0.26	5	19	POST /todos creates todo with category; POST /todos creates todo without category; POST /todos rejects invalid project_id; POST /todos rejects empty title; GET /todos returns todos with project_name; GET /todos/:id returns todo with project_name; PATCH /todos/:id marks completed; GET /todos?completed=1 filters completed; GET /todos?completed=0 filters incomplete; GET /todos?project_id=N filters by category; GET /stats returns counts; GET /stats includes by_category; DELETE /todos/:id returns 204; DELETE /projects/:id with todos returns 400
 2026-03-29T15:36:43.855Z	0.79	15	19	PATCH /todos/:id marks completed; GET /todos?completed=1 filters completed; GET /stats returns counts; GET /stats includes by_category
 2026-03-29T15:43:34.624Z	0.79	15	19	PATCH /todos/:id marks completed; GET /todos?completed=1 filters completed; GET /stats returns counts; GET /stats includes by_category
+2026-03-29T15:51:59.413Z	0.89	17	19	GET /todos?completed=1 filters completed; GET /todos?completed=0 filters incomplete
+2026-03-29T15:57:43.220Z	0.89	17	19	GET /todos?completed=1 filters completed; GET /todos?completed=0 filters incomplete
+2026-03-29T16:03:12.252Z	0.89	17	19	GET /todos?completed=1 filters completed; GET /todos?completed=0 filters incomplete
