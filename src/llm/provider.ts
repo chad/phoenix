@@ -38,4 +38,5 @@ export interface LLMConfig {
 export const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-sonnet-4-20250514',
   openai: 'gpt-4o',
+  'claude-cli': 'sonnet',
 };
