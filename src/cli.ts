@@ -49,7 +49,7 @@ import { runShadowPipeline } from './shadow-pipeline.js';
 import { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
 
 // Scaffold
-import { deriveServices, generateScaffold } from './scaffold.js';
+import { deriveServices, deriveInterfaces, generateScaffold } from './scaffold.js';
 
 // Inspect
 import { collectInspectData, renderInspectHTML, serveInspect } from './inspect.js';
@@ -413,12 +413,15 @@ async function cmdBootstrap(): Promise<void> {
     } catch { /* best effort */ }
   }
 
+  const interfaces = deriveInterfaces(ius, canonNodes);
+
   const regenCtx: RegenContext = {
     llm: llm ?? undefined,
     canonNodes,
     allIUs: ius,
     projectRoot,
     target: arch,
+    interfaces,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
       else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
@@ -445,7 +448,7 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`  ${dim('Scaffold:')} Service wiring + project config`);
   const services = deriveServices(ius);
   const projectName = basename(projectRoot);
-  const scaffold = generateScaffold(services, projectName, arch);
+  const scaffold = generateScaffold(services, projectName, arch, interfaces);
   for (const [filePath, content] of scaffold.files) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
@@ -1066,12 +1069,15 @@ async function cmdRegen(args: string[]): Promise<void> {
     } catch { /* ignore */ }
   }
 
+  const regenInterfaces = deriveInterfaces(ius, canonNodes);
+
   const regenCtx: RegenContext = {
     llm: llm ?? undefined,
     canonNodes,
     allIUs: ius,
     projectRoot,
     target: regenArch,
+    interfaces: regenInterfaces,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
       else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
@@ -1101,8 +1107,9 @@ async function cmdRegen(args: string[]): Promise<void> {
 
   // Re-generate scaffold wiring
   const allIUs = loadIUs(phoenixDir);
+  const allInterfaces = deriveInterfaces(allIUs, canonNodes);
   const services = deriveServices(allIUs);
-  const scaffold = generateScaffold(services, basename(projectRoot));
+  const scaffold = generateScaffold(services, basename(projectRoot), regenArch, allInterfaces);
   for (const [filePath, content] of scaffold.files) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
