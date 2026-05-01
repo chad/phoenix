@@ -10,6 +10,7 @@
  */
 
 import type { ImplementationUnit } from './models/iu.js';
+import type { CanonicalNode } from './models/canonical.js';
 import type { ResolvedTarget } from './models/architecture.js';
 import { sha256 } from './semhash.js';
 
@@ -28,6 +29,65 @@ export interface ServiceDescriptor {
 
 export interface ScaffoldResult {
   files: Map<string, string>;  // path → content
+}
+
+/**
+ * Interface entry — a single source of truth for how an IU is exposed
+ * at the architecture level. Computed by the architecture from the IU plan
+ * and canonical nodes.
+ *
+ * Covers mount paths and resource field descriptions. Full response schemas
+ * (exact field types, validation rules) are not yet included — they are
+ * generated independently per IU and could still diverge.
+ */
+export interface InterfaceEntry {
+  iu_id: string;
+  name: string;
+  mount_path: string;
+  role: 'api' | 'web-ui';
+  /** Resource field description extracted from canonical nodes (e.g., "a name and a color"). */
+  resource_fields: string;
+}
+
+/**
+ * Derive the interface registry from the IU plan and canonical nodes.
+ * This is the single source of truth for mount paths and resource shapes —
+ * both scaffold generation and LLM prompt building must use this.
+ */
+export function deriveInterfaces(
+  ius: ImplementationUnit[],
+  canonNodes?: CanonicalNode[],
+): InterfaceEntry[] {
+  return ius.map(iu => {
+    const lowerName = iu.name.toLowerCase();
+    const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
+    return {
+      iu_id: iu.iu_id,
+      name: iu.name,
+      mount_path: isWebUI ? '' : '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+      role: isWebUI ? 'web-ui' as const : 'api' as const,
+      resource_fields: extractResourceFields(iu, canonNodes),
+    };
+  });
+}
+
+/**
+ * Extract resource field descriptions from canonical nodes for an IU.
+ * Looks for "has/have" statements in CONTEXT/DEFINITION nodes that mention
+ * the IU's resource name (e.g., "a project has a name and a color" for the Projects IU).
+ * Checks both IU-owned nodes and orphan nodes that match by resource name,
+ * since the IU planner may not assign CONTEXT nodes describing resource shape.
+ */
+function extractResourceFields(iu: ImplementationUnit, canonNodes?: CanonicalNode[]): string {
+  if (!canonNodes) return '';
+  // Derive a singular resource name from the IU name: "Projects" → "project", "Tasks" → "task"
+  const resourceName = iu.name.toLowerCase().replace(/s$/, '');
+  const matches = canonNodes.filter(n =>
+    (n.type === 'CONTEXT' || n.type === 'DEFINITION') &&
+    /\bhas\b|\bhave\b/i.test(n.statement) &&
+    n.statement.toLowerCase().includes(resourceName)
+  );
+  return matches.map(n => n.statement).join('; ');
 }
 
 /**
@@ -72,6 +132,7 @@ export function generateScaffold(
   services: ServiceDescriptor[],
   projectName: string = 'phoenix-project',
   target?: ResolvedTarget | null,
+  interfaces?: InterfaceEntry[],
 ): ScaffoldResult {
   const files = new Map<string, string>();
 
@@ -93,12 +154,9 @@ export function generateScaffold(
         const modName = mod.replace('.ts', '').replace(/-/g, '_').replace(/[^a-zA-Z0-9_]/g, '_');
         const importPath = `./generated/${svc.dir}/${mod.replace('.ts', '.js')}`;
         routeImports.push(`import ${modName} from '${importPath}';`);
-        // Derive mount path from IU name: "Todos" → "/todos", "Categories" → "/categories"
-        const iuName = iu?.name ?? mod.replace('.ts', '');
-        const lowerName = iuName.toLowerCase();
-        // Web interface / UI modules mount at root
-        const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
-        const prefix = isWebUI ? '' : '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        // Look up mount path from interface registry (single source of truth)
+        const entry = interfaces?.find(e => e.iu_id === iu?.iu_id);
+        const prefix = entry?.mount_path ?? '';
         routeMounts.push(`mount('${prefix}', ${modName});`);
       }
     }

@@ -19,6 +19,7 @@ import type { IUManifest, RegenMetadata, FileManifestEntry } from './models/mani
 import type { LLMProvider } from './llm/provider.js';
 import { buildPrompt, getSystemPrompt } from './llm/prompt.js';
 import type { ResolvedTarget } from './models/architecture.js';
+import type { InterfaceEntry } from './scaffold.js';
 import { sha256 } from './semhash.js';
 
 const TOOLCHAIN_VERSION = 'phoenix-regen/0.1.0';
@@ -40,6 +41,8 @@ export interface RegenContext {
   projectRoot?: string;
   /** Architecture target (e.g., sqlite-web-api). */
   target?: ResolvedTarget | null;
+  /** Interface registry — shared mount paths for all IUs. */
+  interfaces?: InterfaceEntry[];
   /** Callback for progress reporting. */
   onProgress?: (iu: ImplementationUnit, status: 'start' | 'done' | 'error', message?: string) => void;
 }
@@ -58,7 +61,7 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
     if (ctx?.llm && ctx.canonNodes) {
       ctx.onProgress?.(iu, 'start', `Generating ${iu.name} via ${ctx.llm.name}…`);
       try {
-        content = await generateWithLLM(iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot, ctx.target);
+        content = await generateWithLLM(iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot, ctx.target, ctx.interfaces);
         ctx.onProgress?.(iu, 'done');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -137,15 +140,19 @@ async function generateWithLLM(
   allIUs?: ImplementationUnit[],
   projectRoot?: string,
   target?: ResolvedTarget | null,
+  interfaces?: InterfaceEntry[],
 ): Promise<string> {
-  // Find sibling modules in the same service
+  // Find sibling interface entries in the same service
   const iuDir = iu.output_files[0]?.split('/').slice(0, -1).join('/');
-  const siblings = allIUs
-    ?.filter(other => other.iu_id !== iu.iu_id && other.output_files[0]?.startsWith(iuDir || ''))
-    .map(other => other.name) ?? [];
+  const siblingIUIds = new Set(
+    allIUs
+      ?.filter(other => other.iu_id !== iu.iu_id && other.output_files[0]?.startsWith(iuDir || ''))
+      .map(other => other.iu_id) ?? []
+  );
+  const siblingEntries = interfaces?.filter(e => siblingIUIds.has(e.iu_id)) ?? [];
 
   const systemPrompt = getSystemPrompt(target);
-  const prompt = buildPrompt(iu, canonNodes, siblings, target);
+  const prompt = buildPrompt(iu, canonNodes, siblingEntries, target);
   const template = target?.runtime.moduleTemplate;
 
   let code: string;
@@ -188,6 +195,12 @@ async function generateWithLLM(
         code = cleanCodeResponse(fixResponse);
       }
     }
+  }
+
+  // Repair fetch paths to match the interface registry.
+  // The LLM may use paths like /todos instead of /tasks — the registry is the ground truth.
+  if (interfaces && interfaces.length > 0) {
+    code = repairFetchPaths(code, interfaces);
   }
 
   return code;
@@ -352,6 +365,140 @@ ${errors}
 - Keep all existing exports and the _phoenix metadata constant.
 
 Output the complete fixed TypeScript module now.`;
+}
+
+/**
+ * Repair fetch() paths in generated code to match the interface registry.
+ *
+ * The LLM may invent paths (e.g., /todos instead of /tasks). The interface
+ * registry is the ground truth for mount paths. This scans for fetch('/<path>')
+ * calls and rewrites any that look like a pluralized or synonymous variant of
+ * a registry entry's resource name.
+ */
+function repairFetchPaths(code: string, interfaces: InterfaceEntry[]): string {
+  // Build a map from possible wrong paths to correct mount paths.
+  // For each API entry (e.g., name="Tasks", mount_path="/tasks"),
+  // generate common LLM mistakes: singular, plural, synonyms.
+  const corrections = new Map<string, string>();
+  for (const entry of interfaces) {
+    if (entry.role === 'web-ui' || !entry.mount_path) continue;
+    const name = entry.name.toLowerCase();
+    // The mount path is derived from the IU name, but the LLM might use
+    // the spec's domain language instead. Common patterns:
+    // "Tasks" mounted at /tasks, but LLM writes /todos, /todo, /task
+    // We can't predict all synonyms, but we can detect fetch paths that
+    // don't match ANY registry entry and try to map them.
+    corrections.set(entry.mount_path, entry.mount_path); // identity
+  }
+
+  const validPaths = new Set(interfaces.filter(e => e.role === 'api').map(e => e.mount_path));
+
+  // Find all fetch('/<path>') or fetch("/<path>") or fetch(`/<path>`) calls
+  // and check if the base path matches a valid mount path.
+  code = code.replace(
+    /fetch\(\s*(['"`])(\/.+?)\1/g,
+    (match, quote, fetchPath) => {
+      // Extract the base path: /todos/123 → /todos, /tasks?foo=bar → /tasks
+      const basePath = '/' + fetchPath.slice(1).split(/[/?]/)[0];
+
+      // If it already matches a valid mount path, leave it alone
+      if (validPaths.has(basePath)) return match;
+
+      // Try to find the best matching registry entry by comparing the
+      // fetch path's resource name against registry entry names
+      const fetchResource = basePath.slice(1).toLowerCase(); // "todos"
+      let bestMatch: InterfaceEntry | null = null;
+      let bestScore = 0;
+
+      for (const entry of interfaces) {
+        if (entry.role === 'web-ui' || !entry.mount_path) continue;
+        const entryResource = entry.mount_path.slice(1).toLowerCase(); // "tasks"
+        const entryName = entry.name.toLowerCase(); // "tasks"
+
+        // Score: how similar is the fetch resource to this entry?
+        // Check if they share a common stem or if one contains the other
+        const score = resourceSimilarity(fetchResource, entryResource, entryName);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = entry;
+        }
+      }
+
+      if (bestMatch && bestScore > 0) {
+        const correctedPath = fetchPath.replace(basePath, bestMatch.mount_path);
+        return `fetch(${quote}${correctedPath}${quote}`;
+      }
+
+      return match;
+    }
+  );
+
+  // Also fix template literal fetch paths: fetch(`/todos/${id}`)
+  code = code.replace(
+    /fetch\(\s*`(\/.+?)`/g,
+    (match, fetchPath) => {
+      const firstSegment = fetchPath.slice(1).split(/[/`$?]/)[0];
+      const basePath = '/' + firstSegment;
+
+      if (validPaths.has(basePath)) return match;
+
+      const fetchResource = firstSegment.toLowerCase();
+      let bestMatch: InterfaceEntry | null = null;
+      let bestScore = 0;
+
+      for (const entry of interfaces) {
+        if (entry.role === 'web-ui' || !entry.mount_path) continue;
+        const entryResource = entry.mount_path.slice(1).toLowerCase();
+        const entryName = entry.name.toLowerCase();
+        const score = resourceSimilarity(fetchResource, entryResource, entryName);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = entry;
+        }
+      }
+
+      if (bestMatch && bestScore > 0) {
+        const correctedPath = fetchPath.replace(basePath, bestMatch.mount_path);
+        return `fetch(\`${correctedPath}\``;
+      }
+
+      return match;
+    }
+  );
+
+  return code;
+}
+
+/**
+ * Score how similar a fetch resource name is to a registry entry.
+ * Returns 0 for no match, higher for better matches.
+ */
+function resourceSimilarity(fetchResource: string, entryResource: string, entryName: string): number {
+  // Exact match
+  if (fetchResource === entryResource) return 10;
+
+  // Singular/plural variants: "todo" vs "todos", "task" vs "tasks"
+  const fetchStem = fetchResource.replace(/s$/, '').replace(/ies$/, 'y');
+  const entryStem = entryResource.replace(/s$/, '').replace(/ies$/, 'y');
+  const nameStem = entryName.replace(/s$/, '').replace(/ies$/, 'y');
+
+  if (fetchStem === entryStem) return 8;
+  if (fetchStem === nameStem) return 8;
+
+  // Common synonyms for task-like resources
+  const synonymGroups = [
+    ['task', 'todo', 'item', 'ticket'],
+    ['project', 'workspace', 'board', 'category'],
+    ['user', 'account', 'profile', 'member'],
+  ];
+
+  for (const group of synonymGroups) {
+    const fetchInGroup = group.includes(fetchStem);
+    const entryInGroup = group.includes(entryStem) || group.includes(nameStem);
+    if (fetchInGroup && entryInGroup) return 5;
+  }
+
+  return 0;
 }
 
 /**

@@ -34,7 +34,7 @@ export class ClaudeCliProvider implements LLMProvider {
       encoding: 'utf8',
       input: prompt,
       maxBuffer: 10 * 1024 * 1024, // 10MB
-      timeout: 300_000, // 5 minutes for large generations
+      timeout: 600_000, // 10 minutes for large generations
     });
 
     if (!result || result.trim().length === 0) {

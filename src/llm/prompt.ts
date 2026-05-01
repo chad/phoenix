@@ -8,6 +8,7 @@
 import type { ImplementationUnit } from '../models/iu.js';
 import type { CanonicalNode } from '../models/canonical.js';
 import type { ResolvedTarget } from '../models/architecture.js';
+import type { InterfaceEntry } from '../scaffold.js';
 
 export const SYSTEM_PROMPT = `You are a senior TypeScript engineer generating production-quality module implementations for Phoenix VCS.
 
@@ -61,7 +62,7 @@ ${rt.promptExtension}`;
 export function buildPrompt(
   iu: ImplementationUnit,
   canonNodes: CanonicalNode[],
-  siblingModules?: string[],
+  siblingModules?: InterfaceEntry[],
   target?: ResolvedTarget | null,
 ): string {
   const lines: string[] = [];
@@ -145,21 +146,22 @@ export function buildPrompt(
   lines.push(`## Risk Tier: ${iu.risk_tier}`);
   lines.push('');
 
-  // Context: sibling modules with mount paths for architecture mode
+  // Context: sibling modules with mount paths from the interface registry
   if (siblingModules && siblingModules.length > 0) {
     if (target) {
       lines.push(`## Other API modules (do NOT import them — call their HTTP endpoints from JavaScript):`);
-      for (const m of siblingModules) {
-        const lowerName = m.toLowerCase();
-        const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
-        if (isWebUI) continue; // skip other web modules
-        const mountPath = '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        lines.push(`- "${m}" mounted at ${mountPath} — use fetch('${mountPath}') or fetch('${mountPath}/...') to call it`);
+      for (const entry of siblingModules) {
+        if (entry.role === 'web-ui') continue; // skip other web modules
+        let line = `- "${entry.name}" mounted at ${entry.mount_path} — use fetch('${entry.mount_path}') or fetch('${entry.mount_path}/...') to call it`;
+        if (entry.resource_fields) {
+          line += `. Resource shape: ${entry.resource_fields}`;
+        }
+        lines.push(line);
       }
     } else {
       lines.push(`## Other modules in this service (for context, do NOT import them):`);
-      for (const m of siblingModules) {
-        lines.push(`- ${m}`);
+      for (const entry of siblingModules) {
+        lines.push(`- ${entry.name}`);
       }
     }
     lines.push('');
