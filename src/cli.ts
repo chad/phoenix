@@ -23,24 +23,23 @@ import { diffClauses } from './diff.js';
 
 // Phase B
 import { extractCanonicalNodes, extractCandidates } from './canonicalizer.js';
-import { extractCanonicalNodesLLM } from './canonicalizer-llm.js';
 import { computeWarmHashes } from './warm-hasher.js';
-import { classifyChanges } from './classifier.js';
-import { classifyChangesWithLLM } from './classifier-llm.js';
 import { DRateTracker } from './d-rate.js';
 import { BootstrapStateMachine } from './bootstrap.js';
 
 // Phase C
-import { planIUs } from './iu-planner.js';
-import { generateIU, generateAll } from './regen.js';
 import type { RegenContext } from './regen.js';
 import { detectDrift } from './drift.js';
 import { extractDependencies } from './dep-extractor.js';
 import { validateBoundary } from './boundary-validator.js';
 
 // Phase D
-import { evaluatePolicy, evaluateAllPolicies } from './policy-engine.js';
+import { evaluateAllPolicies } from './policy-engine.js';
 import { computeCascade } from './cascade.js';
+
+// Layered pipeline (canonicalizer, classifier, planner, regenerator, policy)
+import { buildPipeline, loadLayersConfig } from './layers/index.js';
+import type { Pipeline } from './layers/index.js';
 
 // Phase E
 import { runShadowPipeline } from './shadow-pipeline.js';
@@ -321,12 +320,17 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`    ${dim(`Total: ${totalClauses} clauses extracted`)}`);
   console.log();
 
-  // Step 2: Canonicalization
+  // Step 2: Canonicalization (via pluggable layer stack)
   const llmEarly = resolveProvider(phoenixDir);
+  const pipeline = buildPipeline({
+    config: loadLayersConfig(phoenixDir),
+    context: { llm: llmEarly, projectRoot, phoenixDir },
+  });
+  const canonStack = pipeline.stacks.canonicalizer.describe().join(' → ');
   if (llmEarly) {
-    console.log(`  ${dim('Phase B:')} Canonicalization + warm context hashing ${dim(`(LLM: ${llmEarly.name}/${llmEarly.model})`)}`);
+    console.log(`  ${dim('Phase B:')} Canonicalization + warm context hashing ${dim(`(LLM: ${llmEarly.name}/${llmEarly.model}, stack: ${canonStack})`)}`);
   } else {
-    console.log(`  ${dim('Phase B:')} Canonicalization + warm context hashing ${dim('(rule-based)')}`);
+    console.log(`  ${dim('Phase B:')} Canonicalization + warm context hashing ${dim(`(stack: ${canonStack})`)}`);
   }
 
   // Collect all clauses
@@ -336,8 +340,9 @@ async function cmdBootstrap(): Promise<void> {
     allClauses.push(...specStore.getClauses(docId));
   }
 
-  // Extract canonical nodes (LLM-enhanced when available)
-  const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly);
+  // Run the canonicalizer layer stack
+  const canonResult = await pipeline.canonicalize({ clauses: allClauses });
+  const canonNodes = canonResult.nodes;
   canonStore.saveNodes(canonNodes);
   console.log(`    ${green('✔')} ${canonNodes.length} canonical nodes extracted`);
 
@@ -356,9 +361,10 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`    ${green('✔')} System state: ${cyan(machine.getState())}`);
   console.log();
 
-  // Step 3: Plan IUs
-  console.log(`  ${dim('Phase C:')} IU planning`);
-  const ius = planIUs(canonNodes, allClauses);
+  // Step 3: Plan IUs (via pluggable layer stack)
+  const plannerStack = pipeline.stacks.iuPlanner.describe().join(' → ');
+  console.log(`  ${dim('Phase C:')} IU planning ${dim(`(stack: ${plannerStack})`)}`);
+  const ius = await pipeline.planIUs({ canonNodes, clauses: allClauses });
   saveIUs(phoenixDir, ius);
   console.log(`    ${green('✔')} ${ius.length} Implementation Units planned`);
   for (const iu of ius) {
@@ -413,21 +419,19 @@ async function cmdBootstrap(): Promise<void> {
     } catch { /* best effort */ }
   }
 
-  const regenCtx: RegenContext = {
-    llm: llm ?? undefined,
-    canonNodes,
-    allIUs: ius,
-    projectRoot,
-    target: arch,
-    onProgress: (iu, status, msg) => {
-      if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
-      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
-      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
-    },
+  const onProgress = (iu: ImplementationUnit, status: 'start' | 'done' | 'error', msg?: string) => {
+    if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
+    else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
+    else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
   };
 
   const manifestManager = new ManifestManager(phoenixDir);
-  const regenResults = await generateAll(ius, regenCtx);
+  const regenResults = [];
+  for (const iu of ius) {
+    regenResults.push(await pipeline.regenerate({
+      iu, canonNodes, allIUs: ius, target: arch, onProgress,
+    }));
+  }
   for (const result of regenResults) {
     for (const [filePath, content] of result.files) {
       const fullPath = join(projectRoot, filePath);
@@ -973,7 +977,7 @@ function cmdCanon(): void {
   }
 }
 
-function cmdPlan(): void {
+async function cmdPlan(): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const canonStore = new CanonicalStore(phoenixDir);
   const specStore = new SpecStore(phoenixDir);
@@ -992,7 +996,11 @@ function cmdPlan(): void {
     allClauses.push(...specStore.getClauses(docId));
   }
 
-  const ius = planIUs(canonNodes, allClauses);
+  const planPipeline = buildPipeline({
+    config: loadLayersConfig(phoenixDir),
+    context: { llm: resolveProvider(phoenixDir), projectRoot, phoenixDir },
+  });
+  const ius = await planPipeline.planIUs({ canonNodes, clauses: allClauses });
   saveIUs(phoenixDir, ius);
 
   console.log(bold('📦 IU Plan'));
@@ -1066,21 +1074,23 @@ async function cmdRegen(args: string[]): Promise<void> {
     } catch { /* ignore */ }
   }
 
-  const regenCtx: RegenContext = {
-    llm: llm ?? undefined,
-    canonNodes,
-    allIUs: ius,
-    projectRoot,
-    target: regenArch,
-    onProgress: (iu, status, msg) => {
-      if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
-      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
-      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
-    },
+  const regenPipeline = buildPipeline({
+    config: loadLayersConfig(phoenixDir),
+    context: { llm: llm ?? null, projectRoot, phoenixDir },
+  });
+  const onProgress = (iu: ImplementationUnit, status: 'start' | 'done' | 'error', msg?: string) => {
+    if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
+    else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
+    else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
   };
 
   const manifestManager = new ManifestManager(phoenixDir);
-  const results = await generateAll(targetIUs, regenCtx);
+  const results = [];
+  for (const iu of targetIUs) {
+    results.push(await regenPipeline.regenerate({
+      iu, canonNodes, allIUs: ius, target: regenArch, onProgress,
+    }));
+  }
 
   for (const result of results) {
     for (const [filePath, content] of result.files) {
@@ -1179,13 +1189,20 @@ async function cmdCanonicalize(): Promise<void> {
   }
 
   const llm = resolveProvider(phoenixDir);
+  const canonPipeline = buildPipeline({
+    config: loadLayersConfig(phoenixDir),
+    context: { llm, projectRoot, phoenixDir },
+  });
+  const stackDesc = canonPipeline.stacks.canonicalizer.describe().join(' → ');
   console.log(bold('📐 Canonicalization'));
   if (llm) {
     console.log(`  ${dim(`LLM: ${llm.name}/${llm.model}`)}`);
   }
+  console.log(`  ${dim(`Stack: ${stackDesc}`)}`);
   console.log();
 
-  const canonNodes = await extractCanonicalNodesLLM(allClauses, llm);
+  const canonResult = await canonPipeline.canonicalize({ clauses: allClauses });
+  const canonNodes = canonResult.nodes;
   canonStore.saveNodes(canonNodes);
 
   console.log(`  ${green('✔')} ${canonNodes.length} canonical nodes extracted from ${allClauses.length} clauses`);
@@ -1597,7 +1614,7 @@ async function main(): Promise<void> {
       cmdCanon();
       break;
     case 'plan':
-      cmdPlan();
+      await cmdPlan();
       break;
     case 'regen':
     case 'regenerate':

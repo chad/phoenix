@@ -47,7 +47,13 @@ export async function extractCanonicalNodesLLM(
   }
 }
 
-async function normalizeCandidates(
+/**
+ * Normalize a set of candidate statements via LLM.
+ *
+ * Exposed for layered pipelines that want to enhance prior-stage candidates
+ * without re-running extraction. Falls back per-candidate on any LLM failure.
+ */
+export async function normalizeCandidates(
   candidates: CandidateNode[],
   llm: LLMProvider,
   k: number = 1,
@@ -185,10 +191,21 @@ export async function reclassifyCandidatesLLM(
   if (!llm || candidates.length === 0) {
     return resolveGraph(candidates, clauses);
   }
+  const reclassified = await reclassifyCandidates(candidates, llm);
+  return resolveGraph(reclassified, clauses);
+}
 
+/**
+ * Reclassify low-confidence, non-CONTEXT candidates via LLM. Statements are
+ * preserved; only `type` (and `extraction_method`) change. Exposed for layered
+ * pipelines that want a reclassification pass without re-extracting.
+ */
+export async function reclassifyCandidates(
+  candidates: CandidateNode[],
+  llm: LLMProvider,
+): Promise<CandidateNode[]> {
   const reclassified: CandidateNode[] = [];
   for (const c of candidates) {
-    // Only reclassify low-confidence non-CONTEXT nodes
     if (c.type === CanonicalType.CONTEXT || c.confidence > 0.5) {
       reclassified.push(c);
       continue;
@@ -212,8 +229,7 @@ export async function reclassifyCandidatesLLM(
       reclassified.push(c);
     }
   }
-
-  return resolveGraph(reclassified, clauses);
+  return reclassified;
 }
 
 function parseReclassifierResponse(raw: string): CanonicalType | null {
@@ -273,7 +289,11 @@ export async function extractWithLLMFull(
   }
 }
 
-async function extractBatchLLM(
+/**
+ * Run full LLM extraction and return raw candidates (pre-resolution).
+ * Exposed so layered pipelines can chain a resolver or further enhancers.
+ */
+export async function extractBatchLLM(
   clauses: Clause[],
   llm: LLMProvider,
 ): Promise<CandidateNode[]> {

@@ -104,6 +104,26 @@ export { hasRelevantNegativeKnowledge } from './models/negative-knowledge.js';
 export type { AuditResult, AuditDimension, AuditBlocker, ReadinessLevel } from './audit.js';
 export { auditIU, auditAll } from './audit.js';
 
+// Layered pipeline (pluggable, additive layer architecture)
+export type { Layer, LayerContext, LayersConfig, PipelineStacks, BuildPipelineArgs } from './layers/index.js';
+export {
+  LayerStack, LayerRegistry,
+  Pipeline, buildPipeline,
+  defaultLayersConfig, mergeLayersConfig, loadLayersConfig,
+  canonicalizerRegistry, DEFAULT_CANONICALIZER_STACK,
+  classifierRegistry, DEFAULT_CLASSIFIER_STACK,
+  iuPlannerRegistry, DEFAULT_IU_PLANNER_STACK,
+  regeneratorRegistry, DEFAULT_REGENERATOR_STACK,
+  policyRegistry, DEFAULT_POLICY_STACK,
+} from './layers/index.js';
+export type {
+  CanonicalizerInput, CanonicalizerOutput, CanonicalizerLayer,
+  ClassifierInput, ClassifierOutput, ClassifierLayer,
+  IUPlannerInput, IUPlannerOutput, IUPlannerLayer,
+  RegeneratorInput, RegeneratorOutput, RegeneratorLayer,
+  PolicyInput, PolicyOutput, PolicyLayer,
+} from './layers/index.js';
+
 // Stores
 export { ContentStore } from './store/content-store.js';
 export { SpecStore } from './store/spec-store.js';

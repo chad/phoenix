@@ -91,6 +91,14 @@ export async function classifyChangesWithLLM(
   return results;
 }
 
+/**
+ * Ask the LLM to classify a single diff and return only the A/B/C/D verdict.
+ * Exposed for layered pipelines that escalate a specific subset (e.g. only D).
+ */
+export async function resolveDiffWithLLM(diff: ClauseDiff, llm: LLMProvider): Promise<ChangeClass> {
+  return resolveWithLLM(diff, llm);
+}
+
 async function resolveWithLLM(diff: ClauseDiff, llm: LLMProvider): Promise<ChangeClass> {
   const prompt = buildClassifyPrompt(diff);
 
