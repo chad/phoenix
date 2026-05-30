@@ -97,6 +97,8 @@ export interface GenFileInfo {
   /** Actual generated source (embedded; may be truncated). */
   content?: string;
   truncated?: boolean;
+  /** Exact line→canon provenance from generation markers (line index string → canon id). */
+  lineProvenance?: Record<string, string>;
 }
 
 export interface Edge {
@@ -266,6 +268,7 @@ export function collectInspectData(
         driftStatus: drift?.status ?? 'UNKNOWN',
         content,
         truncated,
+        lineProvenance: entry.line_provenance,
       });
     }
   }
@@ -520,6 +523,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13
 .code tr.mapped .gut{color:var(--cyan)}
 .code .ptag{display:inline-block;font-size:9px;padding:0 6px;margin-left:8px;border-radius:3px;border:1px solid var(--border);color:var(--dim);cursor:pointer;vertical-align:middle}
 .code .ptag:hover{border-color:var(--cyan);color:var(--cyan)}
+.code .ptag.exact{border-color:var(--green);color:var(--green)}
+.code .ptag.exact:hover{border-color:var(--green);color:var(--green)}
+.provnote .sw.on{background:rgba(74,222,128,.18);border-color:var(--green)}
 .code .pmeta{color:#5a7a3e}
 .code .pkw{color:var(--purple)}
 .code .pstr{color:#8bd47a}
@@ -784,18 +790,27 @@ function fileSource(f,iu){
     (iu&&iu.regenMeta?'<span class="kv">model <b>'+E(iu.regenMeta.model_id)+'</b></span><span class="kv">promptpack <b>'+E((iu.regenMeta.promptpack_hash||'').slice(0,10))+'</b></span>':'')+
     (iu&&iu.readiness?'<span class="kv">readiness <b class="rd-'+iu.readiness+'">'+(RD_ICON[iu.readiness]||'')+' '+E(iu.readiness)+'</b></span>':'')+
     '</div>';
-  // inferred provenance: code line → best canon node (by term overlap)
-  const canon=iu?D.canonNodes.filter(n=>{return lineage('iu:'+iu.id).has('canon:'+n.id)&&['REQUIREMENT','CONSTRAINT','INVARIANT'].includes(n.type)}):[];
-  const map=inferProvenance(f.content,canon);
+  // provenance: exact from generation markers when present, else inferred by term overlap
+  let map={},exact=false;
+  if(f.lineProvenance&&Object.keys(f.lineProvenance).length){
+    exact=true;
+    for(const k in f.lineProvenance){const it=items['canon:'+f.lineProvenance[k]];if(it)map[+k]={id:f.lineProvenance[k],type:it.d.type,statement:it.d.statement}}
+  }else{
+    const canon=iu?D.canonNodes.filter(n=>lineage('iu:'+iu.id).has('canon:'+n.id)&&['REQUIREMENT','CONSTRAINT','INVARIANT'].includes(n.type)):[];
+    map=inferProvenance(f.content,canon);
+  }
+  const hasMap=Object.keys(map).length>0;
   const lines=f.content.split('\n');
   let rows='';
   lines.forEach((ln,i)=>{
     const m=map[i];
-    const tag=m?'<span class="ptag" data-c="canon:'+E(m.id)+'" title="'+E(m.statement)+'">◄ '+m.type.slice(0,3)+'</span>':'';
+    const tag=m?'<span class="ptag'+(exact?' exact':'')+'" data-c="canon:'+E(m.id)+'" title="'+E(m.statement)+'">◄ '+m.type.slice(0,3)+'</span>':'';
     rows+='<tr class="'+(m?'mapped':'')+'"><td class="gut">'+(i+1)+'</td><td class="ln">'+hi(ln)+tag+'</td></tr>';
   });
-  const note='<div class="provnote"><span class="sw"></span> highlighted lines are an <b style="color:var(--cyan);font-weight:600;margin:0 3px">inferred</b> mapping to the canon node they most likely implement (term overlap). Click a ◄ tag to inspect that requirement.</div>';
-  return meta+(canon.length?note:'')+'<div class="code"><table>'+rows+'</table></div>'+(f.truncated?'<div class="provnote">⚠ source truncated at size cap.</div>':'');
+  const note=exact
+    ?'<div class="provnote"><span class="sw on"></span> highlighted lines are <b style="color:var(--green);font-weight:600;margin:0 3px">traced</b> from generation markers — exact line→requirement provenance. Click a ◄ tag to inspect that requirement.</div>'
+    :'<div class="provnote"><span class="sw"></span> highlighted lines are an <b style="color:var(--cyan);font-weight:600;margin:0 3px">inferred</b> mapping to the canon node they most likely implement (term overlap). Click a ◄ tag to inspect that requirement.</div>';
+  return meta+(hasMap?note:'')+'<div class="code"><table>'+rows+'</table></div>'+(f.truncated?'<div class="provnote">⚠ source truncated at size cap.</div>':'');
 }
 function wireSource(){
   document.querySelectorAll('#tabbody .filepick button[data-f]').forEach(b=>b.addEventListener('click',()=>{curFile=b.dataset.f;renderTab()}));

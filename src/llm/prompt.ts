@@ -57,6 +57,55 @@ ${rt.promptExtension}`;
 }
 
 /**
+ * A provenance label binds a short, prompt-stable token (R1, C1, I1) to a canon
+ * node so the model can cite which requirement a generated line implements
+ * without copying long content-addressed ids. Same function drives prompt
+ * rendering and post-generation marker extraction so the labels always match.
+ */
+export interface ProvenanceLabel {
+  label: string;
+  canonId: string;
+  type: string;
+  statement: string;
+}
+
+export function provenanceLabels(iu: ImplementationUnit, canonNodes: CanonicalNode[]): ProvenanceLabel[] {
+  const nodes = canonNodes.filter(n => iu.source_canon_ids.includes(n.canon_id));
+  const out: ProvenanceLabel[] = [];
+  let r = 0, c = 0, inv = 0;
+  for (const n of nodes) {
+    if (n.type === 'REQUIREMENT') out.push({ label: `R${++r}`, canonId: n.canon_id, type: n.type, statement: n.statement });
+    else if (n.type === 'CONSTRAINT') out.push({ label: `C${++c}`, canonId: n.canon_id, type: n.type, statement: n.statement });
+    else if (n.type === 'INVARIANT') out.push({ label: `I${++inv}`, canonId: n.canon_id, type: n.type, statement: n.statement });
+  }
+  return out;
+}
+
+/**
+ * Extract `//phx:<label>` markers the model emitted, mapping each annotated line
+ * (0-based index) to its canon id, and return the code with the markers stripped
+ * so the written source stays clean. Stripping the trailing marker does not shift
+ * line numbers, so the indices stay valid against the cleaned code.
+ */
+export function extractLineProvenance(
+  code: string,
+  labels: ProvenanceLabel[],
+): { code: string; lineProvenance: Record<string, string> } {
+  const byLabel: Record<string, string> = {};
+  for (const l of labels) byLabel[l.label.toUpperCase()] = l.canonId;
+  const re = /\s*\/\/\s*phx:\s*([A-Za-z]\d+)\s*$/;
+  const lineProvenance: Record<string, string> = {};
+  const out = code.split('\n').map((line, i) => {
+    const m = line.match(re);
+    if (!m) return line;
+    const canonId = byLabel[m[1].toUpperCase()];
+    if (canonId) lineProvenance[String(i)] = canonId;
+    return line.slice(0, m.index).replace(/\s+$/, '');
+  });
+  return { code: out.join('\n'), lineProvenance };
+}
+
+/**
  * Build the user prompt for generating an IU implementation.
  */
 export function buildPrompt(
@@ -67,6 +116,10 @@ export function buildPrompt(
   negativeKnowledge?: NegativeKnowledge[],
 ): string {
   const lines: string[] = [];
+  const labels = provenanceLabels(iu, canonNodes);
+  const labelOf: Record<string, string> = {};
+  for (const l of labels) labelOf[l.canonId] = l.label;
+  const lab = (canonId: string) => (labelOf[canonId] ? `[${labelOf[canonId]}] ` : '');
 
   lines.push(`Generate a TypeScript module implementing "${iu.name}".`);
   lines.push('');
@@ -108,7 +161,7 @@ export function buildPrompt(
   if (requirements.length > 0) {
     lines.push('## Requirements');
     for (const r of requirements) {
-      lines.push(`- ${r.statement}`);
+      lines.push(`- ${lab(r.canon_id)}${r.statement}`);
     }
     lines.push('');
   }
@@ -116,7 +169,7 @@ export function buildPrompt(
   if (constraints.length > 0) {
     lines.push('## Constraints');
     for (const c of constraints) {
-      lines.push(`- ${c.statement}`);
+      lines.push(`- ${lab(c.canon_id)}${c.statement}`);
     }
     lines.push('');
   }
@@ -124,7 +177,7 @@ export function buildPrompt(
   if (invariants.length > 0) {
     lines.push('## Invariants');
     for (const inv of invariants) {
-      lines.push(`- ${inv.statement}`);
+      lines.push(`- ${lab(inv.canon_id)}${inv.statement}`);
     }
     lines.push('');
   }
@@ -179,6 +232,16 @@ export function buildPrompt(
         lines.push(`- ${m}`);
       }
     }
+    lines.push('');
+  }
+
+  // Provenance annotations — let the model cite which requirement each line implements
+  if (labels.length > 0) {
+    lines.push('## Provenance annotations (required)');
+    lines.push('The requirements/constraints/invariants above are tagged with short labels in [brackets], e.g. [R1], [C1], [I1].');
+    lines.push('When a line of code implements one of them, append a marker comment at the END of that line: //phx:<label>');
+    lines.push("Example:  router.post('/login', login);  //phx:R1");
+    lines.push('Use the single most specific label. Add nothing for lines that map to no requirement. Never put the marker on its own line.');
     lines.push('');
   }
 

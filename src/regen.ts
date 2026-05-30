@@ -18,7 +18,7 @@ import type { CanonicalNode } from './models/canonical.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { IUManifest, RegenMetadata, FileManifestEntry } from './models/manifest.js';
 import type { LLMProvider } from './llm/provider.js';
-import { buildPrompt, getSystemPrompt } from './llm/prompt.js';
+import { buildPrompt, getSystemPrompt, provenanceLabels, extractLineProvenance } from './llm/prompt.js';
 import type { ResolvedTarget } from './models/architecture.js';
 import { sha256 } from './semhash.js';
 
@@ -65,6 +65,7 @@ export interface RegenContext {
  */
 export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Promise<RegenResult> {
   const files = new Map<string, string>();
+  const provByPath = new Map<string, Record<string, string>>();
   const modelId = ctx?.llm ? `${ctx.llm.name}/${ctx.llm.model}` : 'stub-generator/1.0';
   const promptpackHash = sha256(JSON.stringify(iu.contract));
   const iuNegativeKnowledge = ctx?.negativeKnowledge?.get(iu.iu_id) ?? [];
@@ -79,6 +80,9 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
           iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot, ctx.target, iuNegativeKnowledge,
         );
         content = gen.code;
+        if (gen.lineProvenance && Object.keys(gen.lineProvenance).length) {
+          provByPath.set(outputPath, gen.lineProvenance);
+        }
         if (gen.typecheckError) {
           // Code was usable enough to keep, but never fully typechecked.
           // Capture as negative knowledge so the next cycle is warned. (Gate 2.)
@@ -117,6 +121,8 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
       content_hash: sha256(content),
       size: content.length,
     };
+    const prov = provByPath.get(path);
+    if (prov) fileEntries[path].line_provenance = prov;
   }
 
   const now = new Date().toISOString();
@@ -169,6 +175,8 @@ interface LLMGenerationResult {
   code: string;
   /** Remaining typecheck errors after retries, if the code never went clean. */
   typecheckError?: string;
+  /** Exact line→canon provenance extracted from //phx: markers (0-based line index → canon id). */
+  lineProvenance?: Record<string, string>;
 }
 
 async function generateWithLLM(
@@ -235,7 +243,12 @@ async function generateWithLLM(
     typecheckError = errors ?? undefined;
   }
 
-  return { code, typecheckError };
+  // Extract exact line→canon provenance from the model's //phx: markers and
+  // strip the markers so the written source stays clean.
+  const labels = provenanceLabels(iu, canonNodes);
+  const extracted = extractLineProvenance(code, labels);
+
+  return { code: extracted.code, typecheckError, lineProvenance: extracted.lineProvenance };
 }
 
 /** First non-empty line of a (possibly multi-line) message, trimmed for logging. */
@@ -401,6 +414,7 @@ ${errors}
 - For DOM/browser code, use string HTML templates — no DOM APIs.
 - The code must compile under strict mode.
 - Keep all existing exports and the _phoenix metadata constant.
+- Keep any //phx:<label> provenance marker comments exactly where they are.
 
 Output the complete fixed TypeScript module now.`;
 }

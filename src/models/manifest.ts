@@ -6,6 +6,12 @@ export interface FileManifestEntry {
   path: string;
   content_hash: string;
   size: number;
+  /**
+   * Exact line→canon provenance captured from the model's //phx: markers at
+   * generation time (0-based line index, as a string key → canon id). Absent for
+   * stub-generated or un-annotated files; the inspector falls back to inference.
+   */
+  line_provenance?: Record<string, string>;
 }
 
 export interface RegenMetadata {
