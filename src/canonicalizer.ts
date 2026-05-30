@@ -16,6 +16,7 @@ import { normalizeText } from './normalizer.js';
 import { segmentSentences } from './sentence-segmenter.js';
 import { resolveGraph } from './resolution.js';
 import { CONFIG } from './experiment-config.js';
+import { classifySignal, stripLeadingNoise } from './signal-classifier.js';
 
 // ─── Domain term whitelist (short tokens to keep) ────────────────────────────
 
@@ -46,8 +47,10 @@ function emptyScores(): TypeScores {
   };
 }
 
-/** Score a sentence across all types; highest score wins */
-function scoreSentence(text: string, headingContext: CanonicalType | null): { type: CanonicalType; confidence: number } {
+/** Score a sentence across all types; highest score wins.
+ * Scores from the statement's own content only — document structure (the heading
+ * it happened to fall under) must not change a statement's semantic type. */
+function scoreSentence(text: string): { type: CanonicalType; confidence: number } {
   const scores = emptyScores();
   const lower = text.toLowerCase();
 
@@ -97,11 +100,6 @@ function scoreSentence(text: string, headingContext: CanonicalType | null): { ty
     scores[CanonicalType.CONTEXT] += CONFIG.CONTEXT_SHORT_WEIGHT;
   }
 
-  // ── Heading context bonus ──
-  if (headingContext) {
-    scores[headingContext] += CONFIG.HEADING_CONTEXT_BONUS;
-  }
-
   // ── Also give constraint "must" credit since "must" appears in constraints too ──
   if (/\b(?:must|shall)\b/i.test(text)) {
     scores[CanonicalType.CONSTRAINT] += CONFIG.CONSTRAINT_MUST_BONUS;
@@ -130,23 +128,10 @@ function hasAnyKeyword(lower: string): boolean {
   return /\b(?:support|provide|implement|enable|allow|accept|return|create|delete|update|send|receive|handle|manage|track|store|validate|generate|defined|means|refers)\b/.test(lower);
 }
 
-// ─── Heading context (same as v1) ────────────────────────────────────────────
-
-const HEADING_CONTEXT: [RegExp, CanonicalType][] = [
-  [/\b(?:constraint|security|limit|restrict)/i, CanonicalType.CONSTRAINT],
-  [/\b(?:requirement|feature|capability)/i, CanonicalType.REQUIREMENT],
-  [/\b(?:definition|glossary|term)/i, CanonicalType.DEFINITION],
-  [/\b(?:invariant|guarantee)/i, CanonicalType.INVARIANT],
-];
-
-function getHeadingContext(sectionPath: string[]): CanonicalType | null {
-  for (let i = sectionPath.length - 1; i >= 0; i--) {
-    for (const [pattern, type] of HEADING_CONTEXT) {
-      if (pattern.test(sectionPath[i])) return type;
-    }
-  }
-  return null;
-}
+// Note: a previous version biased a sentence's type by the markdown heading it fell
+// under (getHeadingContext + HEADING_CONTEXT_BONUS). That coupled semantics to
+// document structure and is removed — a statement's type now derives from its own
+// content. The heading survives only as provenance on the clause.
 
 // ─── Phase 1: Extract candidates ─────────────────────────────────────────────
 
@@ -174,16 +159,26 @@ export function extractCandidates(clauses: Clause[]): ExtractionResult {
 
 function extractFromClause(clause: Clause): { candidates: CandidateNode[]; coverage: ExtractionCoverage } {
   const sentences = segmentSentences(clause.raw_text);
-  const headingContext = getHeadingContext(clause.section_path);
   const candidates: CandidateNode[] = [];
   let extractedCount = 0;
   let contextCount = 0;
   const uncovered: ExtractionCoverage['uncovered'] = [];
 
   for (const sentence of sentences) {
-    const content = sentence.text.trim();
+    // Strip leading noise (speaker label, "<chatter> — <requirement>" lead-in,
+    // filler prefix) so it never leaks into the canonical statement — it survives
+    // only as provenance via the source clause.
+    const content = stripLeadingNoise(sentence.text.trim());
     if (!content || content.length < CONFIG.MIN_EXTRACTION_LENGTH) {
       uncovered.push({ text: content, reason: 'too_short' });
+      continue;
+    }
+
+    // Signal gate — ignore noise (greetings, speaker labels, agenda/process talk,
+    // questions, filler) so unstructured input like meeting notes doesn't pollute
+    // the canonical graph. Conservative: only confident noise is dropped.
+    if (!classifySignal(content).signal) {
+      uncovered.push({ text: content, reason: 'meta_text' });
       continue;
     }
 
@@ -193,7 +188,7 @@ function extractFromClause(clause: Clause): { candidates: CandidateNode[]; cover
       continue;
     }
 
-    const { type, confidence } = scoreSentence(content, headingContext);
+    const { type, confidence } = scoreSentence(content);
     const tags = extractTerms(normalizedStatement);
 
     const candidateId = sha256([type, normalizedStatement, clause.clause_id].join('\x00'));

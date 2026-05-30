@@ -74,7 +74,18 @@ export function segmentSentences(rawText: string): Sentence[] {
         }
       }
     } else {
-      // Prose line — accumulate
+      // Prose line. In unstructured input (notes, chat) each line is usually its
+      // own statement; only join when the line is a soft-wrap continuation of an
+      // unfinished sentence (previous buffer didn't end in .!? and this line starts
+      // lowercase). Otherwise flush the buffer so lines don't bleed together.
+      const isContinuation = proseBuffer.length > 0
+        && !/[.!?]$/.test(proseBuffer)
+        && /^[a-z]/.test(trimmed);
+      if (proseBuffer && !isContinuation) {
+        flushProse(proseBuffer, sentences, idx);
+        idx = sentences.length;
+        proseBuffer = '';
+      }
       proseBuffer += (proseBuffer ? ' ' : '') + trimmed;
     }
   }
