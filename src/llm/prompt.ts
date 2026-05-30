@@ -93,10 +93,11 @@ export function extractLineProvenance(
 ): { code: string; lineProvenance: Record<string, string> } {
   const byLabel: Record<string, string> = {};
   for (const l of labels) byLabel[l.label.toUpperCase()] = l.canonId;
-  // One marker may cite several labels (e.g. //phx:C1,C2 or //phx:R1 R2). Match the
-  // whole list, strip it, and record the first resolvable label as the line's primary
-  // provenance (the gutter shows one tag per line).
-  const re = /\s*\/\/\s*phx:\s*([A-Za-z]\d+(?:[\s,]+[A-Za-z]\d+)*)\s*$/;
+  // One marker may cite several labels (e.g. //phx:C1,C2 or //phx:R1 R2) and may be
+  // written as a line comment (//phx:R1) or a block comment (/*phx:R1*/) — the model
+  // uses block style inside template literals. Match the whole list, strip it, and
+  // record the first resolvable label as the line's primary provenance.
+  const re = /\s*(?:\/\/|\/\*)\s*phx:\s*([A-Za-z]\d+(?:[\s,]+[A-Za-z]\d+)*)\s*(?:\*\/)?\s*$/;
   const lineProvenance: Record<string, string> = {};
   const out = code.split('\n').map((line, i) => {
     const m = line.match(re);

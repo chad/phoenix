@@ -205,7 +205,7 @@ async function generateWithLLM(
     const raw = await llm.generate(prompt, {
       system: systemPrompt,
       temperature: 0.1, // lower temp for more deterministic section filling
-      maxTokens: 8192,
+      maxTokens: 16384,
     });
 
     code = assembleFromTemplate(template, raw, iu);
@@ -214,7 +214,7 @@ async function generateWithLLM(
     code = cleanCodeResponse(await llm.generate(prompt, {
       system: systemPrompt,
       temperature: 0.2,
-      maxTokens: 8192,
+      maxTokens: 16384,
     }));
   }
 
@@ -229,7 +229,7 @@ async function generateWithLLM(
       const fixResponse = await llm.generate(fixPrompt, {
         system: systemPrompt,
         temperature: 0.1,
-        maxTokens: 8192,
+        maxTokens: 16384,
       });
 
       if (template) {
@@ -312,6 +312,9 @@ function assembleFromTemplate(template: string, llmResponse: string, iu: Impleme
   // Remove any existing _phoenix export
   body = body.replace(/\/\*\*[^]*?_phoenix[^]*?\*\/\s*export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
   body = body.replace(/export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
+  // Remove any orphan traceability comment lines the LLM echoed without the export
+  // (otherwise stripping the export above leaves duplicate "@internal" comments).
+  body = body.replace(/\/\*\* @internal Phoenix VCS traceability[^]*?\*\/\s*/g, '');
 
   // Ensure router declaration exists
   if (!body.includes('const router') && !body.includes('new Hono()')) {

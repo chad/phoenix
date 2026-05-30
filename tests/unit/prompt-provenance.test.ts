@@ -97,6 +97,13 @@ describe('extractLineProvenance', () => {
     expect(r.code).toBe('title: z.string().min(1).max(200),');
   });
 
+  it('handles block-comment markers the model uses inside template literals', () => {
+    const code = 'return c.html(`<div>...</div>`); /*phx:R1*/';
+    const r = extractLineProvenance(code, labels);
+    expect(r.lineProvenance).toEqual({ '0': 'c-req-1' });
+    expect(r.code).toBe('return c.html(`<div>...</div>`);');
+  });
+
   it('ignores unknown labels but still strips the marker', () => {
     const r = extractLineProvenance('foo(); //phx:R9', labels);
     expect(r.lineProvenance).toEqual({});
