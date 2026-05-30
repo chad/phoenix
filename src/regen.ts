@@ -11,6 +11,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import vm from 'node:vm';
 import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
@@ -308,7 +309,7 @@ async function generateWithLLM(
       } else {
         code = cleanCodeResponse(fixResponse);
       }
-      errors = typecheckFile(projectRoot, iu.output_files[0], code);
+      errors = typecheckFile(projectRoot, iu.output_files[0], code) || validateInlineScripts(code);
       attempt++;
     }
     typecheckError = errors ?? undefined;
@@ -465,6 +466,37 @@ function typecheckFile(projectRoot: string, filePath: string, content: string): 
       .trim();
     return fileErrors || output.trim();
   }
+}
+
+/**
+ * Validate inline <script> blocks the module emits inside c.html(`...`).
+ *
+ * TypeScript treats the whole HTML page as a template-literal string, so tsc never
+ * parses the JavaScript inside <script> — a browser-fatal syntax error (e.g. nested
+ * quotes in an inline onclick handler) passes typecheck but blanks the page. This
+ * parses each inline script the way a browser would, making browser-JS syntax a
+ * first-class generation gate alongside typecheck. vm.Script only parses; it never
+ * runs the code, so browser globals (document, fetch, …) are irrelevant.
+ */
+export function validateInlineScripts(code: string): string | null {
+  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const body = m[1];
+    if (!body.trim()) continue;
+    try {
+      new vm.Script(body);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return `Inline <script> has a browser JavaScript syntax error: ${msg}. `
+        + 'The HTML you build inside c.html(`...`) is executed by a real browser and must be valid JS, '
+        + 'not just a valid TypeScript string. A common cause is unescaped nested quotes in an inline '
+        + 'event handler like onclick="moveIssue(\' + id + \', \'\' + status + \'\')". Do NOT build inline '
+        + 'on* handlers by string concatenation — render elements with data-* attributes and attach '
+        + 'behaviour with addEventListener after inserting the HTML.';
+    }
+  }
+  return null;
 }
 
 /**

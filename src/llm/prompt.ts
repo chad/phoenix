@@ -233,6 +233,11 @@ export function buildPrompt(
     lines.push('- For an enumerated set of NUMBERS (e.g. allowed point values 1,2,3,5,8,13), use `z.union([z.literal(1), z.literal(2), ...])` or `z.number().refine(v => [1,2,3,5,8,13].includes(v))`. NEVER use `z.enum([...])` with numbers — `z.enum` accepts string literals only and will not compile.');
     lines.push("- Call SQL functions like `datetime('now')` directly inside the SQL string (e.g. `SET completed_at = datetime('now')`). NEVER pass them as a bound `?` parameter — that stores the literal text \"datetime('now')\" instead of a timestamp.");
     lines.push('');
+    lines.push('## Browser code (only if this module returns an HTML page via c.html(`...`))');
+    lines.push('The HTML you emit is executed by a real browser, so it must be valid JS/HTML — not merely a valid TypeScript string (TypeScript will not catch errors inside the page).');
+    lines.push('- Do NOT build inline event handlers (onclick="…") with string concatenation; nested quotes break and blank the page. Instead render elements with data-* attributes (data-id, data-status, …) and attach behaviour with addEventListener after inserting the HTML.');
+    lines.push('- Keep client-side state field names identical to the API contract (e.g. point_estimate, labels as an array).');
+    lines.push('');
   }
 
   // Requirements
