@@ -437,6 +437,12 @@ function cleanCodeResponse(raw: string): string {
     code = innerMatch[1];
   }
 
+  // Strip any remaining standalone markdown fence lines (e.g. a stray ```typescript
+  // the model left mid-body with no matching close). A line that is only a fence is
+  // never valid TypeScript, so removing it is always safe and keeps line numbers
+  // otherwise intact.
+  code = code.split('\n').filter(l => !/^\s*```[a-zA-Z]*\s*$/.test(l)).join('\n');
+
   return code;
 }
 

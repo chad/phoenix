@@ -54,4 +54,15 @@ describe('generateIU — line-level provenance round-trip', () => {
     const result = await generateIU(IU, ctx);
     expect(result.manifest.files['auth.ts'].line_provenance).toBeUndefined();
   });
+
+  it('strips a stray mid-body markdown fence the model left behind', async () => {
+    // Models sometimes emit a ```typescript fence with no matching close.
+    const llm = fakeLLM('const a = 1;\n```typescript\nconst b = 2;\nexport const _phoenix = {};');
+    const ctx: RegenContext = { llm, canonNodes: NODES, allIUs: [IU] };
+    const result = await generateIU(IU, ctx);
+    const written = result.files.get('auth.ts')!;
+    expect(written).not.toContain('```');
+    expect(written).toContain('const a = 1;');
+    expect(written).toContain('const b = 2;');
+  });
 });

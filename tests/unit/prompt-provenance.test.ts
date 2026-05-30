@@ -89,6 +89,14 @@ describe('extractLineProvenance', () => {
     expect(r.code.split('\n')).toHaveLength(3);
   });
 
+  it('handles multi-label markers — strips the whole list, records the first resolvable label', () => {
+    // labels here: R1→c-req-1, C1→c-con-1; C2 is unknown
+    const code = 'title: z.string().min(1).max(200), //phx:C1,C2';
+    const r = extractLineProvenance(code, labels);
+    expect(r.lineProvenance).toEqual({ '0': 'c-con-1' });
+    expect(r.code).toBe('title: z.string().min(1).max(200),');
+  });
+
   it('ignores unknown labels but still strips the marker', () => {
     const r = extractLineProvenance('foo(); //phx:R9', labels);
     expect(r.lineProvenance).toEqual({});
