@@ -31,7 +31,7 @@ import { DRateTracker } from './d-rate.js';
 import { BootstrapStateMachine } from './bootstrap.js';
 
 // Phase C
-import { planIUs } from './iu-planner.js';
+import { planIUs, planIUsAuto } from './iu-planner.js';
 import { generateIU, generateAll, extractContract } from './regen.js';
 import type { RegenContext, RegenResult } from './regen.js';
 import { gateIU } from './regen-gate.js';
@@ -472,9 +472,9 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`    ${green('✔')} System state: ${cyan(machine.getState())}`);
   console.log();
 
-  // Step 3: Plan IUs
+  // Step 3: Plan IUs — semantic domain clustering (LLM) when available
   console.log(`  ${dim('Phase C:')} IU planning`);
-  const ius = planIUs(canonNodes, allClauses);
+  const ius = await planIUsAuto(canonNodes, allClauses, llmEarly);
   saveIUs(phoenixDir, ius);
   console.log(`    ${green('✔')} ${ius.length} Implementation Units planned`);
   for (const iu of ius) {
@@ -1100,7 +1100,7 @@ function cmdCanon(): void {
   }
 }
 
-function cmdPlan(): void {
+async function cmdPlan(): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const canonStore = new CanonicalStore(phoenixDir);
   const specStore = new SpecStore(phoenixDir);
@@ -1119,7 +1119,8 @@ function cmdPlan(): void {
     allClauses.push(...specStore.getClauses(docId));
   }
 
-  const ius = planIUs(canonNodes, allClauses);
+  // Semantic domain clustering when a provider is available; rule fallback otherwise.
+  const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir));
   saveIUs(phoenixDir, ius);
 
   console.log(bold('📦 IU Plan'));
@@ -1758,7 +1759,7 @@ async function main(): Promise<void> {
       cmdCanon();
       break;
     case 'plan':
-      cmdPlan();
+      await cmdPlan();
       break;
     case 'regen':
     case 'regenerate':

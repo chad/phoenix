@@ -29,21 +29,31 @@ loop catches the rest). This is "smart about what to ignore."
       source anchor (doc + line span). Add an explicit `ProvenanceAnchor`
       (doc_id, line span, optional heading hint, optional speaker/timestamp).
 
-### Phase 3 — Semantic IU clustering, mass-bounded  *(next)*
-Replace `planIUs`' `(doc, section)` buckets with domain clustering: partition the
-canonical graph by entity/noun cohesion + the typed-edge community structure +
-embedding similarity, then bound each cluster by **conceptual mass / deletability**
-(split when over budget, merge when too thin). An IU = entity (or capability) +
-its constraints + its operations — a replaceable grain. Make it **incremental**
-(re-cluster only the invalidated subtree) to keep canonical-stability /
-selective-invalidation intact.
+### Phase 3 — Semantic IU clustering, mass-bounded  *(this turn)*
+Replaced `planIUs`' `(doc, section)` buckets with domain clustering (src/iu-clusterer.ts):
+- [x] **LLM clusterer** (`clusterCanonNodesLLM`) — the semantic primary. Partitions
+      requirements into cohesive modules (entity + its rules + ops; a UI is its own
+      module; a report is its own module). Wired into bootstrap/plan via
+      `planIUsAuto` when a provider is available. On Trail it yields: issue-entity,
+      sprint-entity, kanban-board-ui, sprint-rollup, api-interface — named by domain
+      meaning, no document structure.
+- [x] **Rule clusterer** (`clusterCanonNodes`) — deterministic fallback (cold start /
+      no-LLM / tests): anchor each node to its primary entity or capability from its
+      tags; attach constraints to the entity they constrain via typed edges; merge
+      tiny clusters, mass-bound (split) oversized ones. Recovers the major entities;
+      capability boundaries are where it's weak (intrinsically semantic).
+- [ ] (next) Incremental re-clustering (re-cluster only the invalidated subtree) for
+      canonical-stability / selective-invalidation; embedding similarity as a third
+      signal in the rule path.
 
 ## Notes
-- The "fold refinement sections" heuristic (regex on heading names) is a stopgap
-  *in the structure-coupled idiom we are removing*; Phase 3 deletes the need for it.
+- The "fold refinement sections" heuristic (regex on heading names) is now deleted —
+  domain clustering folds rules into their entity by meaning, not by heading.
 - Risk: clustering is fuzzier than buckets → pushes correctness onto evals + the
   D-rate trust loop, which is exactly where the architecture says value lives, but
   raises the bar on canonicalization confidence and cold-start.
 
-## Status: Phase 1 + Phase 2 (semantics) in progress
+## Status: Phase 1 ✓, Phase 2 semantics ✓, Phase 3 (LLM + rule clustering) ✓.
+## Remaining: clause-identity de-structuring (drop section_path from clause_id) and
+## incremental re-clustering.
 </content>

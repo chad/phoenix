@@ -1,14 +1,12 @@
 /**
- * IU Planner — maps canonical nodes to Implementation Unit proposals.
+ * IU Planner — maps the canonical graph to Implementation Unit proposals.
  *
- * Groups related requirements into module-level IUs based on:
- * - Source document (service boundary)
- * - Source section within a document (module boundary)
- *
- * Naming produces natural developer-facing identifiers:
- *   spec/api-gateway.md, section "Rate Limiting"
- *   → name: "Rate Limiting"
- *   → file: src/generated/api-gateway/rate-limiting.ts
+ * IUs emerge from DOMAIN clustering (see iu-clusterer), not document structure:
+ * each IU is a domain entity (or a UI/report capability) plus its constraints and
+ * operations. The source location survives only as provenance on each node.
+ *   - planIUs:      deterministic, rule-clustered (no LLM).
+ *   - planIUsAuto:  semantic LLM clustering when a provider is available, rule fallback.
+ * CONTEXT nodes are excluded from IU generation (they don't produce code).
  */
 
 import type { CanonicalNode } from './models/canonical.js';
@@ -16,118 +14,39 @@ import { CanonicalType } from './models/canonical.js';
 import type { Clause } from './models/clause.js';
 import type { ImplementationUnit } from './models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from './models/iu.js';
+import type { CanonCluster } from './iu-clusterer.js';
+import { clusterCanonNodes, clusterCanonNodesLLM } from './iu-clusterer.js';
+import type { LLMProvider } from './llm/provider.js';
 import { sha256 } from './semhash.js';
 
-/**
- * Plan IUs from canonical nodes, grouping by source document + section.
- *
- * Each top-level section of each spec document becomes one IU.
- * Canon nodes are assigned to the IU of their source clause's section.
- * CONTEXT nodes are excluded from IU generation (they don't produce code).
- */
-export function planIUs(
+/** Deterministic, rule-clustered planning (no LLM). */
+export function planIUs(canonNodes: CanonicalNode[], clauses?: Clause[]): ImplementationUnit[] {
+  void clauses; // source anchoring stays on the nodes as provenance; not used for grouping
+  if (canonNodes.filter(n => n.type !== CanonicalType.CONTEXT).length === 0) return [];
+  return buildIUsFromClusters(clusterCanonNodes(canonNodes));
+}
+
+/** Semantic planning — LLM domain clustering when a provider is given; rule fallback. */
+export async function planIUsAuto(
   canonNodes: CanonicalNode[],
-  clauses: Clause[],
-): ImplementationUnit[] {
-  // Filter out CONTEXT nodes — they don't generate code
-  canonNodes = canonNodes.filter(n => n.type !== CanonicalType.CONTEXT);
-  if (canonNodes.length === 0) return [];
+  clauses?: Clause[],
+  llm?: LLMProvider | null,
+): Promise<ImplementationUnit[]> {
+  void clauses;
+  if (canonNodes.filter(n => n.type !== CanonicalType.CONTEXT).length === 0) return [];
+  const clusters = llm ? await clusterCanonNodesLLM(canonNodes, llm) : clusterCanonNodes(canonNodes);
+  return buildIUsFromClusters(clusters);
+}
 
-  // Index clauses by ID
-  const clauseMap = new Map(clauses.map(c => [c.clause_id, c]));
-
-  // Group canonical nodes by (doc, top-level section)
-  const buckets = new Map<string, { nodes: CanonicalNode[]; docId: string; sectionName: string }>();
-
-  for (const node of canonNodes) {
-    const clause = node.source_clause_ids
-      .map(id => clauseMap.get(id))
-      .find(c => c !== undefined);
-
-    if (!clause) continue;
-
-    const docId = clause.source_doc_id;
-    // Use the second level of section_path as the grouping key.
-    // section_path[0] is typically the doc title, section_path[1] is the first real section.
-    // If there's only one level, use that.
-    const sectionName = clause.section_path.length > 1
-      ? clause.section_path[1]
-      : clause.section_path[0] || 'main';
-
-    const key = `${docId}::${sectionName}`;
-    let bucket = buckets.get(key);
-    if (!bucket) {
-      bucket = { nodes: [], docId, sectionName };
-      buckets.set(key, bucket);
-    }
-    bucket.nodes.push(node);
-  }
-
-  // Within a document (one service/entity), fold refinement sections — validation,
-  // rules, workflow, constraints — into the document's primary entity bucket. Each
-  // such section otherwise becomes a peer module that re-CREATE TABLEs the same
-  // entity with a divergent schema and enum spellings. A refinement section is one
-  // named like a rules section, or one that introduces no REQUIREMENT of its own
-  // (pure constraints/invariants over an entity defined elsewhere in the doc).
-  const sectionsByDoc = new Map<string, string[]>();
-  for (const [key, bucket] of buckets) {
-    const list = sectionsByDoc.get(bucket.docId) ?? [];
-    list.push(key);
-    sectionsByDoc.set(bucket.docId, list);
-  }
-  const reqCount = (key: string) =>
-    buckets.get(key)!.nodes.filter(n => n.type === 'REQUIREMENT').length;
-  for (const [, keys] of sectionsByDoc) {
-    if (keys.length < 2) continue;
-    const entityKeys = keys.filter(k => !isRefinementSection(buckets.get(k)!.sectionName));
-    const refinementKeys = keys.filter(k => isRefinementSection(buckets.get(k)!.sectionName));
-    if (entityKeys.length === 0 || refinementKeys.length === 0) continue;
-    // Primary entity = the entity section with the most requirements (the CRUD surface).
-    const primaryKey = entityKeys.sort((a, b) =>
-      reqCount(b) - reqCount(a) || buckets.get(b)!.nodes.length - buckets.get(a)!.nodes.length,
-    )[0];
-    const primary = buckets.get(primaryKey)!;
-    for (const key of refinementKeys) {
-      primary.nodes.push(...buckets.get(key)!.nodes);
-      buckets.delete(key);
-    }
-  }
-
-  // Merge small buckets (≤1 node) into their document's largest bucket
-  const docBuckets = new Map<string, string[]>(); // docId → keys
-  for (const [key, bucket] of buckets) {
-    const list = docBuckets.get(bucket.docId) ?? [];
-    list.push(key);
-    docBuckets.set(bucket.docId, list);
-  }
-
-  for (const [docId, keys] of docBuckets) {
-    const small = keys.filter(k => buckets.get(k)!.nodes.length <= 1);
-    const large = keys.filter(k => buckets.get(k)!.nodes.length > 1);
-
-    if (small.length > 0 && large.length > 0) {
-      // Find the largest bucket in this doc
-      const targetKey = large.sort((a, b) =>
-        buckets.get(b)!.nodes.length - buckets.get(a)!.nodes.length
-      )[0];
-      const target = buckets.get(targetKey)!;
-      for (const smallKey of small) {
-        target.nodes.push(...buckets.get(smallKey)!.nodes);
-        buckets.delete(smallKey);
-      }
-    }
-  }
-
-  // Convert buckets to IUs
+function buildIUsFromClusters(clusters: CanonCluster[]): ImplementationUnit[] {
   const ius: ImplementationUnit[] = [];
-
-  for (const [, bucket] of buckets) {
-    const { nodes, docId, sectionName } = bucket;
+  for (const cluster of clusters) {
+    const nodes = cluster.nodes;
     if (nodes.length === 0) continue;
 
-    const name = cleanName(sectionName);
-    const serviceName = deriveServiceName(docId);
-    const fileName = slugify(name);
+    const name = cleanName(cluster.anchor.replace(/-/g, ' '));
+    const serviceName = slugify(cluster.anchor);
+    const fileName = serviceName;
     const riskTier = deriveRiskTier(nodes);
     const canonIds = nodes.map(n => n.canon_id);
 
