@@ -19,6 +19,7 @@ import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { IUManifest, RegenMetadata, FileManifestEntry } from './models/manifest.js';
 import type { LLMProvider } from './llm/provider.js';
 import { buildPrompt, getSystemPrompt, provenanceLabels, extractLineProvenance } from './llm/prompt.js';
+import type { SiblingContract } from './llm/prompt.js';
 import type { ResolvedTarget } from './models/architecture.js';
 import { sha256 } from './semhash.js';
 
@@ -55,6 +56,12 @@ export interface RegenContext {
     iu: ImplementationUnit,
     detail: { model_id: string; promptpack_hash: string; reason: string },
   ) => void;
+  /**
+   * Real contracts of already-generated IUs (iu_id → schemas+routes), accumulated
+   * by generateAll as it goes and injected into later IUs so consumers (e.g. a web
+   * UI) are generated against the actual API contract instead of guessing.
+   */
+  siblingContracts?: Map<string, string>;
   /** Callback for progress reporting. */
   onProgress?: (iu: ImplementationUnit, status: 'start' | 'done' | 'error', message?: string) => void;
 }
@@ -78,6 +85,7 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
       try {
         const gen = await generateWithLLM(
           iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot, ctx.target, iuNegativeKnowledge,
+          ctx.siblingContracts,
         );
         content = gen.code;
         if (gen.lineProvenance && Object.keys(gen.lineProvenance).length) {
@@ -148,13 +156,66 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
 
 /**
  * Generate code for all IUs. Runs sequentially to respect LLM rate limits.
+ *
+ * UI IUs are generated last so their API/data siblings already exist; each IU's
+ * real contract (schemas + routes) is extracted and accumulated into
+ * ctx.siblingContracts so later (consumer) IUs are generated against it.
  */
 export async function generateAll(ius: ImplementationUnit[], ctx?: RegenContext): Promise<RegenResult[]> {
+  const contracts = ctx?.siblingContracts ?? new Map<string, string>();
+  if (ctx) ctx.siblingContracts = contracts;
+
   const results: RegenResult[] = [];
-  for (const iu of ius) {
-    results.push(await generateIU(iu, ctx));
+  for (const iu of orderForGeneration(ius)) {
+    const result = await generateIU(iu, ctx);
+    // Extract this IU's contract for downstream consumers.
+    const primary = result.files.get(iu.output_files[0]) ?? [...result.files.values()][0];
+    if (primary) {
+      const contract = extractContract(primary);
+      if (contract) contracts.set(iu.iu_id, contract);
+    }
+    results.push(result);
   }
   return results;
+}
+
+/** UI IUs depend on API/data IUs, so generate them last. Stable otherwise. */
+function orderForGeneration(ius: ImplementationUnit[]): ImplementationUnit[] {
+  return [...ius].sort((a, b) => (isUiIU(a) ? 1 : 0) - (isUiIU(b) ? 1 : 0));
+}
+
+function isUiIU(iu: ImplementationUnit): boolean {
+  const name = iu.name.toLowerCase();
+  const path = (iu.output_files[0] ?? '').toLowerCase();
+  return /\b(web|ui|frontend|interface|page|dashboard|board|design|screen|view)\b/.test(name)
+    || /(?:^|\/)(web|ui|frontend|board|dashboard)\//.test(path);
+}
+
+/**
+ * Extract a module's public contract — its Zod request/response schemas and its
+ * routes — so consumer IUs can be generated against the exact field names, types,
+ * enum spellings, and nullability rather than guessing.
+ */
+export function extractContract(code: string): string {
+  const parts: string[] = [];
+  const schemaRe = /const\s+\w+\s*=\s*z\.object\(\{[\s\S]*?\}\)\s*;/g;
+  let m: RegExpExecArray | null;
+  while ((m = schemaRe.exec(code))) parts.push(m[0]);
+
+  const routes: string[] = [];
+  const seen = new Set<string>();
+  for (const line of code.split('\n')) {
+    const r = line.match(/router\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]/);
+    if (r) {
+      const sig = `router.${r[1]}('${r[2]}')`;
+      if (!seen.has(sig)) { seen.add(sig); routes.push(sig); }
+    }
+  }
+  if (routes.length) parts.push('// routes:\n' + routes.join('\n'));
+
+  let text = parts.join('\n\n');
+  if (text.length > 2500) text = text.slice(0, 2500) + '\n// …(truncated)';
+  return text;
 }
 
 // ─── LLM Generation ─────────────────────────────────────────────────────────
@@ -187,15 +248,25 @@ async function generateWithLLM(
   projectRoot?: string,
   target?: ResolvedTarget | null,
   negativeKnowledge?: NegativeKnowledge[],
+  siblingContracts?: Map<string, string>,
 ): Promise<LLMGenerationResult> {
-  // Find sibling modules in the same service
+  // Find sibling modules in the same service (for soft "do not import" context)
   const iuDir = iu.output_files[0]?.split('/').slice(0, -1).join('/');
   const siblings = allIUs
     ?.filter(other => other.iu_id !== iu.iu_id && other.output_files[0]?.startsWith(iuDir || ''))
     .map(other => other.name) ?? [];
 
+  // Inter-IU contracts: any other IU (across services) whose real contract is known.
+  const knownContracts: SiblingContract[] = (allIUs ?? [])
+    .filter(other => other.iu_id !== iu.iu_id && siblingContracts?.has(other.iu_id))
+    .map(other => ({
+      name: other.name,
+      mountPath: '/' + other.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+      contract: siblingContracts!.get(other.iu_id)!,
+    }));
+
   const systemPrompt = getSystemPrompt(target);
-  const prompt = buildPrompt(iu, canonNodes, siblings, target, negativeKnowledge);
+  const prompt = buildPrompt(iu, canonNodes, siblings, target, negativeKnowledge, knownContracts);
   const template = target?.runtime.moduleTemplate;
 
   let code: string;

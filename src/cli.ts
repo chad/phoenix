@@ -32,7 +32,7 @@ import { BootstrapStateMachine } from './bootstrap.js';
 
 // Phase C
 import { planIUs } from './iu-planner.js';
-import { generateIU, generateAll } from './regen.js';
+import { generateIU, generateAll, extractContract } from './regen.js';
 import type { RegenContext, RegenResult } from './regen.js';
 import { gateIU } from './regen-gate.js';
 import type { GateVerdict } from './regen-gate.js';
@@ -300,6 +300,26 @@ function cmdInit(args?: string[]): void {
 
 // ─── Regeneration Gate wiring (warn-first) ───────────────────────────────────
 
+/**
+ * Build the sibling-contract map from already-generated files on disk, so an
+ * incremental regen (e.g. just the board) still sees the real contracts of the
+ * other modules it calls. generateAll refreshes entries for IUs it regenerates.
+ */
+function loadExistingContracts(projectRoot: string, ius: ImplementationUnit[]): Map<string, string> {
+  const contracts = new Map<string, string>();
+  for (const iu of ius) {
+    const fp = iu.output_files[0];
+    if (!fp) continue;
+    const full = join(projectRoot, fp);
+    if (!existsSync(full)) continue;
+    try {
+      const c = extractContract(readFileSync(full, 'utf8'));
+      if (c) contracts.set(iu.iu_id, c);
+    } catch { /* unreadable — skip */ }
+  }
+  return contracts;
+}
+
 /** Load each IU's conceptual mass from the previous manifest cycle. */
 function loadPreviousMasses(manifestManager: ManifestManager): Map<string, number> {
   const manifest = manifestManager.load();
@@ -518,6 +538,7 @@ async function cmdBootstrap(): Promise<void> {
     projectRoot,
     target: arch,
     negativeKnowledge: nkByIU,
+    siblingContracts: loadExistingContracts(projectRoot, ius),
     onGenerationFailure,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
@@ -1181,6 +1202,7 @@ async function cmdRegen(args: string[]): Promise<void> {
     projectRoot,
     target: regenArch,
     negativeKnowledge: nkByIU,
+    siblingContracts: loadExistingContracts(projectRoot, ius),
     onGenerationFailure,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
