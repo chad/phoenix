@@ -315,7 +315,14 @@ export function collectInspectData(
 // ─── HTML renderer ───────────────────────────────────────────────────────────
 
 export function renderInspectHTML(data: InspectData): string {
-  const json = JSON.stringify(data);
+  // Embedded as `const D = <json>` inside an inline <script>. Generated source we
+  // embed (e.g. a web UI module) can itself contain "</script>" and the JS line
+  // terminators U+2028/U+2029, which JSON.stringify leaves unescaped — any of these
+  // would terminate or break our inline script. Escape them so the blob is safe.
+  const sep = new RegExp('[\\u2028\\u2029]', 'g');
+  const json = JSON.stringify(data)
+    .replace(/</g, '\\u003c')
+    .replace(sep, c => (c.charCodeAt(0) === 0x2028 ? '\\u2028' : '\\u2029'));
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
