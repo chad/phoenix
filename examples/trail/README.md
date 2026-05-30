@@ -43,10 +43,13 @@ emits). The Trust tab surfaces the regeneration gate's verdict per IU.
 
 ## Honesty note
 
-This is real, unedited generator output. The trust gate marks all six IUs
-`opaque` (no evaluations/evidence collected yet) and the **Issues** and
-**Validation** modules carry negative-knowledge records from residual type
-issues the typecheck-retry couldn't fully resolve (a persistent `z.enum` over
-numeric estimate values). The emitted JavaScript runs correctly regardless; the
-inspector shows the system being truthful about its own output rather than hiding
-it — which is the point.
+This is real, unedited generator output — four coherent modules (board, issues,
+sprints, sprint-rollup). The validation/workflow-rules sections fold into their
+entity IU rather than spawning duplicate table-owning modules, and the web UI is
+generated *against* the issues API's real contract, so the board and API agree on
+field names (`point_estimate`), types (`labels` as an array), and status spelling.
+Create / move / save all work end to end.
+
+The trust gate still marks every IU `opaque` (no evaluations/evidence collected
+yet) and flags the merged Issues module's conceptual mass — honest signal, not a
+bug. The inspector surfaces all of this rather than hiding it, which is the point.

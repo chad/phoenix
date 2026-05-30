@@ -8,6 +8,34 @@ describe('planIUs', () => {
     expect(planIUs([], [])).toEqual([]);
   });
 
+  it('folds a refinement (validation/rules) section into the entity IU, not a peer module', () => {
+    const spec = `# Issues
+
+## Issues
+
+- Users can create an issue with a title
+- Users can view all issues
+- Users can edit an issue
+- Users can delete an issue
+- Users can move an issue to a different status
+
+## Validation rules
+
+- A title must not be empty and must not exceed 200 characters
+- Status must be one of: backlog, todo, in_progress, in_review, done
+- Priority must be one of: urgent, high, normal, low`;
+    const clauses = parseSpec(spec, 'spec/issues.md');
+    const canon = extractCanonicalNodes(clauses);
+    const ius = planIUs(canon, clauses);
+    // The validation section must NOT become its own table-owning module.
+    const names = ius.map(i => i.name.toLowerCase());
+    expect(names.some(n => /validation|rules/.test(n))).toBe(false);
+    // Exactly one issues module owns the entity, carrying both sections' canon nodes.
+    const issueModules = ius.filter(i => i.output_files[0].includes('/issues/'));
+    expect(issueModules.length).toBe(1);
+    expect(issueModules[0].source_canon_ids.length).toBe(canon.filter(n => n.type !== 'CONTEXT').length);
+  });
+
   it('creates IUs from canonical nodes', () => {
     const clauses = parseSpec('# Auth\n\nUsers must log in.\nPasswords must be hashed.', 'test.md');
     const canon = extractCanonicalNodes(clauses);

@@ -63,6 +63,36 @@ export function planIUs(
     bucket.nodes.push(node);
   }
 
+  // Within a document (one service/entity), fold refinement sections — validation,
+  // rules, workflow, constraints — into the document's primary entity bucket. Each
+  // such section otherwise becomes a peer module that re-CREATE TABLEs the same
+  // entity with a divergent schema and enum spellings. A refinement section is one
+  // named like a rules section, or one that introduces no REQUIREMENT of its own
+  // (pure constraints/invariants over an entity defined elsewhere in the doc).
+  const sectionsByDoc = new Map<string, string[]>();
+  for (const [key, bucket] of buckets) {
+    const list = sectionsByDoc.get(bucket.docId) ?? [];
+    list.push(key);
+    sectionsByDoc.set(bucket.docId, list);
+  }
+  const reqCount = (key: string) =>
+    buckets.get(key)!.nodes.filter(n => n.type === 'REQUIREMENT').length;
+  for (const [, keys] of sectionsByDoc) {
+    if (keys.length < 2) continue;
+    const entityKeys = keys.filter(k => !isRefinementSection(buckets.get(k)!.sectionName));
+    const refinementKeys = keys.filter(k => isRefinementSection(buckets.get(k)!.sectionName));
+    if (entityKeys.length === 0 || refinementKeys.length === 0) continue;
+    // Primary entity = the entity section with the most requirements (the CRUD surface).
+    const primaryKey = entityKeys.sort((a, b) =>
+      reqCount(b) - reqCount(a) || buckets.get(b)!.nodes.length - buckets.get(a)!.nodes.length,
+    )[0];
+    const primary = buckets.get(primaryKey)!;
+    for (const key of refinementKeys) {
+      primary.nodes.push(...buckets.get(key)!.nodes);
+      buckets.delete(key);
+    }
+  }
+
   // Merge small buckets (≤1 node) into their document's largest bucket
   const docBuckets = new Map<string, string[]>(); // docId → keys
   for (const [key, bucket] of buckets) {
@@ -148,6 +178,16 @@ export function planIUs(
 function deriveServiceName(docId: string): string {
   const base = docId.split('/').pop() || docId;
   return slugify(base.replace(/\.md$/i, ''));
+}
+
+/**
+ * A refinement section refines an entity defined elsewhere in the same document
+ * (validation, rules, workflow, constraints, limits, policies) rather than
+ * introducing its own resource, so it should fold into the entity's IU instead of
+ * becoming a peer module that re-creates the table.
+ */
+function isRefinementSection(sectionName: string): boolean {
+  return /\b(validation|rule|rules|constraint|constraints|workflow|invariant|invariants|limit|limits|policy|policies)\b/i.test(sectionName);
 }
 
 /**

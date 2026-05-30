@@ -10,6 +10,6 @@ export * as sprints from './sprints/index.js';
 
 export const services = [
   { name: 'Board', dir: 'board', port: 3000, modules: 1 },
-  { name: 'Issues', dir: 'issues', port: 3001, modules: 2 },
-  { name: 'Sprints', dir: 'sprints', port: 3002, modules: 3 },
+  { name: 'Issues', dir: 'issues', port: 3001, modules: 1 },
+  { name: 'Sprints', dir: 'sprints', port: 3002, modules: 2 },
 ] as const;

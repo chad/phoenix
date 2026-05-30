@@ -1235,10 +1235,12 @@ async function cmdRegen(args: string[]): Promise<void> {
     }
   }
 
-  // Re-generate scaffold wiring
+  // Re-generate scaffold wiring. Pass the architecture so the unified app/server
+  // wiring (src/server.ts) is refreshed too — otherwise removing or renaming an IU
+  // leaves stale imports to deleted modules and the app won't compile.
   const allIUs = loadIUs(phoenixDir);
   const services = deriveServices(allIUs);
-  const scaffold = generateScaffold(services, basename(projectRoot));
+  const scaffold = generateScaffold(services, basename(projectRoot), regenArch);
   for (const [filePath, content] of scaffold.files) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });

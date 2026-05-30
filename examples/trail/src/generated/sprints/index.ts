@@ -7,4 +7,3 @@
 
 export * as sprintRollup from './sprint-rollup.js';
 export * as sprints from './sprints.js';
-export * as validationRules from './validation-rules.js';

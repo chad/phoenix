@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { extractContract } from '../../src/regen.js';
-import { buildPrompt, type SiblingContract } from '../../src/llm/prompt.js';
+import { buildPrompt, extractVocabularies, type SiblingContract } from '../../src/llm/prompt.js';
+import type { CanonicalNode as CNode } from '../../src/models/canonical.js';
 import type { ImplementationUnit } from '../../src/models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from '../../src/models/iu.js';
 import type { CanonicalNode } from '../../src/models/canonical.js';
@@ -62,5 +63,28 @@ describe('buildPrompt sibling contract injection', () => {
   it('omits the section when there are no known sibling contracts', () => {
     const p = buildPrompt(makeIU('Design'), NODES, [], { runtime: {} } as any, [], []);
     expect(p).not.toContain('Sibling module contracts');
+  });
+});
+
+describe('extractVocabularies', () => {
+  const node = (statement: string) => ({ statement } as CNode);
+
+  it('pulls enum token lists with their spec spelling', () => {
+    const v = extractVocabularies([
+      node('Status must always be one of: backlog, todo, in_progress, in_review, done'),
+      node('Priority must always be one of: urgent, high, normal, low'),
+    ]);
+    const status = v.find(x => x.label === 'status');
+    expect(status?.values).toEqual(['backlog', 'todo', 'in_progress', 'in_review', 'done']);
+    const priority = v.find(x => x.label === 'priority');
+    expect(priority?.values).toEqual(['urgent', 'high', 'normal', 'low']);
+  });
+
+  it('injects the same fixed vocabulary into every IU prompt so spellings cannot drift', () => {
+    const nodes = [node('Status must always be one of: backlog, todo, in_progress, in_review, done')];
+    const p = buildPrompt(makeIU('Design'), nodes, [], { runtime: {} } as any, []);
+    expect(p).toContain('Fixed vocabularies');
+    expect(p).toContain("'in_progress'");
+    expect(p).toContain('never `inprogress`');
   });
 });

@@ -4,19 +4,23 @@ import { z } from 'zod';
 
 // ─── Database migrations ────────────────────────────────────────────────────
 
+// ─── Database migrations ────────────────────────────────────────────────────
+
+// ─── Database migrations ────────────────────────────────────────────────────
+
 const router = new Hono();
 
 registerMigration('issues', `
   CREATE TABLE IF NOT EXISTS issues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
+    description TEXT DEFAULT '',
     status TEXT NOT NULL DEFAULT 'backlog',
     priority TEXT NOT NULL DEFAULT 'normal',
-    points INTEGER,
+    point_estimate INTEGER,
     assignee TEXT,
-    labels TEXT NOT NULL DEFAULT '',
-    sprint_id INTEGER REFERENCES sprints(id),
+    labels TEXT DEFAULT '',
+    sprint_id INTEGER,
     completed_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -24,54 +28,52 @@ registerMigration('issues', `
 `);
 
 const CreateIssueSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().optional().default(''),
-  status: z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done']).optional().default('backlog'),
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).nullable().optional(),
+  status: z.enum(['backlog', 'todo', 'inprogress', 'inreview', 'done']).optional().default('backlog'),
   priority: z.enum(['urgent', 'high', 'normal', 'low']).optional().default('normal'),
-  points: z.number().int().min(1).nullable().optional(),
+  point_estimate: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8), z.literal(13)]).nullable().optional(),
   assignee: z.string().nullable().optional(),
-  labels: z.string().optional().default(''),
+  labels: z.array(z.string().max(24)).max(8).nullable().optional(),
   sprint_id: z.number().int().nullable().optional(),
 });
 
 const UpdateIssueSchema = z.object({
-  title: z.string().min(1).max(500).optional(),
-  description: z.string().optional(),
-  status: z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done']).optional(),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(5000).nullable().optional(),
+  status: z.enum(['backlog', 'todo', 'inprogress', 'inreview', 'done']).optional(),
   priority: z.enum(['urgent', 'high', 'normal', 'low']).optional(),
-  points: z.number().int().min(1).nullable().optional(),
+  point_estimate: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8), z.literal(13)]).nullable().optional(),
   assignee: z.string().nullable().optional(),
-  labels: z.string().optional(),
+  labels: z.array(z.string().max(24)).max(8).nullable().optional(),
   sprint_id: z.number().int().nullable().optional(),
 });
 
 router.get('/', (c) => {
-  let sql = 'SELECT issues.*, sprints.name as sprint_name FROM issues LEFT JOIN sprints ON issues.sprint_id = sprints.id';
+  let sql = 'SELECT * FROM issues';
   const conditions: string[] = [];
   const params: unknown[] = [];
   
   const status = c.req.query('status');
-  if (status !== undefined) { conditions.push('issues.status = ?'); params.push(status); }
+  if (status !== undefined) { conditions.push('status = ?'); params.push(status); }
   
   const assignee = c.req.query('assignee');
-  if (assignee !== undefined) { conditions.push('issues.assignee = ?'); params.push(assignee); }
+  if (assignee !== undefined) { conditions.push('assignee = ?'); params.push(assignee); }
   
   const label = c.req.query('label');
-  if (label !== undefined) { conditions.push('issues.labels LIKE ?'); params.push(`%${label}%`); }
+  if (label !== undefined) { conditions.push('labels LIKE ?'); params.push(`%${label}%`); }
   
   const sprintId = c.req.query('sprint_id');
-  if (sprintId !== undefined) { conditions.push('issues.sprint_id = ?'); params.push(Number(sprintId)); }
+  if (sprintId !== undefined) { conditions.push('sprint_id = ?'); params.push(Number(sprintId)); }
   
   if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
-  sql += " ORDER BY CASE issues.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 WHEN 'low' THEN 4 END, issues.updated_at DESC";
+  sql += " ORDER BY CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 WHEN 'low' THEN 4 END, updated_at DESC";
   
-  return c.json(db.prepare(sql).all(...params));
-});
-
-router.get('/:id', (c) => {
-  const issue = db.prepare('SELECT issues.*, sprints.name as sprint_name FROM issues LEFT JOIN sprints ON issues.sprint_id = sprints.id WHERE issues.id = ?').get(c.req.param('id'));
-  if (!issue) return c.json({ error: 'Not found' }, 404);
-  return c.json(issue);
+  const issues = db.prepare(sql).all(...params) as any[];
+  return c.json(issues.map((issue) => ({
+    ...issue,
+    labels: issue.labels ? issue.labels.split(',').filter(Boolean) : []
+  })));
 });
 
 router.post('/', async (c) => {
@@ -79,21 +81,38 @@ router.post('/', async (c) => {
   const result = CreateIssueSchema.safeParse(body);
   if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
   
-  const { title, description, status, priority, points, assignee, labels, sprint_id } = result.data;
+  const { title, description, status, priority, point_estimate, assignee, labels, sprint_id } = result.data;
   
-  if (sprint_id != null) {
-    if (!db.prepare('SELECT id FROM sprints WHERE id = ?').get(sprint_id)) return c.json({ error: 'Sprint not found' }, 400);
+  // Check for duplicate labels
+  if (labels && new Set(labels).size !== labels.length) {
+    return c.json({ error: 'Duplicate labels not allowed' }, 400);
   }
   
-  const info = db.prepare('INSERT INTO issues (title, description, status, priority, points, assignee, labels, sprint_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(title, description, status, priority, points ?? null, assignee ?? null, labels, sprint_id ?? null);
-  const issue = db.prepare('SELECT issues.*, sprints.name as sprint_name FROM issues LEFT JOIN sprints ON issues.sprint_id = sprints.id WHERE issues.id = ?').get(info.lastInsertRowid);
-  return c.json(issue, 201);
+  const labelsStr = labels ? labels.join(',') : '';
+  const info = db.prepare('INSERT INTO issues (title, description, status, priority, point_estimate, assignee, labels, sprint_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
+    title, description || '', status, priority, point_estimate ?? null, assignee ?? null, labelsStr, sprint_id ?? null
+  );
+  
+  const issue = db.prepare('SELECT * FROM issues WHERE id = ?').get(info.lastInsertRowid) as any;
+  return c.json({
+    ...issue,
+    labels: issue.labels ? issue.labels.split(',').filter(Boolean) : []
+  }, 201);
+});
+
+router.get('/:id', (c) => {
+  const issue = db.prepare('SELECT * FROM issues WHERE id = ?').get(c.req.param('id')) as any;
+  if (!issue) return c.json({ error: 'Not found' }, 404);
+  return c.json({
+    ...issue,
+    labels: issue.labels ? issue.labels.split(',').filter(Boolean) : []
+  });
 });
 
 router.patch('/:id', async (c) => {
   const id = c.req.param('id');
-  const existing = db.prepare('SELECT * FROM issues WHERE id = ?').get(id);
-  if (!existing) return c.json({ error: 'Not found' }, 404);
+  const currentIssue = db.prepare('SELECT * FROM issues WHERE id = ?').get(id) as any;
+  if (!currentIssue) return c.json({ error: 'Not found' }, 404);
   
   let body; try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
   const result = UpdateIssueSchema.safeParse(body);
@@ -101,32 +120,52 @@ router.patch('/:id', async (c) => {
   
   const u = result.data;
   
-  if (u.sprint_id !== undefined && u.sprint_id != null) {
-    if (!db.prepare('SELECT id FROM sprints WHERE id = ?').get(u.sprint_id)) return c.json({ error: 'Sprint not found' }, 400);
+  // Check for duplicate labels
+  if (u.labels && new Set(u.labels).size !== u.labels.length) {
+    return c.json({ error: 'Duplicate labels not allowed' }, 400);
+  }
+  
+  // Status transition validation
+  if (u.status !== undefined) {
+    const validTransitions: Record<string, string[]> = {
+      'backlog': ['todo'],
+      'todo': ['backlog', 'inprogress'],
+      'inprogress': ['backlog', 'todo', 'inreview'],
+      'inreview': ['backlog', 'inprogress', 'done'],
+      'done': ['backlog', 'inreview']
+    };
+    
+    if (u.status !== currentIssue.status && !validTransitions[currentIssue.status]?.includes(u.status)) {
+      return c.json({ error: 'Invalid status transition' }, 400);
+    }
+    
+    // Cannot move out of backlog without point estimate
+    if (currentIssue.status === 'backlog' && u.status !== 'backlog' && !currentIssue.point_estimate) {
+      return c.json({ error: 'Cannot move out of backlog without point estimate' }, 400);
+    }
   }
   
   if (u.title !== undefined) db.prepare("UPDATE issues SET title = ?, updated_at = datetime('now') WHERE id = ?").run(u.title, id);
   if (u.description !== undefined) db.prepare("UPDATE issues SET description = ?, updated_at = datetime('now') WHERE id = ?").run(u.description, id);
+  if (u.status !== undefined) {
+    const completedAt = u.status === 'done' && currentIssue.status !== 'done' ? "datetime('now')" : 
+                       u.status !== 'done' && currentIssue.status === 'done' ? null : currentIssue.completed_at;
+    db.prepare("UPDATE issues SET status = ?, completed_at = ?, updated_at = datetime('now') WHERE id = ?").run(u.status, completedAt, id);
+  }
   if (u.priority !== undefined) db.prepare("UPDATE issues SET priority = ?, updated_at = datetime('now') WHERE id = ?").run(u.priority, id);
-  if (u.points !== undefined) db.prepare("UPDATE issues SET points = ?, updated_at = datetime('now') WHERE id = ?").run(u.points, id);
+  if (u.point_estimate !== undefined) db.prepare("UPDATE issues SET point_estimate = ?, updated_at = datetime('now') WHERE id = ?").run(u.point_estimate, id);
   if (u.assignee !== undefined) db.prepare("UPDATE issues SET assignee = ?, updated_at = datetime('now') WHERE id = ?").run(u.assignee, id);
-  if (u.labels !== undefined) db.prepare("UPDATE issues SET labels = ?, updated_at = datetime('now') WHERE id = ?").run(u.labels, id);
+  if (u.labels !== undefined) {
+    const labelsStr = u.labels ? u.labels.join(',') : '';
+    db.prepare("UPDATE issues SET labels = ?, updated_at = datetime('now') WHERE id = ?").run(labelsStr, id);
+  }
   if (u.sprint_id !== undefined) db.prepare("UPDATE issues SET sprint_id = ?, updated_at = datetime('now') WHERE id = ?").run(u.sprint_id, id);
   
-  if (u.status !== undefined) {
-    const wasCompleted = existing.status === 'done';
-    const nowCompleted = u.status === 'done';
-    
-    if (!wasCompleted && nowCompleted) {
-      db.prepare("UPDATE issues SET status = ?, completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(u.status, id);
-    } else if (wasCompleted && !nowCompleted) {
-      db.prepare("UPDATE issues SET status = ?, completed_at = NULL, updated_at = datetime('now') WHERE id = ?").run(u.status, id);
-    } else {
-      db.prepare("UPDATE issues SET status = ?, updated_at = datetime('now') WHERE id = ?").run(u.status, id);
-    }
-  }
-  
-  return c.json(db.prepare('SELECT issues.*, sprints.name as sprint_name FROM issues LEFT JOIN sprints ON issues.sprint_id = sprints.id WHERE issues.id = ?').get(id));
+  const issue = db.prepare('SELECT * FROM issues WHERE id = ?').get(id) as any;
+  return c.json({
+    ...issue,
+    labels: issue.labels ? issue.labels.split(',').filter(Boolean) : []
+  });
 });
 
 router.delete('/:id', (c) => {
@@ -138,12 +177,16 @@ router.delete('/:id', (c) => {
 
 
 
+
+
+
+
 export default router;
 
 /** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
-  iu_id: 'caf2230f0f0b8ca06f1ac444a82cb0e9ba5765422cc953d1519ba4cc610e9a73',
+  iu_id: '81f2a41625ffa635d449537199437aa82bf97dbacc3f22b2af7f4b7934256c03',
   name: 'Issues',
   risk_tier: 'high',
-  canon_ids: [4 as const],
+  canon_ids: [15 as const],
 } as const;

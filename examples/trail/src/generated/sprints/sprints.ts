@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 // ─── Database migrations ────────────────────────────────────────────────────
 
+// ─── Database migrations ────────────────────────────────────────────────────
+
 registerMigration('sprints', `
   CREATE TABLE IF NOT EXISTS sprints (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,47 +20,35 @@ registerMigration('sprints', `
   )
 `);
 
+// ─── Schemas ────────────────────────────────────────────────────────────────
+
 const CreateSprintSchema = z.object({
-  name: z.string().min(1).max(200),
-  goal: z.string().optional(),
-  start_date: z.string().min(1),
-  end_date: z.string().min(1),
-  capacity: z.number().int().positive().optional(),
+  name: z.string().min(1).max(80),
+  goal: z.string().max(280).nullable().optional(),
+  start_date: z.string(),
+  end_date: z.string(),
+  capacity: z.number().int().positive().nullable().optional(),
+  is_current: z.boolean().optional().default(false),
+  is_closed: z.boolean().optional().default(false),
 });
 
 const UpdateSprintSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  goal: z.string().optional(),
-  start_date: z.string().min(1).optional(),
-  end_date: z.string().min(1).optional(),
-  capacity: z.number().int().positive().optional(),
+  name: z.string().min(1).max(80).optional(),
+  goal: z.string().max(280).nullable().optional(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+  capacity: z.number().int().positive().nullable().optional(),
   is_current: z.boolean().optional(),
   is_closed: z.boolean().optional(),
 });
 
+// ─── Routes ─────────────────────────────────────────────────────────────────
+
 const router = new Hono();
 
 router.get('/', (c) => {
-  let sql = 'SELECT * FROM sprints';
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-  
-  const isCurrent = c.req.query('is_current');
-  if (isCurrent !== undefined) {
-    conditions.push('is_current = ?');
-    params.push(isCurrent === 'true' ? 1 : 0);
-  }
-  
-  const isClosed = c.req.query('is_closed');
-  if (isClosed !== undefined) {
-    conditions.push('is_closed = ?');
-    params.push(isClosed === 'true' ? 1 : 0);
-  }
-  
-  if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
-  sql += ' ORDER BY is_closed ASC, start_date DESC';
-  
-  return c.json(db.prepare(sql).all(...params));
+  const sprints = db.prepare('SELECT * FROM sprints ORDER BY is_closed ASC, start_date DESC').all();
+  return c.json(sprints);
 });
 
 router.get('/:id', (c) => {
@@ -68,16 +58,29 @@ router.get('/:id', (c) => {
 });
 
 router.post('/', async (c) => {
-  let body;
-  try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
-  
+  let body; try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
   const result = CreateSprintSchema.safeParse(body);
   if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
   
-  const { name, goal, start_date, end_date, capacity } = result.data;
+  const { name, goal, start_date, end_date, capacity, is_current, is_closed } = result.data;
   
-  const info = db.prepare('INSERT INTO sprints (name, goal, start_date, end_date, capacity) VALUES (?, ?, ?, ?, ?)').run(
-    name, goal ?? null, start_date, end_date, capacity ?? null
+  // Validate dates
+  const startDate = new Date(start_date);
+  const endDate = new Date(end_date);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return c.json({ error: 'Invalid date format' }, 400);
+  }
+  if (endDate < startDate) {
+    return c.json({ error: 'End date cannot be before start date' }, 400);
+  }
+  
+  // If setting as current, clear other current sprints
+  if (is_current) {
+    db.prepare('UPDATE sprints SET is_current = 0').run();
+  }
+  
+  const info = db.prepare('INSERT INTO sprints (name, goal, start_date, end_date, capacity, is_current, is_closed) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    name, goal ?? null, start_date, end_date, capacity ?? null, is_current ? 1 : 0, is_closed ? 1 : 0
   );
   
   const sprint = db.prepare('SELECT * FROM sprints WHERE id = ?').get(info.lastInsertRowid);
@@ -88,14 +91,26 @@ router.patch('/:id', async (c) => {
   const id = c.req.param('id');
   if (!db.prepare('SELECT id FROM sprints WHERE id = ?').get(id)) return c.json({ error: 'Not found' }, 404);
   
-  let body;
-  try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
-  
+  let body; try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
   const result = UpdateSprintSchema.safeParse(body);
   if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
   
   const u = result.data;
   
+  // Validate dates if provided
+  if (u.start_date !== undefined || u.end_date !== undefined) {
+    const current = db.prepare('SELECT start_date, end_date FROM sprints WHERE id = ?').get(id) as any;
+    const startDate = new Date(u.start_date ?? current.start_date);
+    const endDate = new Date(u.end_date ?? current.end_date);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return c.json({ error: 'Invalid date format' }, 400);
+    }
+    if (endDate < startDate) {
+      return c.json({ error: 'End date cannot be before start date' }, 400);
+    }
+  }
+  
+  // If setting as current, clear other current sprints
   if (u.is_current === true) {
     db.prepare('UPDATE sprints SET is_current = 0').run();
   }
@@ -115,9 +130,10 @@ router.delete('/:id', (c) => {
   const id = c.req.param('id');
   if (!db.prepare('SELECT id FROM sprints WHERE id = ?').get(id)) return c.json({ error: 'Not found' }, 404);
   
-  const issueCount = db.prepare('SELECT COUNT(*) as count FROM issues WHERE sprint_id = ?').get(id) as { count: number };
+  // Check if any issues are attached to this sprint
+  const issueCount = db.prepare('SELECT COUNT(*) as count FROM issues WHERE sprint_id = ?').get(id) as any;
   if (issueCount.count > 0) {
-    return c.json({ error: 'Cannot delete sprint with attached issues' }, 400);
+    return c.json({ error: 'Cannot delete sprint with attached issues. Move issues to another sprint or backlog first.' }, 400);
   }
   
   db.prepare('DELETE FROM sprints WHERE id = ?').run(id);
@@ -130,8 +146,8 @@ export default router;
 
 /** @internal Phoenix VCS traceability — do not remove. */
 export const _phoenix = {
-  iu_id: '7b9f964a95c3555aa97ce3a64c1382be65c433a813dea8fe988ca8c17d47dd02',
+  iu_id: 'f745d73f0d623d1b37ed3c98eb682c2c5834ff112da861c93120a50097c9d4c6',
   name: 'Sprints',
-  risk_tier: 'low',
-  canon_ids: [3 as const],
+  risk_tier: 'high',
+  canon_ids: [9 as const],
 } as const;

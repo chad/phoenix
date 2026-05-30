@@ -4,17 +4,17 @@ import { z } from 'zod';
 
 // ─── Database migrations ────────────────────────────────────────────────────
 
-const router = new Hono();
+// ─── Database migrations ────────────────────────────────────────────────────
 
 registerMigration('sprint_rollups', `
   CREATE TABLE IF NOT EXISTS sprint_rollups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sprint_id INTEGER NOT NULL REFERENCES sprints(id),
+    sprint_id INTEGER NOT NULL UNIQUE REFERENCES sprints(id),
     total_issues INTEGER NOT NULL DEFAULT 0,
     total_points INTEGER NOT NULL DEFAULT 0,
     completed_points INTEGER NOT NULL DEFAULT 0,
     points_remaining INTEGER NOT NULL DEFAULT 0,
-    percent_complete REAL NOT NULL DEFAULT 0.0,
+    completion_percentage REAL NOT NULL DEFAULT 0.0,
     backlog_count INTEGER NOT NULL DEFAULT 0,
     todo_count INTEGER NOT NULL DEFAULT 0,
     inprogress_count INTEGER NOT NULL DEFAULT 0,
@@ -26,122 +26,141 @@ registerMigration('sprint_rollups', `
   )
 `);
 
-const SprintRollupSchema = z.object({
-  id: z.number().int(),
+// ─── Schemas ────────────────────────────────────────────────────────────────
+
+const CreateRollupSchema = z.object({
   sprint_id: z.number().int(),
-  total_issues: z.number().int(),
-  total_points: z.number().int(),
-  completed_points: z.number().int(),
-  points_remaining: z.number().int(),
-  percent_complete: z.number(),
-  backlog_count: z.number().int(),
-  todo_count: z.number().int(),
-  inprogress_count: z.number().int(),
-  inreview_count: z.number().int(),
-  done_count: z.number().int(),
-  is_over_capacity: z.boolean(),
-  capacity_exceeded_by: z.number().int(),
-  created_at: z.string(),
 });
+
+const UpdateRollupSchema = z.object({
+  sprint_id: z.number().int().optional(),
+});
+
+// ─── Routes ─────────────────────────────────────────────────────────────────
+
+const router = new Hono();
 
 router.get('/', (c) => {
   const sprintId = c.req.query('sprint_id');
-  if (sprintId) {
-    return c.json(computeSprintRollup(Number(sprintId)));
+  let sql = 'SELECT * FROM sprint_rollups';
+  const params: unknown[] = [];
+  if (sprintId !== undefined) {
+    sql += ' WHERE sprint_id = ?';
+    params.push(Number(sprintId));
   }
-  
-  const rollups = db.prepare(`
-    SELECT * FROM sprint_rollups 
-    ORDER BY created_at DESC
-  `).all();
-  return c.json(rollups);
+  sql += ' ORDER BY created_at DESC';
+  return c.json(db.prepare(sql).all(...params));
 });
 
-router.get('/:sprint_id', (c) => {
-  const sprintId = Number(c.req.param('sprint_id'));
-  const rollup = computeSprintRollup(sprintId);
-  if (!rollup) return c.json({ error: 'Sprint not found' }, 404);
+router.get('/:id', (c) => {
+  const rollup = db.prepare('SELECT * FROM sprint_rollups WHERE id = ?').get(c.req.param('id'));
+  if (!rollup) return c.json({ error: 'Not found' }, 404);
   return c.json(rollup);
 });
 
-function computeSprintRollup(sprintId: number) {
-  // Verify sprint exists
-  const sprint = db.prepare('SELECT id, capacity FROM sprints WHERE id = ?').get(sprintId) as any;
-  if (!sprint) return null;
-
-  // Get issue counts by status for this sprint
-  const statusCounts = db.prepare(`
-    SELECT 
-      status,
-      COUNT(*) as count,
-      COALESCE(SUM(estimate), 0) as points
-    FROM issues 
-    WHERE sprint_id = ?
-    GROUP BY status
-  `).all(sprintId) as any[];
-
-  // Initialize counts
-  let totalIssues = 0;
-  let totalPoints = 0;
-  let completedPoints = 0;
-  let backlogCount = 0;
-  let todoCount = 0;
-  let inprogressCount = 0;
-  let inreviewCount = 0;
-  let doneCount = 0;
-
-  // Process status counts
-  for (const row of statusCounts) {
-    totalIssues += row.count;
-    totalPoints += row.points;
-    
-    switch (row.status) {
-      case 'backlog':
-        backlogCount = row.count;
-        break;
-      case 'todo':
-        todoCount = row.count;
-        break;
-      case 'inprogress':
-        inprogressCount = row.count;
-        break;
-      case 'inreview':
-        inreviewCount = row.count;
-        break;
-      case 'done':
-        doneCount = row.count;
-        completedPoints += row.points;
-        break;
-    }
-  }
-
+router.post('/', async (c) => {
+  let body; try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  const result = CreateRollupSchema.safeParse(body);
+  if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+  const { sprint_id } = result.data;
+  
+  // Validate sprint exists
+  const sprint = db.prepare('SELECT id, capacity FROM sprints WHERE id = ?').get(sprint_id) as { id: number; capacity: number } | undefined;
+  if (!sprint) return c.json({ error: 'Sprint not found' }, 400);
+  
+  // Fetch issues for this sprint
+  const issues = db.prepare('SELECT status, point_estimate FROM issues WHERE sprint_id = ?').all(sprint_id) as { status: string; point_estimate: number | null }[];
+  
+  // Calculate rollup metrics
+  const totalIssues = issues.length;
+  const totalPoints = issues.reduce((sum, issue) => sum + (issue.point_estimate || 0), 0);
+  const completedPoints = issues.filter(issue => issue.status === 'done').reduce((sum, issue) => sum + (issue.point_estimate || 0), 0);
   const pointsRemaining = totalPoints - completedPoints;
-  const percentComplete = totalPoints > 0 ? (completedPoints / totalPoints) * 100 : 0;
-
+  const completionPercentage = totalPoints > 0 ? (completedPoints / totalPoints) * 100 : 0;
+  
+  // Count issues by status
+  const backlogCount = issues.filter(issue => issue.status === 'backlog').length;
+  const todoCount = issues.filter(issue => issue.status === 'todo').length;
+  const inprogressCount = issues.filter(issue => issue.status === 'inprogress').length;
+  const inreviewCount = issues.filter(issue => issue.status === 'inreview').length;
+  const doneCount = issues.filter(issue => issue.status === 'done').length;
+  
   // Check capacity
-  const isOverCapacity = totalPoints > sprint.capacity;
-  const capacityExceededBy = isOverCapacity ? totalPoints - sprint.capacity : 0;
+  const isOverCapacity = totalPoints > sprint.capacity ? 1 : 0;
+  const capacityExceededBy = Math.max(0, totalPoints - sprint.capacity);
+  
+  const info = db.prepare(`
+    INSERT INTO sprint_rollups (
+      sprint_id, total_issues, total_points, completed_points, points_remaining, 
+      completion_percentage, backlog_count, todo_count, inprogress_count, 
+      inreview_count, done_count, is_over_capacity, capacity_exceeded_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    sprint_id, totalIssues, totalPoints, completedPoints, pointsRemaining,
+    completionPercentage, backlogCount, todoCount, inprogressCount,
+    inreviewCount, doneCount, isOverCapacity, capacityExceededBy
+  );
+  
+  const rollup = db.prepare('SELECT * FROM sprint_rollups WHERE id = ?').get(info.lastInsertRowid);
+  return c.json(rollup, 201);
+});
 
-  return {
-    sprint_id: sprintId,
-    total_issues: totalIssues,
-    total_points: totalPoints,
-    completed_points: completedPoints,
-    points_remaining: pointsRemaining,
-    percent_complete: Math.round(percentComplete * 100) / 100,
-    backlog_count: backlogCount,
-    todo_count: todoCount,
-    inprogress_count: inprogressCount,
-    inreview_count: inreviewCount,
-    done_count: doneCount,
-    is_over_capacity: isOverCapacity,
-    capacity_exceeded_by: capacityExceededBy,
-  };
-}
+router.patch('/:id', async (c) => {
+  const id = c.req.param('id');
+  const existingRollup = db.prepare('SELECT * FROM sprint_rollups WHERE id = ?').get(id);
+  if (!existingRollup) return c.json({ error: 'Not found' }, 404);
+  
+  let body; try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  const result = UpdateRollupSchema.safeParse(body);
+  if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+  const u = result.data;
+  
+  if (u.sprint_id !== undefined) {
+    const sprint = db.prepare('SELECT id, capacity FROM sprints WHERE id = ?').get(u.sprint_id) as { id: number; capacity: number } | undefined;
+    if (!sprint) return c.json({ error: 'Sprint not found' }, 400);
+    
+    // Recalculate rollup for new sprint
+    const issues = db.prepare('SELECT status, point_estimate FROM issues WHERE sprint_id = ?').all(u.sprint_id) as { status: string; point_estimate: number | null }[];
+    
+    const totalIssues = issues.length;
+    const totalPoints = issues.reduce((sum, issue) => sum + (issue.point_estimate || 0), 0);
+    const completedPoints = issues.filter(issue => issue.status === 'done').reduce((sum, issue) => sum + (issue.point_estimate || 0), 0);
+    const pointsRemaining = totalPoints - completedPoints;
+    const completionPercentage = totalPoints > 0 ? (completedPoints / totalPoints) * 100 : 0;
+    
+    const backlogCount = issues.filter(issue => issue.status === 'backlog').length;
+    const todoCount = issues.filter(issue => issue.status === 'todo').length;
+    const inprogressCount = issues.filter(issue => issue.status === 'inprogress').length;
+    const inreviewCount = issues.filter(issue => issue.status === 'inreview').length;
+    const doneCount = issues.filter(issue => issue.status === 'done').length;
+    
+    const isOverCapacity = totalPoints > sprint.capacity ? 1 : 0;
+    const capacityExceededBy = Math.max(0, totalPoints - sprint.capacity);
+    
+    db.prepare(`
+      UPDATE sprint_rollups SET 
+        sprint_id = ?, total_issues = ?, total_points = ?, completed_points = ?, 
+        points_remaining = ?, completion_percentage = ?, backlog_count = ?, 
+        todo_count = ?, inprogress_count = ?, inreview_count = ?, done_count = ?, 
+        is_over_capacity = ?, capacity_exceeded_by = ?
+      WHERE id = ?
+    `).run(
+      u.sprint_id, totalIssues, totalPoints, completedPoints, pointsRemaining,
+      completionPercentage, backlogCount, todoCount, inprogressCount,
+      inreviewCount, doneCount, isOverCapacity, capacityExceededBy, id
+    );
+  }
+  
+  return c.json(db.prepare('SELECT * FROM sprint_rollups WHERE id = ?').get(id));
+});
 
-/** @internal Phoenix VCS traceability — do not remove. */
+router.delete('/:id', (c) => {
+  const id = c.req.param('id');
+  if (!db.prepare('SELECT id FROM sprint_rollups WHERE id = ?').get(id)) return c.json({ error: 'Not found' }, 404);
+  db.prepare('DELETE FROM sprint_rollups WHERE id = ?').run(id);
+  return c.body(null, 204);
+});
 
-/** @internal Phoenix VCS traceability — do not remove. */
 
 
 export default router;
