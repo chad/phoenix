@@ -55,6 +55,7 @@ import { deriveServices, generateScaffold } from './scaffold.js';
 
 // Inspect
 import { collectInspectData, renderInspectHTML, serveInspect } from './inspect.js';
+import type { TrustInputs } from './inspect.js';
 
 // LLM
 import { resolveProvider, describeAvailability } from './llm/resolve.js';
@@ -1473,6 +1474,27 @@ async function cmdInspect(args: string[]): Promise<void> {
     driftReport = detectDrift(manifest, projectRoot);
   }
 
+  // Trust layer — evidence, negative knowledge, evaluation coverage per IU
+  const evidenceStore = new EvidenceStore(phoenixDir);
+  const nkStore = new NegativeKnowledgeStore(phoenixDir);
+  const evalStore = new EvaluationStore(phoenixDir);
+  const trust: TrustInputs = { evidenceByIU: {}, nkByIU: {}, evalByIU: {} };
+  for (const iu of ius) {
+    trust.evidenceByIU![iu.iu_id] = evidenceStore.getByIU(iu.iu_id).map(e => ({
+      kind: e.kind,
+      status: e.status,
+      message: e.message,
+    }));
+    trust.nkByIU![iu.iu_id] = nkStore.getBySubject(iu.iu_id).map(nk => ({
+      kind: nk.kind,
+      whatWasTried: nk.what_was_tried,
+      whyItFailed: nk.why_it_failed,
+      constraint: nk.constraint_for_future,
+    }));
+    const cov = evalStore.coverage(iu);
+    trust.evalByIU![iu.iu_id] = { total: cov.total_evaluations, ratio: cov.coverage_ratio, gaps: cov.gaps.length };
+  }
+
   const projectName = basename(projectRoot);
   const data = collectInspectData(
     projectName,
@@ -1483,6 +1505,7 @@ async function cmdInspect(args: string[]): Promise<void> {
     manifest,
     driftReport,
     projectRoot,
+    trust,
   );
 
   const html = renderInspectHTML(data);
