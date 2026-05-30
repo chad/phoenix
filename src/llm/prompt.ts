@@ -8,6 +8,7 @@
 import type { ImplementationUnit } from '../models/iu.js';
 import type { CanonicalNode } from '../models/canonical.js';
 import type { ResolvedTarget } from '../models/architecture.js';
+import type { NegativeKnowledge } from '../models/negative-knowledge.js';
 
 export const SYSTEM_PROMPT = `You are a senior TypeScript engineer generating production-quality module implementations for Phoenix VCS.
 
@@ -63,11 +64,27 @@ export function buildPrompt(
   canonNodes: CanonicalNode[],
   siblingModules?: string[],
   target?: ResolvedTarget | null,
+  negativeKnowledge?: NegativeKnowledge[],
 ): string {
   const lines: string[] = [];
 
   lines.push(`Generate a TypeScript module implementing "${iu.name}".`);
   lines.push('');
+
+  // Negative knowledge — the system's immune memory. Past failed approaches and
+  // incident-driven constraints for this IU. Shaping the prompt with what failed
+  // is the "gradient of trust": better shapes, not just better prompts.
+  if (negativeKnowledge && negativeKnowledge.length > 0) {
+    lines.push('## Known failures — do not repeat');
+    lines.push('Previous attempts on this module ran into the following. Avoid them:');
+    for (const nk of negativeKnowledge.slice(0, 8)) {
+      lines.push(`- ${nk.what_was_tried} — ${nk.why_it_failed}`);
+      if (nk.constraint_for_future) {
+        lines.push(`  → ${nk.constraint_for_future}`);
+      }
+    }
+    lines.push('');
+  }
 
   // For architecture mode, inject the mandatory imports at the top of the prompt
   if (target) {

@@ -15,6 +15,7 @@ import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
 import type { CanonicalNode } from './models/canonical.js';
+import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { IUManifest, RegenMetadata, FileManifestEntry } from './models/manifest.js';
 import type { LLMProvider } from './llm/provider.js';
 import { buildPrompt, getSystemPrompt } from './llm/prompt.js';
@@ -40,6 +41,20 @@ export interface RegenContext {
   projectRoot?: string;
   /** Architecture target (e.g., sqlite-web-api). */
   target?: ResolvedTarget | null;
+  /**
+   * Negative knowledge per IU (keyed by iu_id). Injected into the generation
+   * prompt so past failures shape the next attempt. (Gate 1.)
+   */
+  negativeKnowledge?: Map<string, NegativeKnowledge[]>;
+  /**
+   * Called when a generation attempt fails (LLM threw, or code never typechecked
+   * after retries). The caller records this as negative knowledge so the immune
+   * memory self-populates. (Gate 2.)
+   */
+  onGenerationFailure?: (
+    iu: ImplementationUnit,
+    detail: { model_id: string; promptpack_hash: string; reason: string },
+  ) => void;
   /** Callback for progress reporting. */
   onProgress?: (iu: ImplementationUnit, status: 'start' | 'done' | 'error', message?: string) => void;
 }
@@ -51,6 +66,8 @@ export interface RegenContext {
 export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Promise<RegenResult> {
   const files = new Map<string, string>();
   const modelId = ctx?.llm ? `${ctx.llm.name}/${ctx.llm.model}` : 'stub-generator/1.0';
+  const promptpackHash = sha256(JSON.stringify(iu.contract));
+  const iuNegativeKnowledge = ctx?.negativeKnowledge?.get(iu.iu_id) ?? [];
 
   for (const outputPath of iu.output_files) {
     let content: string;
@@ -58,12 +75,31 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
     if (ctx?.llm && ctx.canonNodes) {
       ctx.onProgress?.(iu, 'start', `Generating ${iu.name} via ${ctx.llm.name}…`);
       try {
-        content = await generateWithLLM(iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot, ctx.target);
-        ctx.onProgress?.(iu, 'done');
+        const gen = await generateWithLLM(
+          iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot, ctx.target, iuNegativeKnowledge,
+        );
+        content = gen.code;
+        if (gen.typecheckError) {
+          // Code was usable enough to keep, but never fully typechecked.
+          // Capture as negative knowledge so the next cycle is warned. (Gate 2.)
+          ctx.onProgress?.(iu, 'done');
+          ctx.onGenerationFailure?.(iu, {
+            model_id: modelId,
+            promptpack_hash: promptpackHash,
+            reason: `Generated code did not typecheck after retries: ${firstLine(gen.typecheckError)}`,
+          });
+        } else {
+          ctx.onProgress?.(iu, 'done');
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         ctx.onProgress?.(iu, 'error', msg);
-        // Fall back to stub on LLM failure
+        // Fall back to stub on LLM failure — and record what failed. (Gate 2.)
+        ctx.onGenerationFailure?.(iu, {
+          model_id: modelId,
+          promptpack_hash: promptpackHash,
+          reason: `Generation threw, fell back to stub: ${firstLine(msg)}`,
+        });
         content = ctx.target ? generateArchStub(iu) : generateModule(iu);
       }
     } else {
@@ -84,7 +120,6 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
   }
 
   const now = new Date().toISOString();
-  const promptpackHash = sha256(JSON.stringify(iu.contract));
 
   const metadata: RegenMetadata = {
     model_id: modelId,
@@ -130,6 +165,12 @@ const MAX_RETRIES = 2;
  *
  * Both modes include typecheck-and-retry.
  */
+interface LLMGenerationResult {
+  code: string;
+  /** Remaining typecheck errors after retries, if the code never went clean. */
+  typecheckError?: string;
+}
+
 async function generateWithLLM(
   iu: ImplementationUnit,
   llm: LLMProvider,
@@ -137,7 +178,8 @@ async function generateWithLLM(
   allIUs?: ImplementationUnit[],
   projectRoot?: string,
   target?: ResolvedTarget | null,
-): Promise<string> {
+  negativeKnowledge?: NegativeKnowledge[],
+): Promise<LLMGenerationResult> {
   // Find sibling modules in the same service
   const iuDir = iu.output_files[0]?.split('/').slice(0, -1).join('/');
   const siblings = allIUs
@@ -145,7 +187,7 @@ async function generateWithLLM(
     .map(other => other.name) ?? [];
 
   const systemPrompt = getSystemPrompt(target);
-  const prompt = buildPrompt(iu, canonNodes, siblings, target);
+  const prompt = buildPrompt(iu, canonNodes, siblings, target, negativeKnowledge);
   const template = target?.runtime.moduleTemplate;
 
   let code: string;
@@ -168,12 +210,12 @@ async function generateWithLLM(
     }));
   }
 
-  // Typecheck-and-retry loop
+  // Typecheck-and-retry loop. Re-checks after each fix so the final state is known.
+  let typecheckError: string | undefined;
   if (projectRoot && iu.output_files[0]) {
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      const errors = typecheckFile(projectRoot, iu.output_files[0], code);
-      if (!errors) break; // clean!
-
+    let errors = typecheckFile(projectRoot, iu.output_files[0], code);
+    let attempt = 0;
+    while (errors && attempt < MAX_RETRIES) {
       // Feed errors back to LLM with the current code
       const fixPrompt = buildFixPrompt(code, errors);
       const fixResponse = await llm.generate(fixPrompt, {
@@ -187,10 +229,19 @@ async function generateWithLLM(
       } else {
         code = cleanCodeResponse(fixResponse);
       }
+      errors = typecheckFile(projectRoot, iu.output_files[0], code);
+      attempt++;
     }
+    typecheckError = errors ?? undefined;
   }
 
-  return code;
+  return { code, typecheckError };
+}
+
+/** First non-empty line of a (possibly multi-line) message, trimmed for logging. */
+function firstLine(text: string): string {
+  const line = text.split('\n').map(l => l.trim()).find(Boolean) ?? text.trim();
+  return line.length > 200 ? line.slice(0, 197) + '…' : line;
 }
 
 /**

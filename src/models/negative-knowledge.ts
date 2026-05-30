@@ -41,6 +41,37 @@ export interface NegativeKnowledge {
 }
 
 /**
+ * Build a negative-knowledge record from a failed generation attempt.
+ *
+ * The nk_id is deterministic on (iu_id, promptpack_hash) so that re-running the
+ * same failing contract updates the record in place rather than spamming
+ * duplicates. This is how the immune memory self-populates from the regen path.
+ */
+export function failedGenerationKnowledge(params: {
+  iu_id: string;
+  model_id: string;
+  promptpack_hash: string;
+  reason: string;
+  recorded_at: string;
+}): NegativeKnowledge {
+  const shortHash = params.promptpack_hash.slice(0, 8);
+  return {
+    nk_id: `failgen:${params.iu_id}:${shortHash}`,
+    kind: 'failed_generation',
+    subject_id: params.iu_id,
+    subject_type: 'iu',
+    what_was_tried: `Generation via ${params.model_id} (promptpack ${shortHash})`,
+    why_it_failed: params.reason,
+    constraint_for_future:
+      'A prior generation with this contract failed. Re-read the failure detail ' +
+      'before regenerating; adjust the contract or approach rather than repeating it.',
+    recorded_at: params.recorded_at,
+    recorded_by: 'phoenix-regen',
+    active: true,
+  };
+}
+
+/**
  * Check if a regeneration should consult negative knowledge before proceeding.
  */
 export function hasRelevantNegativeKnowledge(

@@ -13,6 +13,16 @@ export interface RegenMetadata {
   promptpack_hash: string;
   toolchain_version: string;
   generated_at: string;
+  /**
+   * Regeneration gate verdict, stamped at accept time (warn-first in alpha).
+   * Readiness from the Replacement Audit: opaque|observable|evaluable|regenerable.
+   */
+  readiness?: string;
+  /**
+   * Conceptual mass at this regeneration. The next cycle reads this as the
+   * `previousMass` baseline for the ratchet check.
+   */
+  conceptual_mass?: number;
 }
 
 export interface IUManifest {

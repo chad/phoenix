@@ -33,7 +33,9 @@ import { BootstrapStateMachine } from './bootstrap.js';
 // Phase C
 import { planIUs } from './iu-planner.js';
 import { generateIU, generateAll } from './regen.js';
-import type { RegenContext } from './regen.js';
+import type { RegenContext, RegenResult } from './regen.js';
+import { gateIU } from './regen-gate.js';
+import type { GateVerdict } from './regen-gate.js';
 import { detectDrift } from './drift.js';
 import { extractDependencies } from './dep-extractor.js';
 import { validateBoundary } from './boundary-validator.js';
@@ -66,6 +68,8 @@ import { auditIU, auditAll } from './audit.js';
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
 import { NegativeKnowledgeStore } from './store/negative-knowledge-store.js';
+import { failedGenerationKnowledge } from './models/negative-knowledge.js';
+import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { PaceLayerMetadata } from './models/pace-layer.js';
 
 // Models
@@ -293,6 +297,97 @@ function cmdInit(args?: string[]): void {
   console.log(`    2. Run ${cyan('phoenix bootstrap')} to ingest & canonicalize`);
 }
 
+// ─── Regeneration Gate wiring (warn-first) ───────────────────────────────────
+
+/** Load each IU's conceptual mass from the previous manifest cycle. */
+function loadPreviousMasses(manifestManager: ManifestManager): Map<string, number> {
+  const manifest = manifestManager.load();
+  const masses = new Map<string, number>();
+  for (const [id, iuManifest] of Object.entries(manifest.iu_manifests)) {
+    const mass = iuManifest.regen_metadata.conceptual_mass;
+    if (typeof mass === 'number') masses.set(id, mass);
+  }
+  return masses;
+}
+
+/**
+ * Build the negative-knowledge routing for a regen run: the per-IU map fed into
+ * generation prompts (Gate 1) and the failure callback that records new negative
+ * knowledge as it happens (Gate 2 — the immune memory self-populates).
+ */
+function buildNKRouting(phoenixDir: string, ius: ImplementationUnit[]): {
+  nkByIU: Map<string, NegativeKnowledge[]>;
+  onGenerationFailure: NonNullable<RegenContext['onGenerationFailure']>;
+} {
+  const nkStore = new NegativeKnowledgeStore(phoenixDir);
+  const nkByIU = new Map<string, NegativeKnowledge[]>();
+  for (const iu of ius) nkByIU.set(iu.iu_id, nkStore.getBySubject(iu.iu_id));
+  const onGenerationFailure: NonNullable<RegenContext['onGenerationFailure']> = (iu, detail) => {
+    nkStore.add(failedGenerationKnowledge({
+      iu_id: iu.iu_id,
+      model_id: detail.model_id,
+      promptpack_hash: detail.promptpack_hash,
+      reason: detail.reason,
+      recorded_at: new Date().toISOString(),
+    }));
+  };
+  return { nkByIU, onGenerationFailure };
+}
+
+/**
+ * Run the regeneration gate over fresh results, stamping readiness + conceptual
+ * mass into each manifest (warn-first — commits are never blocked in alpha).
+ * Must run before recordIU so the stamp is persisted.
+ */
+function gateRegenResults(
+  phoenixDir: string,
+  results: RegenResult[],
+  ius: ImplementationUnit[],
+  previousMasses: Map<string, number>,
+): GateVerdict[] {
+  const evalStore = new EvaluationStore(phoenixDir);
+  const nkStore = new NegativeKnowledgeStore(phoenixDir);
+  const nk = nkStore.getActive(); // includes failures just recorded this run
+  const verdicts: GateVerdict[] = [];
+  for (const result of results) {
+    const iu = ius.find(i => i.iu_id === result.iu_id);
+    if (!iu) continue;
+    const verdict = gateIU({
+      iu,
+      allIUs: ius,
+      evalCoverage: evalStore.coverage(iu),
+      negativeKnowledge: nk.filter(n => n.subject_id === iu.iu_id),
+      previousMass: previousMasses.get(iu.iu_id),
+      mode: 'warn',
+    });
+    result.manifest.regen_metadata.readiness = verdict.readiness;
+    result.manifest.regen_metadata.conceptual_mass = verdict.mass;
+    verdicts.push(verdict);
+  }
+  return verdicts;
+}
+
+/** Print the regeneration gate verdicts. Warn-first: surfaced, not blocking. */
+function reportRegenGate(verdicts: GateVerdict[], indent = '  '): void {
+  if (verdicts.length === 0) return;
+  console.log(`${indent}${bold('🚪 Regeneration Gate')} ${dim('(warn-first — commits not blocked in alpha)')}`);
+  for (const v of verdicts) {
+    const icon = readinessToIcon(v.readiness);
+    const massStr = v.mass_delta === undefined
+      ? `mass ${v.mass}`
+      : `mass ${v.mass} (${v.mass_delta >= 0 ? '+' : ''}${v.mass_delta})`;
+    console.log(`${indent}  ${icon} ${v.iu_name} ${dim('—')} ${v.readiness}, score ${v.score}, ${massStr}`);
+    if (v.ratchet_violation) {
+      console.log(`${indent}    ${yellow('⚠ mass ratchet')} ${dim('— conceptual mass grew without justification')}`);
+    }
+    for (const b of v.blockers) {
+      const mark = b.severity === 'error' ? red('●') : yellow('○');
+      console.log(`${indent}    ${mark} ${dim(`[${b.category}]`)} ${b.message}`);
+    }
+  }
+  console.log();
+}
+
 async function cmdBootstrap(): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
 
@@ -413,12 +508,16 @@ async function cmdBootstrap(): Promise<void> {
     } catch { /* best effort */ }
   }
 
+  const { nkByIU, onGenerationFailure } = buildNKRouting(phoenixDir, ius);
+
   const regenCtx: RegenContext = {
     llm: llm ?? undefined,
     canonNodes,
     allIUs: ius,
     projectRoot,
     target: arch,
+    negativeKnowledge: nkByIU,
+    onGenerationFailure,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
       else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
@@ -427,7 +526,12 @@ async function cmdBootstrap(): Promise<void> {
   };
 
   const manifestManager = new ManifestManager(phoenixDir);
+  const previousMasses = loadPreviousMasses(manifestManager);
   const regenResults = await generateAll(ius, regenCtx);
+
+  // Gate: stamp readiness + conceptual mass into manifests before recording.
+  const gateVerdicts = gateRegenResults(phoenixDir, regenResults, ius, previousMasses);
+
   for (const result of regenResults) {
     for (const [filePath, content] of result.files) {
       const fullPath = join(projectRoot, filePath);
@@ -440,6 +544,7 @@ async function cmdBootstrap(): Promise<void> {
     }
   }
   console.log();
+  reportRegenGate(gateVerdicts, '  ');
 
   // Step 5: Service scaffold
   console.log(`  ${dim('Scaffold:')} Service wiring + project config`);
@@ -1066,12 +1171,16 @@ async function cmdRegen(args: string[]): Promise<void> {
     } catch { /* ignore */ }
   }
 
+  const { nkByIU, onGenerationFailure } = buildNKRouting(phoenixDir, ius);
+
   const regenCtx: RegenContext = {
     llm: llm ?? undefined,
     canonNodes,
     allIUs: ius,
     projectRoot,
     target: regenArch,
+    negativeKnowledge: nkByIU,
+    onGenerationFailure,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
       else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
@@ -1080,7 +1189,11 @@ async function cmdRegen(args: string[]): Promise<void> {
   };
 
   const manifestManager = new ManifestManager(phoenixDir);
+  const previousMasses = loadPreviousMasses(manifestManager);
   const results = await generateAll(targetIUs, regenCtx);
+
+  // Gate: stamp readiness + conceptual mass into manifests before recording.
+  const gateVerdicts = gateRegenResults(phoenixDir, results, ius, previousMasses);
 
   for (const result of results) {
     for (const [filePath, content] of result.files) {
@@ -1110,6 +1223,7 @@ async function cmdRegen(args: string[]): Promise<void> {
   }
 
   console.log();
+  reportRegenGate(gateVerdicts, '  ');
   console.log(`  ${dim(`${results.length} IU(s) regenerated. Scaffold updated.`)}`);
 }
 
@@ -1419,8 +1533,8 @@ function cmdAudit(args: string[]): void {
   // TODO: load from .phoenix/pace-layers.json when populated
 
   const nk = nkStore.getActive();
-  const previousMasses = new Map<string, number>();
-  // TODO: load from previous manifest cycle
+  // Conceptual mass stamped by the regeneration gate into the manifest.
+  const previousMasses = loadPreviousMasses(new ManifestManager(phoenixDir));
 
   // Filter by --iu if specified
   const iuArg = args.find(a => a.startsWith('--iu='));
