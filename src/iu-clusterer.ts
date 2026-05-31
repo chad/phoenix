@@ -198,13 +198,14 @@ export async function clusterCanonNodesLLM(
   const listed = real.map((n, i) => `${i + 1}. [${n.type}] ${n.statement.replace(/\n/g, ' ')}`).join('\n');
   const prompt = `Group these software requirements into cohesive implementation modules.
 
-Rules for a good module:
-- It is a single domain ENTITY (e.g. an issue, a sprint) together with its constraints, invariants, and operations — or a single CAPABILITY (a UI/board view, or a derived report/rollup).
-- Validation/workflow rules go WITH the entity they govern — never as a separate module.
-- A user-facing UI is ONE module, separate from the API entities it displays.
-- Group by domain meaning, not by any document structure. Aim for a handful of cohesive modules, each replaceable on its own.
+A module is ONE real-world thing. The whole system is usually 3–6 modules:
+- one module per domain ENTITY — its data model, ALL its validation/workflow rules, AND its API/operations are the SAME module. Never split "issue" from "issue api" or "issue validation"; combine them into one "issue" module.
+- one module for the user-facing UI (the board/dashboard), separate from the entities it displays.
+- one module per genuinely DERIVED view (e.g. a rollup/report computed from other entities).
 
-Return ONLY a JSON array: [{"name": "<short module name>", "members": [<requirement numbers>]}], every requirement assigned to exactly one module, no prose.
+Do NOT create a module for a cross-cutting phrase like "expose a programmatic interface", or for generic definitions/identifiers — attach those requirements to the entity they most concern. Group by domain meaning, never by document structure. Every module must be replaceable on its own.
+
+Return ONLY a JSON array: [{"name": "<short entity or capability name>", "members": [<requirement numbers>]}], with every requirement assigned to exactly one module and no prose.
 
 Requirements:
 ${listed}`;

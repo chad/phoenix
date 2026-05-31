@@ -3,16 +3,16 @@ import { app, mount } from './app.js';
 import { runMigrations } from './db.js';
 
 // Generated route modules
-import design from './generated/board/design.js';
-import issues from './generated/issues/issues.js';
-import sprint_rollup from './generated/sprints/sprint-rollup.js';
-import sprints from './generated/sprints/sprints.js';
+import board from './generated/board/board.js';
+import issue from './generated/issue/issue.js';
+import sprint from './generated/sprint/sprint.js';
+import sprint_rollup from './generated/sprint-rollup/sprint-rollup.js';
 
 // Mount routes
-mount('/design', design);
-mount('/issues', issues);
+mount('/board', board);
+mount('/issue', issue);
+mount('/sprint', sprint);
 mount('/sprint-rollup', sprint_rollup);
-mount('/sprints', sprints);
 
 const port = parseInt(process.env.PORT ?? '3000', 10);
 runMigrations();

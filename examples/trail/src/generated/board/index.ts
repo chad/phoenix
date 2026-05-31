@@ -5,4 +5,4 @@
  * Barrel export for all Board modules.
  */
 
-export * as design from './design.js';
+export * as board from './board.js';

@@ -4,13 +4,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import design from '../design.js';
+import board from '../board.js';
 
 describe('Board modules', () => {
-  describe('Design', () => {
+  describe('Board', () => {
     it('exports a Hono router as default', () => {
-      expect(design).toBeDefined();
-      expect(typeof design.fetch).toBe('function');
+      expect(board).toBeDefined();
+      expect(typeof board.fetch).toBe('function');
     });
   });
 });

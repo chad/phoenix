@@ -5,11 +5,13 @@
  */
 
 export * as board from './board/index.js';
-export * as issues from './issues/index.js';
-export * as sprints from './sprints/index.js';
+export * as issue from './issue/index.js';
+export * as sprint from './sprint/index.js';
+export * as sprintRollup from './sprint-rollup/index.js';
 
 export const services = [
   { name: 'Board', dir: 'board', port: 3000, modules: 1 },
-  { name: 'Issues', dir: 'issues', port: 3001, modules: 1 },
-  { name: 'Sprints', dir: 'sprints', port: 3002, modules: 2 },
+  { name: 'Issue', dir: 'issue', port: 3001, modules: 1 },
+  { name: 'Sprint', dir: 'sprint', port: 3003, modules: 1 },
+  { name: 'Sprint Rollup', dir: 'sprint-rollup', port: 3002, modules: 1 },
 ] as const;
