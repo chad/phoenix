@@ -37,6 +37,8 @@ import type { RegenContext, RegenResult } from './regen.js';
 import { gateIU } from './regen-gate.js';
 import type { GateVerdict } from './regen-gate.js';
 import { detectDrift } from './drift.js';
+import { splitSharedArtifacts, parseRegions, MIGRATIONS_FILE } from './artifacts.js';
+import type { SplitResult, ParsedRegion } from './artifacts.js';
 import { extractDependencies } from './dep-extractor.js';
 import { validateBoundary } from './boundary-validator.js';
 
@@ -79,7 +81,7 @@ import { DiffType } from './models/clause.js';
 import type { CanonicalNode } from './models/canonical.js';
 import type { ImplementationUnit } from './models/iu.js';
 import type { Diagnostic } from './models/diagnostic.js';
-import type { DriftReport } from './models/manifest.js';
+import type { DriftReport, DriftEntry } from './models/manifest.js';
 import { DriftStatus } from './models/manifest.js';
 import { BootstrapState, DRateLevel } from './models/classification.js';
 import type { PolicyEvaluation, CascadeEvent } from './models/evidence.js';
@@ -320,6 +322,23 @@ function loadExistingContracts(projectRoot: string, ius: ImplementationUnit[]): 
   return contracts;
 }
 
+/** Read the existing shared migrations file's regions (for partial-regen merge). */
+function readSharedRegions(projectRoot: string): ParsedRegion[] {
+  const p = join(projectRoot, MIGRATIONS_FILE);
+  if (!existsSync(p)) return [];
+  return parseRegions(readFileSync(p, 'utf8'));
+}
+
+/** Report what the artifact split lifted into the shared aggregate. */
+function reportArtifactSplit(split: SplitResult, indent: string): void {
+  if (!split.sharedFiles.length) return;
+  const regions = split.sharedFiles.reduce((n, s) => n + s.regions.length, 0);
+  console.log(`${indent}${dim('Shared artifact:')} ${cyan(MIGRATIONS_FILE)} ${dim(`(${regions} migration region${regions === 1 ? '' : 's'})`)}`);
+  for (const conf of split.conflicts) {
+    console.log(`${indent}${yellow('⚠')} duplicate table ${bold(conf.table)} — kept ${conf.keptIU.slice(0, 8)}…, dropped ${conf.droppedIUs.length}`);
+  }
+}
+
 /** Load each IU's conceptual mass from the previous manifest cycle. */
 function loadPreviousMasses(manifestManager: ManifestManager): Map<string, number> {
   const manifest = manifestManager.load();
@@ -551,6 +570,11 @@ async function cmdBootstrap(): Promise<void> {
   const previousMasses = loadPreviousMasses(manifestManager);
   const regenResults = await generateAll(ius, regenCtx);
 
+  // Lift shared aggregate artifacts (migrations) out of the modules into one file
+  // with per-IU regions. Mutates regenResults (module content + remapped provenance).
+  const split = splitSharedArtifacts(regenResults, arch);
+  reportArtifactSplit(split, '    ');
+
   // Gate: stamp readiness + conceptual mass into manifests before recording.
   const gateVerdicts = gateRegenResults(phoenixDir, regenResults, ius, previousMasses);
 
@@ -565,6 +589,12 @@ async function cmdBootstrap(): Promise<void> {
       console.log(`    ${green('✔')} ${result.iu_id.slice(0, 8)}… → ${result.files.size} file(s)`);
     }
   }
+  for (const [filePath, content] of split.files) {
+    const fullPath = join(projectRoot, filePath);
+    mkdirSync(join(fullPath, '..'), { recursive: true });
+    writeFileSync(fullPath, content, 'utf8');
+  }
+  manifestManager.recordSharedFiles(split.sharedFiles);
   console.log();
   reportRegenGate(gateVerdicts, '  ');
 
@@ -572,7 +602,7 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`  ${dim('Scaffold:')} Service wiring + project config`);
   const services = deriveServices(ius);
   const projectName = basename(projectRoot);
-  const scaffold = generateScaffold(services, projectName, arch);
+  const scaffold = generateScaffold(services, projectName, arch, split.serverImports);
   for (const [filePath, content] of scaffold.files) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
@@ -1216,6 +1246,14 @@ async function cmdRegen(args: string[]): Promise<void> {
   const previousMasses = loadPreviousMasses(manifestManager);
   const results = await generateAll(targetIUs, regenCtx);
 
+  // Shared aggregate (migrations): this may be a PARTIAL regen, so preserve regions
+  // owned by IUs not in this batch and merge the freshly-generated ones over them.
+  const regeneratedIUs = new Set(results.map(r => r.iu_id));
+  const preserve = readSharedRegions(projectRoot)
+    .filter(r => !regeneratedIUs.has(r.iu_id));
+  const split = splitSharedArtifacts(results, regenArch, { preserve });
+  reportArtifactSplit(split, '  ');
+
   // Gate: stamp readiness + conceptual mass into manifests before recording.
   const gateVerdicts = gateRegenResults(phoenixDir, results, ius, previousMasses);
 
@@ -1235,13 +1273,19 @@ async function cmdRegen(args: string[]): Promise<void> {
       }
     }
   }
+  for (const [filePath, content] of split.files) {
+    const fullPath = join(projectRoot, filePath);
+    mkdirSync(join(fullPath, '..'), { recursive: true });
+    writeFileSync(fullPath, content, 'utf8');
+  }
+  if (split.sharedFiles.length) manifestManager.recordSharedFiles(split.sharedFiles);
 
   // Re-generate scaffold wiring. Pass the architecture so the unified app/server
   // wiring (src/server.ts) is refreshed too — otherwise removing or renaming an IU
   // leaves stale imports to deleted modules and the app won't compile.
   const allIUs = loadIUs(phoenixDir);
   const services = deriveServices(allIUs);
-  const scaffold = generateScaffold(services, basename(projectRoot), regenArch);
+  const scaffold = generateScaffold(services, basename(projectRoot), regenArch, split.serverImports);
   for (const [filePath, content] of scaffold.files) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
@@ -1265,6 +1309,16 @@ function cmdDrift(): void {
 
   const report = detectDrift(manifest, projectRoot);
 
+  // Map IU id → name so shared-file regions show whose contribution drifted.
+  const iuNames = new Map(loadIUs(phoenixDir).map(iu => [iu.iu_id, iu.name]));
+  // A shared-file region: distinguish it from the file as a whole.
+  const label = (entry: DriftEntry): string => {
+    if (!entry.role) return entry.file_path;
+    const owner = entry.iu_id ? (iuNames.get(entry.iu_id) ?? entry.iu_id.slice(0, 8)) : '?';
+    const where = entry.region ? ` ${dim(`L${entry.region.start_line + 1}–${entry.region.end_line}`)}` : '';
+    return `${entry.file_path} ${dim('›')} ${entry.role}${entry.key ? `:${entry.key}` : ''} ${dim(`(${owner})`)}${where}`;
+  };
+
   console.log(bold('🔍 Drift Detection'));
   console.log();
 
@@ -1278,20 +1332,20 @@ function cmdDrift(): void {
   for (const entry of report.entries) {
     switch (entry.status) {
       case DriftStatus.CLEAN:
-        console.log(`  ${green('✔')} ${entry.file_path}`);
+        console.log(`  ${green('✔')} ${label(entry)}`);
         break;
       case DriftStatus.DRIFTED:
-        console.log(`  ${red('✖')} ${entry.file_path} ${red('DRIFTED')}`);
+        console.log(`  ${red('✖')} ${label(entry)} ${red('DRIFTED')}`);
         console.log(`    ${dim('expected:')} ${entry.expected_hash?.slice(0, 12)}…`);
         console.log(`    ${dim('actual:')}   ${entry.actual_hash?.slice(0, 12)}…`);
         console.log(`    ${dim('→ Label this edit: promote_to_requirement | waiver | temporary_patch')}`);
         break;
       case DriftStatus.MISSING:
-        console.log(`  ${red('✖')} ${entry.file_path} ${red('MISSING')}`);
+        console.log(`  ${red('✖')} ${label(entry)} ${red('MISSING')}`);
         console.log(`    ${dim('→ Run `phoenix regen` to regenerate')}`);
         break;
       case DriftStatus.WAIVED:
-        console.log(`  ${yellow('⚠')} ${entry.file_path} ${yellow('WAIVED')}`);
+        console.log(`  ${yellow('⚠')} ${label(entry)} ${yellow('WAIVED')}`);
         if (entry.waiver) {
           console.log(`    ${dim('kind:')} ${entry.waiver.kind}`);
           console.log(`    ${dim('reason:')} ${entry.waiver.reason}`);

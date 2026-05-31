@@ -291,9 +291,14 @@ async function generateWithLLM(
   }
 
   // Typecheck-and-retry loop. Re-checks after each fix so the final state is known.
+  // The check is BOTH tsc AND inline-script validation — a module can typecheck clean
+  // yet ship browser-fatal JS inside c.html(`…`), so inline validation must gate the
+  // initial pass too, not only post-fix retries.
   let typecheckError: string | undefined;
   if (projectRoot && iu.output_files[0]) {
-    let errors = typecheckFile(projectRoot, iu.output_files[0], code);
+    const check = (c: string): string | null =>
+      typecheckFile(projectRoot, iu.output_files[0], c) || validateInlineScripts(c);
+    let errors = check(code);
     let attempt = 0;
     while (errors && attempt < MAX_RETRIES) {
       // Feed errors back to LLM with the current code
@@ -309,7 +314,7 @@ async function generateWithLLM(
       } else {
         code = cleanCodeResponse(fixResponse);
       }
-      errors = typecheckFile(projectRoot, iu.output_files[0], code) || validateInlineScripts(code);
+      errors = check(code);
       attempt++;
     }
     typecheckError = errors ?? undefined;
@@ -485,7 +490,12 @@ export function validateInlineScripts(code: string): string | null {
     const body = m[1];
     if (!body.trim()) continue;
     try {
-      new vm.Script(body);
+      // The inline <script> is emitted inside c.html(`…`), so the browser sees the
+      // TEMPLATE-LITERAL-COOKED text, not the raw source. A source `\'` (a valid
+      // escaped quote) collapses to `'` at render time and can break client JS
+      // (e.g. `', \'' +` → `', '' +`, two adjacent strings → SyntaxError). Validate
+      // the cooked form the browser will actually parse.
+      new vm.Script(cookTemplateLiteral(body));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return `Inline <script> has a browser JavaScript syntax error: ${msg}. `
@@ -497,6 +507,22 @@ export function validateInlineScripts(code: string): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Cook a string the way a backtick template literal would, since our inline scripts
+ * are emitted inside c.html(`…`). This is what the browser actually receives:
+ * `${…}` interpolations resolve to runtime values (we neutralize them to a literal),
+ * and backslash escapes are consumed (`\'`→`'`, `\\`→`\`, `` \` ``→`` ` ``, `\n`→LF…).
+ * Validating the cooked form catches client-JS syntax errors that the raw source hides.
+ */
+function cookTemplateLiteral(body: string): string {
+  // Neutralize interpolations first — their runtime value is unknown; a literal keeps
+  // the surrounding JS parseable. (Escaped `\${…}` is handled by the cook pass below.)
+  const noInterp = body.replace(/(^|[^\\])\$\{[^}]*\}/g, '$1(0)');
+  const map: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
+  // Consume backslash-escapes left-to-right (so `\\` becomes a single `\`).
+  return noInterp.replace(/\\([\s\S])/g, (_, c: string) => map[c] ?? c);
 }
 
 /**

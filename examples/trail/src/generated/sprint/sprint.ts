@@ -1,24 +1,6 @@
 import { Hono } from 'hono';
-import { db, registerMigration } from '../../db.js';
+import { db } from '../../db.js';
 import { z } from 'zod';
-
-// ─── Database migrations ────────────────────────────────────────────────────
-
-// ─── Database migrations ────────────────────────────────────────────────────
-
-registerMigration('sprints', `
-  CREATE TABLE IF NOT EXISTS sprints (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    goal TEXT,
-    start_date TEXT NOT NULL,
-    end_date TEXT NOT NULL,
-    capacity INTEGER,
-    is_current BOOLEAN NOT NULL DEFAULT 0,
-    is_closed BOOLEAN NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
-`);
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -28,7 +10,6 @@ const CreateSprintSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   capacity: z.number().int().positive().nullable().optional(),
-  is_current: z.boolean().optional().default(false),
 });
 
 const UpdateSprintSchema = z.object({
@@ -37,7 +18,6 @@ const UpdateSprintSchema = z.object({
   start_date: z.string().optional(),
   end_date: z.string().optional(),
   capacity: z.number().int().positive().nullable().optional(),
-  is_current: z.boolean().optional(),
   is_closed: z.boolean().optional(),
 });
 
@@ -66,7 +46,7 @@ router.post('/', async (c) => {
   const result = CreateSprintSchema.safeParse(body);
   if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
   
-  const { name, goal, start_date, end_date, capacity, is_current } = result.data;
+  const { name, goal, start_date, end_date, capacity } = result.data;
   
   // Validate dates
   const startDate = new Date(start_date);
@@ -78,15 +58,10 @@ router.post('/', async (c) => {
     return c.json({ error: 'End date cannot be before start date' }, 400);
   }
   
-  // If setting as current, clear other current sprints
-  if (is_current) {
-    db.prepare('UPDATE sprints SET is_current = 0').run();
-  }
-  
   const info = db.prepare(`
-    INSERT INTO sprints (name, goal, start_date, end_date, capacity, is_current) 
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name, goal ?? null, start_date, end_date, capacity ?? null, is_current ? 1 : 0);
+    INSERT INTO sprints (name, goal, start_date, end_date, capacity) 
+    VALUES (?, ?, ?, ?, ?)
+  `).run(name, goal ?? null, start_date, end_date, capacity ?? null);
   
   const sprint = db.prepare('SELECT * FROM sprints WHERE id = ?').get(info.lastInsertRowid);
   return c.json(sprint, 201);
@@ -94,8 +69,9 @@ router.post('/', async (c) => {
 
 router.patch('/:id', async (c) => {
   const id = c.req.param('id');
-  const sprint = db.prepare('SELECT * FROM sprints WHERE id = ?').get(id);
-  if (!sprint) return c.json({ error: 'Not found' }, 404);
+  if (!db.prepare('SELECT id FROM sprints WHERE id = ?').get(id)) {
+    return c.json({ error: 'Not found' }, 404);
+  }
   
   let body;
   try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
@@ -105,11 +81,11 @@ router.patch('/:id', async (c) => {
   
   const u = result.data;
   
-  // Validate dates if provided
+  // Validate dates if both are provided
   if (u.start_date !== undefined || u.end_date !== undefined) {
-    const currentSprint = db.prepare('SELECT start_date, end_date FROM sprints WHERE id = ?').get(id) as any;
-    const startDate = new Date(u.start_date ?? currentSprint.start_date);
-    const endDate = new Date(u.end_date ?? currentSprint.end_date);
+    const current = db.prepare('SELECT start_date, end_date FROM sprints WHERE id = ?').get(id) as any;
+    const startDate = new Date(u.start_date ?? current.start_date);
+    const endDate = new Date(u.end_date ?? current.end_date);
     
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       return c.json({ error: 'Invalid date format' }, 400);
@@ -119,35 +95,34 @@ router.patch('/:id', async (c) => {
     }
   }
   
-  // If setting as current, clear other current sprints
-  if (u.is_current === true) {
-    db.prepare('UPDATE sprints SET is_current = 0').run();
-  }
-  
   if (u.name !== undefined) db.prepare('UPDATE sprints SET name = ? WHERE id = ?').run(u.name, id);
   if (u.goal !== undefined) db.prepare('UPDATE sprints SET goal = ? WHERE id = ?').run(u.goal, id);
   if (u.start_date !== undefined) db.prepare('UPDATE sprints SET start_date = ? WHERE id = ?').run(u.start_date, id);
   if (u.end_date !== undefined) db.prepare('UPDATE sprints SET end_date = ? WHERE id = ?').run(u.end_date, id);
   if (u.capacity !== undefined) db.prepare('UPDATE sprints SET capacity = ? WHERE id = ?').run(u.capacity, id);
-  if (u.is_current !== undefined) db.prepare('UPDATE sprints SET is_current = ? WHERE id = ?').run(u.is_current ? 1 : 0, id);
   if (u.is_closed !== undefined) db.prepare('UPDATE sprints SET is_closed = ? WHERE id = ?').run(u.is_closed ? 1 : 0, id);
   
-  return c.json(db.prepare('SELECT * FROM sprints WHERE id = ?').get(id));
+  const sprint = db.prepare('SELECT * FROM sprints WHERE id = ?').get(id);
+  return c.json(sprint);
 });
 
 router.delete('/:id', (c) => {
   const id = c.req.param('id');
-  if (!db.prepare('SELECT id FROM sprints WHERE id = ?').get(id)) return c.json({ error: 'Not found' }, 404);
+  if (!db.prepare('SELECT id FROM sprints WHERE id = ?').get(id)) {
+    return c.json({ error: 'Not found' }, 404);
+  }
   
   // Check if any issues are attached to this sprint
-  const issueCount = db.prepare('SELECT COUNT(*) as count FROM issues WHERE sprint_id = ?').get(id) as any;
+  const issueCount = db.prepare('SELECT COUNT(*) as count FROM issues WHERE sprint_id = ?').get(id) as { count: number };
   if (issueCount.count > 0) {
-    return c.json({ error: 'Cannot delete sprint with attached issues. Move issues to another sprint or back to backlog first.' }, 400);
+    return c.json({ error: 'Cannot delete sprint with attached issues. Move issues to another sprint or backlog first.' }, 400);
   }
   
   db.prepare('DELETE FROM sprints WHERE id = ?').run(id);
   return c.body(null, 204);
 });
+
+
 
 
 

@@ -38,8 +38,42 @@ export interface IUManifest {
   regen_metadata: RegenMetadata;
 }
 
+/**
+ * One IU's contribution to a shared aggregate file (e.g. its migration inside the
+ * shared `_migrations.ts`). The region is delimited in the file by
+ * `// <<phx:region iu=… role=…>> … // <</phx:region>>` markers; `content_hash` is
+ * over the region body alone, so drift is localized and attributed to one IU.
+ */
+export interface FileRegion {
+  iu_id: string;
+  /** Artifact role of this region, e.g. 'migration'. */
+  role: string;
+  /** Optional secondary key within a role (e.g. the table name for a migration). */
+  key?: string;
+  /** Hash of the region body (the lines between the markers), not the whole file. */
+  content_hash: string;
+  /** 0-based line index of the region body's first line in the assembled file. */
+  start_line: number;
+  /** 0-based line index just past the region body's last line. */
+  end_line: number;
+}
+
+/**
+ * A file owned by NO single IU — an aggregate of contributions from many IUs.
+ * The canonical example is the database migrations file: every entity IU
+ * contributes one `registerMigration` region.
+ */
+export interface SharedFileManifest {
+  path: string;
+  /** Whole-file hash — fast path for "nothing drifted". */
+  content_hash: string;
+  regions: FileRegion[];
+}
+
 export interface GeneratedManifest {
   iu_manifests: Record<string, IUManifest>;
+  /** Shared aggregate files (path → manifest). IUs contribute regions, not the file. */
+  shared_files?: Record<string, SharedFileManifest>;
   generated_at: string;
 }
 
@@ -63,6 +97,12 @@ export interface DriftEntry {
   expected_hash?: string;
   actual_hash?: string;
   waiver?: DriftWaiver;
+  /** For a shared-file region: the artifact role (e.g. 'migration'). */
+  role?: string;
+  /** For a shared-file region: the role's secondary key (e.g. the table name). */
+  key?: string;
+  /** For a shared-file region: its body line range in the file. */
+  region?: { start_line: number; end_line: number };
 }
 
 export interface DriftWaiver {

@@ -72,6 +72,7 @@ export function generateScaffold(
   services: ServiceDescriptor[],
   projectName: string = 'phoenix-project',
   target?: ResolvedTarget | null,
+  sharedImports: string[] = [],
 ): ScaffoldResult {
   const files = new Map<string, string>();
 
@@ -107,6 +108,10 @@ export function generateScaffold(
       `import { serve } from '@hono/node-server';`,
       `import { app, mount } from './app.js';`,
       `import { runMigrations } from './db.js';`,
+      ...(sharedImports.length
+        ? [``, `// Shared aggregate artifacts (register migrations, etc.)`,
+           ...sharedImports.map(s => `import '${s}';`)]
+        : []),
       ``,
       `// Generated route modules`,
       ...routeImports,

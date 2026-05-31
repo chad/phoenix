@@ -2,6 +2,9 @@ import { serve } from '@hono/node-server';
 import { app, mount } from './app.js';
 import { runMigrations } from './db.js';
 
+// Shared aggregate artifacts (register migrations, etc.)
+import './generated/_migrations.js';
+
 // Generated route modules
 import board from './generated/board/board.js';
 import issue from './generated/issue/issue.js';

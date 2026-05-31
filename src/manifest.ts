@@ -4,7 +4,7 @@
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { GeneratedManifest, IUManifest } from './models/manifest.js';
+import type { GeneratedManifest, IUManifest, SharedFileManifest } from './models/manifest.js';
 
 export class ManifestManager {
   private manifestPath: string;
@@ -17,9 +17,11 @@ export class ManifestManager {
 
   load(): GeneratedManifest {
     if (!existsSync(this.manifestPath)) {
-      return { iu_manifests: {}, generated_at: '' };
+      return { iu_manifests: {}, shared_files: {}, generated_at: '' };
     }
-    return JSON.parse(readFileSync(this.manifestPath, 'utf8'));
+    const m = JSON.parse(readFileSync(this.manifestPath, 'utf8')) as GeneratedManifest;
+    if (!m.shared_files) m.shared_files = {};
+    return m;
   }
 
   save(manifest: GeneratedManifest): void {
@@ -75,6 +77,18 @@ export class ManifestManager {
   getIUManifest(iuId: string): IUManifest | null {
     const manifest = this.load();
     return manifest.iu_manifests[iuId] ?? null;
+  }
+
+  /**
+   * Record shared aggregate files (e.g. the migrations file). Replaces the whole
+   * shared-file set — these are regenerated wholesale each cycle from all IUs.
+   */
+  recordSharedFiles(shared: SharedFileManifest[]): void {
+    const manifest = this.load();
+    manifest.shared_files = {};
+    for (const s of shared) manifest.shared_files[s.path] = s;
+    manifest.generated_at = new Date().toISOString();
+    this.save(manifest);
   }
 
   /**
