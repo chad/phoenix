@@ -39,6 +39,8 @@ import type { GateVerdict } from './regen-gate.js';
 import { detectDrift } from './drift.js';
 import { splitSharedArtifacts, parseRegions, MIGRATIONS_FILE } from './artifacts.js';
 import type { SplitResult, ParsedRegion } from './artifacts.js';
+import { runCompileGate } from './compile-gate.js';
+import type { CompileGateResult } from './compile-gate.js';
 import { extractDependencies } from './dep-extractor.js';
 import { validateBoundary } from './boundary-validator.js';
 
@@ -61,6 +63,7 @@ import type { TrustInputs } from './inspect.js';
 
 // LLM
 import { resolveProvider, describeAvailability } from './llm/resolve.js';
+import type { LLMProvider } from './llm/provider.js';
 
 // Architectures
 import { resolveTarget, listArchitectures } from './architectures/index.js';
@@ -339,6 +342,75 @@ function reportArtifactSplit(split: SplitResult, indent: string): void {
   }
 }
 
+/**
+ * Run the compile gate over the assembled project and report honestly: repair what we
+ * can, refresh manifest hashes for repaired files, record unresolved build errors as
+ * negative knowledge, and persist a build-status the trust dashboard reads. A failing
+ * build is surfaced loudly — never swallowed.
+ */
+async function runCompileGateAndReport(
+  projectRoot: string,
+  phoenixDir: string,
+  ius: ImplementationUnit[],
+  opts: {
+    llm: LLMProvider | null;
+    target: ResolvedTarget | null;
+    manifestManager: ManifestManager;
+    onGenerationFailure?: RegenContext['onGenerationFailure'];
+    indent?: string;
+  },
+): Promise<CompileGateResult> {
+  const indent = opts.indent ?? '  ';
+  console.log(`${indent}${bold('🔧 Compile Gate')} ${dim('(the assembled system must typecheck)')}`);
+
+  const result = await runCompileGate(projectRoot, {
+    llm: opts.llm ?? undefined,
+    target: opts.target,
+    ius,
+    onRound: (round, errors) => {
+      console.log(`${indent}  ${dim(`round ${round}: ${errors.length} error(s)`)}`);
+    },
+    onRepair: (file, iu) => {
+      const full = join(projectRoot, file);
+      if (existsSync(full)) opts.manifestManager.updateGeneratedFile(file, readFileSync(full, 'utf8'));
+      console.log(`${indent}  ${cyan('↻')} repaired ${file}${iu ? dim(` (${iu.name})`) : ''}`);
+    },
+  });
+
+  if (result.ok) {
+    console.log(`${indent}  ${green('✔')} project compiles${result.repaired.length ? dim(` (repaired ${result.repaired.length} file(s))`) : ''}`);
+  } else {
+    console.log(`${indent}  ${red('✖')} ${red(`${result.unresolved.length} unresolved build error(s)`)}`);
+    for (const e of result.unresolved.slice(0, 8)) {
+      console.log(`${indent}    ${red('●')} ${e.file}${e.line ? `:${e.line}` : ''} ${dim(e.code)} ${e.message}`);
+    }
+    // Honest immune memory: a build error is a generation failure for its IU.
+    const byFile = new Map<string, string[]>();
+    for (const e of result.unresolved) (byFile.get(e.file) ?? byFile.set(e.file, []).get(e.file)!).push(`${e.code} ${e.message}`);
+    for (const [file, msgs] of byFile) {
+      const iu = ius.find(u => u.output_files.includes(file));
+      if (iu && opts.onGenerationFailure) {
+        opts.onGenerationFailure(iu, {
+          model_id: opts.llm ? `${opts.llm.name}/${opts.llm.model}` : 'stub',
+          promptpack_hash: '',
+          reason: `Assembled project does not compile: ${msgs[0]}`,
+        });
+      }
+    }
+  }
+
+  writeFileSync(join(phoenixDir, 'build-status.json'), JSON.stringify({
+    ok: result.ok,
+    rounds: result.rounds,
+    repaired: result.repaired,
+    unresolved: result.unresolved,
+    checked_at: new Date().toISOString(),
+  }, null, 2), 'utf8');
+
+  console.log();
+  return result;
+}
+
 /** Load each IU's conceptual mass from the previous manifest cycle. */
 function loadPreviousMasses(manifestManager: ManifestManager): Map<string, number> {
   const manifest = manifestManager.load();
@@ -614,6 +686,12 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`    ${green('✔')} package.json, tsconfig.json`);
   console.log();
 
+  // Compile gate: the assembled system must typecheck. Repair what we can, surface the
+  // rest honestly (recorded as negative knowledge; never a silent ✔).
+  await runCompileGateAndReport(projectRoot, phoenixDir, ius, {
+    llm, target: arch, manifestManager, onGenerationFailure,
+  });
+
   // Save state
   saveBootstrapState(phoenixDir, machine);
 
@@ -788,6 +866,31 @@ function printTrustDashboard(
     }
   } else {
     console.log(`  ${dim('Drift:')} ${dim('no manifest')}`);
+  }
+
+  // Build status — the assembled system's most basic eval: does it compile?
+  const buildStatusPath = join(phoenixDir, 'build-status.json');
+  if (existsSync(buildStatusPath)) {
+    try {
+      const bs = JSON.parse(readFileSync(buildStatusPath, 'utf8')) as {
+        ok: boolean; unresolved?: Array<{ file: string; line: number; code: string; message: string }>;
+      };
+      if (bs.ok) {
+        console.log(`  ${dim('Build:')} ${green('compiles')}`);
+      } else {
+        const n = bs.unresolved?.length ?? 0;
+        console.log(`  ${dim('Build:')} ${red(`${n} error(s)`)}`);
+        for (const e of bs.unresolved ?? []) {
+          diagnostics.push({
+            severity: 'error',
+            category: 'build',
+            subject: e.file,
+            message: `${e.code} ${e.message}`,
+            recommended_actions: ['Run `phoenix regen` — the compile gate will attempt repair', 'Fix the generator if the pattern recurs'],
+          });
+        }
+      }
+    } catch { /* ignore malformed build status */ }
   }
 
   // Boundary validation
@@ -1295,6 +1398,13 @@ async function cmdRegen(args: string[]): Promise<void> {
   console.log();
   reportRegenGate(gateVerdicts, '  ');
   console.log(`  ${dim(`${results.length} IU(s) regenerated. Scaffold updated.`)}`);
+  console.log();
+
+  // Compile gate over the whole assembled project (regen touched a subset, but the
+  // system as a whole must still typecheck).
+  await runCompileGateAndReport(projectRoot, phoenixDir, allIUs, {
+    llm, target: regenArch, manifestManager, onGenerationFailure,
+  });
 }
 
 function cmdDrift(): void {

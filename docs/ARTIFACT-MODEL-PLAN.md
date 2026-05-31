@@ -77,6 +77,28 @@ The board shipped a browser-fatal `SyntaxError`. Root cause was TWO gate gaps:
 Regenerating the board through the fixed gate produced correct `addEventListener` +
 `data-*` code. Two regression tests added.
 
+## Compile Gate — "the assembled system must compile, honestly" (SHIPPED ✅)
+The purist follow-on. Per-IU typecheck during generation has incomplete sibling
+context, so cross-module / declaration-emit errors slipped through and shipped under a
+green ✔. Phoenix now treats the build as the most basic eval:
+- `compile-gate.ts`: after every IU + shared artifact + scaffold is written, `tsc` the
+  WHOLE project. While the LLM is available, repair offending **generated** files
+  (feeding tsc's own errors back) for a few rounds; never touch hand-written scaffold.
+  Folds inline-`<script>` validation in too. Returns unresolved errors.
+- Honest reporting: repaired files refresh their manifest hash (drift stays clean) and
+  drop now-stale exact provenance; unresolved errors become negative knowledge +
+  diagnostics + a persisted `.phoenix/build-status.json`; the trust dashboard shows
+  `Build: compiles | N error(s)`. No silent ✔ on code that doesn't compile.
+- Generation rule added: narrow nullables INLINE (TS doesn't carry narrowing through a
+  stored boolean) — fixed the `sprint.capacity` class at the source.
+
+The gate immediately earned its keep on Trail: it fixed sprint-rollup at the source,
+then surfaced a **previously-masked** real error in the scaffold (`db.ts` TS4023 from
+`declaration: true` on an app) and refused to auto-edit hand-written scaffold — root-
+caused to the architecture target's tsconfig (apps don't emit `.d.ts`). After the fix:
+`tsc` exits 0, gate reports `project compiles`, board renders with 0 console errors.
+472 tests.
+
 ## Later increments (not now)
 - Generalize roles beyond migration (schema, routing, OpenAPI) — target declares the
   layout + merge.

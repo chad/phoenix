@@ -232,6 +232,7 @@ export function buildPrompt(
     lines.push('- Use snake_case for all field and column names, and keep field names identical between the create schema, the update schema, the DB columns, and the JSON you return.');
     lines.push('- For an enumerated set of NUMBERS (e.g. allowed point values 1,2,3,5,8,13), use `z.union([z.literal(1), z.literal(2), ...])` or `z.number().refine(v => [1,2,3,5,8,13].includes(v))`. NEVER use `z.enum([...])` with numbers — `z.enum` accepts string literals only and will not compile.');
     lines.push("- Call SQL functions like `datetime('now')` directly inside the SQL string (e.g. `SET completed_at = datetime('now')`). NEVER pass them as a bound `?` parameter — that stores the literal text \"datetime('now')\" instead of a timestamp.");
+    lines.push('- Narrow nullable values INLINE at each use. TypeScript does NOT carry a narrowing through a stored boolean: `const over = sprint.capacity != null && pts > sprint.capacity; const by = over ? pts - sprint.capacity : 0;` FAILS (`sprint.capacity` is still possibly undefined on the second line). Instead capture the value once: `const cap = sprint.capacity ?? null; const by = cap != null && pts > cap ? pts - cap : 0;`');
     lines.push('');
     lines.push('## Browser code (only if this module returns an HTML page via c.html(`...`))');
     lines.push('The HTML you emit is executed by a real browser, so it must be valid JS/HTML — not merely a valid TypeScript string (TypeScript will not catch errors inside the page).');

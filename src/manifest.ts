@@ -5,6 +5,7 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { GeneratedManifest, IUManifest, SharedFileManifest } from './models/manifest.js';
+import { sha256 } from './semhash.js';
 
 export class ManifestManager {
   private manifestPath: string;
@@ -77,6 +78,26 @@ export class ManifestManager {
   getIUManifest(iuId: string): IUManifest | null {
     const manifest = this.load();
     return manifest.iu_manifests[iuId] ?? null;
+  }
+
+  /**
+   * Refresh a generated file's manifest hash after the compile gate repaired it, so
+   * drift detection stays honest. An LLM rewrite invalidates the exact line→canon
+   * provenance, so we drop it (the inspector falls back to inference).
+   */
+  updateGeneratedFile(path: string, content: string): void {
+    const manifest = this.load();
+    for (const iuManifest of Object.values(manifest.iu_manifests)) {
+      const entry = iuManifest.files[path];
+      if (entry) {
+        entry.content_hash = sha256(content);
+        entry.size = content.length;
+        delete entry.line_provenance;
+        manifest.generated_at = new Date().toISOString();
+        this.save(manifest);
+        return;
+      }
+    }
   }
 
   /**

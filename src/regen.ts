@@ -528,7 +528,7 @@ function cookTemplateLiteral(body: string): string {
 /**
  * Build a prompt asking the LLM to fix typecheck errors.
  */
-function buildFixPrompt(code: string, errors: string): string {
+export function buildFixPrompt(code: string, errors: string): string {
   return `The following TypeScript module has compilation errors. Fix them.
 
 ## Current code:
@@ -554,7 +554,7 @@ Output the complete fixed TypeScript module now.`;
 /**
  * Strip markdown code fences from LLM response.
  */
-function cleanCodeResponse(raw: string): string {
+export function cleanCodeResponse(raw: string): string {
   let code = raw.trim();
 
   // Remove ```typescript ... ``` or ```ts ... ``` or ``` ... ```

@@ -838,7 +838,11 @@ function generateTsConfig(): string {
       target: 'ES2022',
       module: 'ESNext',
       moduleResolution: 'bundler',
-      declaration: true,
+      // A generated service is an application, not a published library: emitting
+      // .d.ts files forces TS to name types it cannot (e.g. better-sqlite3's
+      // BetterSqlite3.Database on the exported `db`), failing the build for no
+      // runtime benefit. Apps don't ship declarations.
+      declaration: false,
       outDir: 'dist',
       rootDir: 'src',
       strict: true,

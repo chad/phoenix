@@ -12,7 +12,8 @@ export type DiagnosticCategory =
   | 'd-rate'
   | 'canon'
   | 'evidence'
-  | 'regen';
+  | 'regen'
+  | 'build';
 
 export interface Diagnostic {
   severity: DiagnosticSeverity;
