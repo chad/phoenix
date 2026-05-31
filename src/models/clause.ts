@@ -4,7 +4,8 @@
  */
 
 export interface Clause {
-  /** Content-addressed ID: SHA-256(source_doc_id + section_path + normalized_text) */
+  /** Content-addressed ID: SHA-256(source_doc_id + normalized_text). Structure-free —
+   *  a statement keeps its identity if it is moved to a different section. */
   clause_id: string;
   /** Document identifier (usually relative file path) */
   source_doc_id: string;
@@ -14,11 +15,12 @@ export interface Clause {
   raw_text: string;
   /** Normalized text for stable hashing */
   normalized_text: string;
-  /** Heading hierarchy, e.g. ["1. Adoption Scope", "v1 Scope"] */
+  /** Provenance only — the heading hierarchy this statement happened to fall under
+   *  (empty for unstructured input). Never an organizing principle or part of identity. */
   section_path: string[];
   /** SHA-256 of normalized_text — content identity */
   clause_semhash: string;
-  /** SHA-256 of normalized_text + section_path + neighbor hashes — local structural context */
+  /** SHA-256 of normalized_text + neighbor hashes — local context (structure-free) */
   context_semhash_cold: string;
 }
 

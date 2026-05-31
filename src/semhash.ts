@@ -23,36 +23,29 @@ export function clauseSemhash(normalizedText: string): string {
 }
 
 /**
- * Compute context_semhash_cold — content + local structural context.
+ * Compute context_semhash_cold — content + local neighbour context.
  *
+ * Document structure (the heading hierarchy) is no longer part of identity or
+ * context; it survives only as provenance metadata on the clause.
  * Includes:
  * - normalized text
- * - section path (heading hierarchy)
  * - previous clause's semhash (or empty string)
  * - next clause's semhash (or empty string)
  */
 export function contextSemhashCold(
   normalizedText: string,
-  sectionPath: string[],
   prevClauseSemhash: string,
   nextClauseSemhash: string,
 ): string {
-  const parts = [
-    normalizedText,
-    sectionPath.join('/'),
-    prevClauseSemhash,
-    nextClauseSemhash,
-  ];
+  const parts = [normalizedText, prevClauseSemhash, nextClauseSemhash];
   return sha256(parts.join('\x00'));
 }
 
 /**
- * Compute content-addressed clause ID.
+ * Content-addressed clause ID = source document + normalized content. The heading a
+ * statement fell under is provenance, not identity, so it is NOT hashed — a statement
+ * keeps its identity if it is moved to a different section.
  */
-export function clauseId(
-  sourceDocId: string,
-  sectionPath: string[],
-  normalizedText: string,
-): string {
-  return sha256([sourceDocId, sectionPath.join('/'), normalizedText].join('\x00'));
+export function clauseId(sourceDocId: string, normalizedText: string): string {
+  return sha256([sourceDocId, normalizedText].join('\x00'));
 }

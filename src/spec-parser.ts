@@ -32,8 +32,8 @@ export function parseSpec(content: string, docId: string): Clause[] {
     const normalizedText = normalizeText(content);
     const semhash = clauseSemhash(normalizedText);
     const sectionPath: string[] = [];
-    const id = clauseId(docId, sectionPath, normalizedText);
-    const ctxHash = contextSemhashCold(normalizedText, sectionPath, '', '');
+    const id = clauseId(docId, normalizedText);
+    const ctxHash = contextSemhashCold(normalizedText, '', '');
     return [{
       clause_id: id,
       source_doc_id: docId,
@@ -50,7 +50,7 @@ export function parseSpec(content: string, docId: string): Clause[] {
   const preClauses: Omit<Clause, 'context_semhash_cold'>[] = sections.map(sec => {
     const normalized = normalizeText(sec.rawText);
     const semhash = clauseSemhash(normalized);
-    const id = clauseId(docId, sec.sectionPath, normalized);
+    const id = clauseId(docId, normalized);
     return {
       clause_id: id,
       source_doc_id: docId,
@@ -66,7 +66,7 @@ export function parseSpec(content: string, docId: string): Clause[] {
   const clauses: Clause[] = preClauses.map((pc, i) => {
     const prev = i > 0 ? preClauses[i - 1].clause_semhash : '';
     const next = i < preClauses.length - 1 ? preClauses[i + 1].clause_semhash : '';
-    const ctxHash = contextSemhashCold(pc.normalized_text, pc.section_path, prev, next);
+    const ctxHash = contextSemhashCold(pc.normalized_text, prev, next);
     return { ...pc, context_semhash_cold: ctxHash };
   });
 
