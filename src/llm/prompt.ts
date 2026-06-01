@@ -98,15 +98,29 @@ export function extractLineProvenance(
   // uses block style inside template literals. Match the whole list, strip it, and
   // record the first resolvable label as the line's primary provenance.
   const re = /\s*(?:\/\/|\/\*)\s*phx:\s*([A-Za-z]\d+(?:[\s,]+[A-Za-z]\d+)*)\s*(?:\*\/)?\s*$/;
+  // Inline block markers — e.g. inside a template literal: `<div>/*phx:R1*/</div>` — are
+  // not at end of line, so strip them in place wherever they appear.
+  const blockRe = /\/\*\s*phx:\s*([A-Za-z]\d+(?:[\s,]+[A-Za-z]\d+)*)\s*\*\//g;
   const lineProvenance: Record<string, string> = {};
-  const out = code.split('\n').map((line, i) => {
-    const m = line.match(re);
-    if (!m) return line;
-    for (const tok of m[1].split(/[\s,]+/)) {
+  const record = (group: string, i: number): void => {
+    if (lineProvenance[String(i)]) return;
+    for (const tok of group.split(/[\s,]+/)) {
       const canonId = byLabel[tok.trim().toUpperCase()];
       if (canonId) { lineProvenance[String(i)] = canonId; break; }
     }
-    return line.slice(0, m.index).replace(/\s+$/, '');
+  };
+  const out = code.split('\n').map((line, i) => {
+    // Inline block markers first (anywhere on the line).
+    let blockHit = false;
+    let stripped = line.replace(blockRe, (_m, group: string) => { record(group, i); blockHit = true; return ''; });
+    if (blockHit) stripped = stripped.replace(/\s+$/, ''); // a trailing block marker left whitespace
+    // Then a trailing end-of-line marker (// or /* … */).
+    const m = stripped.match(re);
+    if (m) {
+      record(m[1], i);
+      stripped = stripped.slice(0, m.index).replace(/\s+$/, '');
+    }
+    return stripped;
   });
   return { code: out.join('\n'), lineProvenance };
 }
@@ -131,13 +145,13 @@ export interface SiblingContract {
  */
 export function extractVocabularies(canonNodes: CanonicalNode[]): { label: string; values: string[] }[] {
   const byKey = new Map<string, { label: string; values: string[] }>();
-  const re = /\b(\w+)\b[^.;:]*?\bone of\b[^:]*:?\s*([a-z0-9_][a-z0-9_,\s]*?)(?:[.;]|$)/gi;
+  const re = /\b(\w+)\b[^.;:]*?\bone of\b\s*:?\s*([a-z0-9_][a-z0-9_,\s]*?)(?:[.;]|$)/gi;
   for (const node of canonNodes) {
     let m: RegExpExecArray | null;
     re.lastIndex = 0;
     while ((m = re.exec(node.statement))) {
       const values = m[2]
-        .split(/\s*,\s*|\s+or\s+|\s+and\s+/)
+        .split(/\s*,\s*|\s*\b(?:or|and)\b\s*/i)
         .map(t => t.trim())
         .filter(t => /^[a-z0-9_]+$/i.test(t) && t.length > 0);
       if (values.length < 2) continue;
@@ -323,9 +337,9 @@ export function buildPrompt(
   lines.push('```');
   lines.push(`/** @internal Phoenix VCS traceability — do not remove. */`);
   lines.push(`export const _phoenix = {`);
-  lines.push(`  iu_id: '${iu.iu_id}',`);
-  lines.push(`  name: '${iu.name}',`);
-  lines.push(`  risk_tier: '${iu.risk_tier}',`);
+  lines.push(`  iu_id: ${JSON.stringify(iu.iu_id)},`);
+  lines.push(`  name: ${JSON.stringify(iu.name)},`);
+  lines.push(`  risk_tier: ${JSON.stringify(iu.risk_tier)},`);
   lines.push(`  canon_ids: [${iu.source_canon_ids.length} as const],`);
   lines.push(`} as const;`);
   lines.push('```');
