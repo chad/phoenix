@@ -7,9 +7,11 @@ describe('normalizeText', () => {
     expect(result).toBe('hello world');
   });
 
-  it('removes bold and italic markers', () => {
+  it('removes asterisk bold/italic markers (underscores preserved for identifier safety)', () => {
     expect(normalizeText('**bold** and *italic*')).toBe('bold and italic');
-    expect(normalizeText('__bold__ and _italic_')).toBe('bold and italic');
+    // Underscore emphasis is intentionally NOT stripped — in technical specs snake_case
+    // (user_id) and dunders (__init__) vastly outnumber `_italic_` and are indistinguishable.
+    expect(normalizeText('__bold__ and _italic_')).toBe('__bold__ and _italic_');
   });
 
   it('removes inline code backticks but keeps content', () => {
