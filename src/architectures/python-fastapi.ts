@@ -88,10 +88,12 @@ const MODULE_GUIDE = [
   'from src.db import db, register_migration',
   '```',
   'Do NOT call sqlite3.connect or open your own database — always use the shared `db`.',
+  'Use ONLY the standard library plus fastapi and pydantic — NO third-party packages (no httpx, requests, aiohttp, sqlalchemy, …). To read another entity\'s data, query the shared `db` DIRECTLY (a JOIN or a second query). Backend modules MUST NOT make HTTP calls to sibling modules — they share one database.',
   '',
   '## Conventions',
   '- Register schema migrations with `register_migration("table", """ CREATE TABLE IF NOT EXISTS ... """)`.',
   '- Validate request bodies with Pydantic models (BaseModel). Optional fields: `Optional[int] = None`.',
+  '- Numeric fields are numbers, not strings: point estimates, counts, capacities → `int` (e.g. `point_estimate: Optional[int] = None`). For a fixed numeric set (1,2,3,5,8,13) use `Literal[1,2,3,5,8,13]`. NEVER type a number as `str`.',
   '- Use parameterized SQL ALWAYS: `db.execute("... WHERE id = ?", (id,))`. NEVER f-string user input into SQL.',
   '- In SQL, use single quotes for string literals: `datetime(\'now\')`. NEVER double quotes (SQLite reads "x" as a column name).',
   '- Use snake_case for all column names and JSON keys; keep names identical across the create model, update model, DB columns, and returned JSON.',
@@ -308,6 +310,30 @@ function pyCompile(projectRoot: string): CompileError[] {
   }
 }
 
+// Third-party packages the model tends to reach for but that aren't available and
+// signal a design error (a backend module HTTP-calling siblings or using an ORM
+// instead of the shared sqlite db). Catching these at the source gate turns a
+// runtime ImportError crash into a fixable generation error.
+const FORBIDDEN_IMPORTS = new Set([
+  'httpx', 'requests', 'aiohttp', 'urllib3', 'httplib2',
+  'sqlalchemy', 'sqlmodel', 'databases', 'psycopg2', 'pymysql', 'asyncpg', 'aiosqlite',
+]);
+
+/** Source gate: inline-<script> validation PLUS a forbidden-import check (Python can't
+ *  catch a missing module until import time; the syntax gate won't see it). */
+function pythonValidateSource(code: string): string | null {
+  const inline = validateInlineScripts(code);
+  if (inline) return inline;
+  for (const line of code.split('\n')) {
+    const m = line.match(/^\s*(?:import|from)\s+([a-zA-Z0-9_]+)/);
+    if (m && FORBIDDEN_IMPORTS.has(m[1])) {
+      return `Module imports the unavailable third-party package "${m[1]}". Use ONLY the standard library plus fastapi and pydantic. `
+        + 'To read another entity\'s data, query the shared `db` directly (JOIN or a second query) — backend modules must NOT make HTTP calls to sibling modules.';
+    }
+  }
+  return null;
+}
+
 // ─── Migration aggregate ────────────────────────────────────────────────────
 
 const MIGRATIONS_FILE = 'src/generated/_migrations.py';
@@ -396,8 +422,11 @@ function pythonScaffold(services: ServiceDescriptor[], projectName: string, shar
       const modName = mod.replace(/\.py$/, '');
       const alias = `${modName.replace(/-/g, '_')}_router`;
       imports.push(`from src.generated.${svc.dir}.${modName} import router as ${alias}`);
-      const isWeb = WEB_RE.test(svc.name.toLowerCase());
-      const prefix = isWeb ? '' : '/' + svc.dir;
+      // Normalize separators so web-detection works on snake_case dirs (board_ui).
+      const isWeb = WEB_RE.test(`${svc.name} ${svc.dir}`.replace(/[_-]/g, ' ').toLowerCase());
+      // URL prefixes use hyphens (web convention; matches sibling contract mount paths);
+      // the Python package dir uses underscores.
+      const prefix = isWeb ? '' : '/' + svc.dir.replace(/_/g, '-');
       mounts.push(`app.include_router(${alias}, prefix="${prefix}")`);
     }
   }
@@ -470,7 +499,12 @@ export const pythonFastapi: RuntimeTarget = {
   },
   packageExtras: {},
 
-  outputPathFor: (slug: string): string => `src/generated/${slug}/${slug}.py`,
+  // Python package/module names must be valid identifiers — no hyphens. Underscore the
+  // kebab slug for the dir + file; URL prefixes keep hyphens (see pythonScaffold).
+  outputPathFor: (slug: string): string => {
+    const s = slug.replace(/-/g, '_');
+    return `src/generated/${s}/${s}.py`;
+  },
   assemble: assemblePy,
   stub: stubPy,
   extractContract: extractPyContract,
@@ -478,7 +512,7 @@ export const pythonFastapi: RuntimeTarget = {
   ownsGeneratedFile: (path: string): boolean =>
     path.startsWith('src/generated/') && path.endsWith('.py')
     && !path.endsWith('_migrations.py') && !path.endsWith('__init__.py'),
-  validateSource: validateInlineScripts,
+  validateSource: pythonValidateSource,
   aggregates: [migrationRole],
   scaffold: pythonScaffold,
 };

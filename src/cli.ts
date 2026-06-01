@@ -602,28 +602,16 @@ async function cmdBootstrap(): Promise<void> {
   }
 
 
-  // Write shared architecture files BEFORE code generation
-  // so the typecheck-retry loop can resolve imports like ../../db.js
+  // Write shared architecture files (db.ts/db.py, …) BEFORE code generation so the
+  // per-IU compile-retry loop can resolve imports, then let the target prepare the
+  // project for its compiler (e.g. npm install for tsc; a no-op for the python AST gate).
   if (arch) {
     for (const [filePath, content] of Object.entries(arch.runtime.sharedFiles)) {
       const fullPath = join(projectRoot, filePath);
       mkdirSync(dirname(fullPath), { recursive: true });
       writeFileSync(fullPath, content, 'utf8');
     }
-    // Write package.json with arch deps so tsc can resolve types during generation
-    const earlyPkg = {
-      name: basename(projectRoot),
-      version: '0.1.0',
-      type: 'module',
-      dependencies: arch.runtime.packages,
-      devDependencies: arch.runtime.devPackages,
-    };
-    const pkgPath = join(projectRoot, 'package.json');
-    writeFileSync(pkgPath, JSON.stringify(earlyPkg, null, 2) + '\n', 'utf8');
-    // Install so type declarations are available for typecheck-retry
-    try {
-      execSync('npm install --silent 2>/dev/null', { cwd: projectRoot, stdio: 'pipe', timeout: 60000 });
-    } catch { /* best effort */ }
+    arch.runtime.prepareProject?.(projectRoot);
   }
 
   const { nkByIU, onGenerationFailure } = buildNKRouting(phoenixDir, ius);

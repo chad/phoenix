@@ -81,6 +81,16 @@ describe('python-fastapi target', () => {
     expect(code).not.toContain('datetime("now")');
   });
 
+  it('source gate flags an unavailable third-party import (e.g. httpx)', () => {
+    const bad = 'from fastapi import APIRouter\nimport httpx\nrouter = APIRouter()\n';
+    const err = pythonFastapi.validateSource!(bad);
+    expect(err).toBeTruthy();
+    expect(err).toContain('httpx');
+    // stdlib + fastapi/pydantic are fine
+    const ok = 'from fastapi import APIRouter\nimport sqlite3, json\nfrom pydantic import BaseModel\nrouter = APIRouter()\n';
+    expect(pythonFastapi.validateSource!(ok)).toBeNull();
+  });
+
   it('extractContract pulls Pydantic models and routes', () => {
     const c = pythonFastapi.extractContract(PY_MODULE)!;
     expect(c).toContain('class CreateIssue(BaseModel):');

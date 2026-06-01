@@ -7,7 +7,7 @@
 
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import type {
   RuntimeTarget, CompileError, AggregateRole, AggregateRecognition, ServiceDescriptor,
 } from '../models/architecture.js';
@@ -504,4 +504,17 @@ export const nodeTypescript: RuntimeTarget = {
   aggregates: [migrationRole],
   scaffold: (services: ServiceDescriptor[], projectName: string, sharedImports: string[]): Map<string, string> =>
     nodeScaffold(services, projectName, nodeTypescript, sharedImports).files,
+
+  // Write package.json + npm install before generation so tsc can resolve the
+  // framework's type declarations during the per-IU typecheck-retry loop.
+  prepareProject(projectRoot: string): void {
+    const pkg = {
+      name: basename(projectRoot), version: '0.1.0', type: 'module',
+      dependencies: nodeTypescript.packages, devDependencies: nodeTypescript.devPackages,
+    };
+    writeFileSync(join(projectRoot, 'package.json'), JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+    try {
+      execSync('npm install --silent 2>/dev/null', { cwd: projectRoot, stdio: 'pipe', timeout: 60_000 });
+    } catch { /* best effort */ }
+  },
 };

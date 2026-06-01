@@ -155,6 +155,9 @@ export interface RuntimeTarget {
   aggregates: AggregateRole[];
   /** Generate the runnable shell: server entry, project config, per-service wiring. */
   scaffold(services: ServiceDescriptor[], projectName: string, sharedImports: string[]): Map<string, string>;
+  /** Optional: prepare the project before generation so the compiler can resolve imports
+   *  (e.g. write package.json + npm install for tsc). No-op for targets that don't need it. */
+  prepareProject?(projectRoot: string): void;
 }
 
 // ─── Resolved target (what the pipeline actually uses) ──────────────────────
