@@ -19,8 +19,11 @@ import type { ResolvedTarget, AggregateRole } from './models/architecture.js';
 import type { SharedFileManifest, FileRegion } from './models/manifest.js';
 import { sha256 } from './semhash.js';
 
-const REGION_OPEN_RE = /<<phx:region iu=(\S+) role=(\S+?)(?: key=(\S+))?>>/;
-const REGION_CLOSE_RE = /<<\/phx:region>>/;
+// Anchored to a full marker line (optional single-token comment prefix). Anchoring stops
+// a marker-like token embedded in body text from being read as a structural marker; the
+// `key=(.+?)` lets a key contain spaces and still round-trip.
+const REGION_OPEN_RE = /^\s*\S*\s*<<phx:region iu=(\S+) role=(\S+?)(?: key=(.+?))?>>\s*$/;
+const REGION_CLOSE_RE = /^\s*\S*\s*<<\/phx:region>>\s*$/;
 
 export interface SplitResult {
   /** Shared-file manifests to record. */
@@ -131,7 +134,7 @@ function assembleAggregate(
     lines.push(close);
     lines.push('');
     regions.push({
-      iu_id: c.iu_id, role: role.role, key: c.key,
+      iu_id: c.iu_id, role: role.role, key: c.key || undefined, // symmetric with parse (empty → no key= → undefined)
       content_hash: sha256(c.body), start_line: bodyStart, end_line: bodyEnd,
     });
   }
@@ -181,13 +184,16 @@ export function parseRegions(content: string): ParsedRegion[] {
     if (!open) { i++; continue; }
     const bodyStart = i + 1;
     let j = bodyStart;
-    while (j < lines.length && !REGION_CLOSE_RE.test(lines[j])) j++;
+    // Stop on the close marker OR a new open (a malformed/missing-close region) so a
+    // following well-formed region is not swallowed.
+    while (j < lines.length && !REGION_CLOSE_RE.test(lines[j]) && !REGION_OPEN_RE.test(lines[j])) j++;
     const body = lines.slice(bodyStart, j).join('\n');
     out.push({
       iu_id: open[1], role: open[2], key: open[3],
       body, content_hash: sha256(body), start_line: bodyStart, end_line: j,
     });
-    i = j + 1;
+    // Resume AT a new open (so it's still parsed); otherwise skip past the close line.
+    i = (j < lines.length && REGION_OPEN_RE.test(lines[j])) ? j : j + 1;
   }
   return out;
 }
