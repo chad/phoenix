@@ -20,7 +20,10 @@ export function fixSqliteQuotes(code: string): string {
     .replace(/datetime\s*\(\s*"now"\s*\)/g, "datetime('now')")
     .replace(/date\s*\(\s*"now"\s*\)/g, "date('now')")
     .replace(/WHEN "(\w+)" THEN/g, "WHEN '$1' THEN")
-    .replace(/DEFAULT "([^"]+)"/g, "DEFAULT '$1'");
+    .replace(/DEFAULT "((?:[^"]|"")*)"/g, (_m, body: string) => {
+      const value = body.replace(/""/g, '"');                 // un-double SQLite escapes
+      return "DEFAULT '" + value.replace(/'/g, "''") + "'";   // emit a real string literal
+    });
 }
 
 /** Strip markdown code fences from an LLM response. */
@@ -37,8 +40,14 @@ export function cleanCodeResponse(raw: string): string {
     code = innerMatch[1];
   }
 
-  // Strip any remaining standalone markdown fence lines.
-  code = code.split('\n').filter(l => !/^\s*```[a-zA-Z]*\s*$/.test(l)).join('\n');
+  // Strip a leading/trailing standalone fence line (bare or tagged), plus any interior
+  // LANGUAGE-TAGGED fence (e.g. a stray ```typescript the model left mid-body). Keep
+  // interior BARE ``` lines, which may be legitimate template-literal string content.
+  const fenceLine = /^\s*```[a-zA-Z]*\s*$/;
+  const lines = code.split('\n');
+  if (lines.length && fenceLine.test(lines[0])) lines.shift();
+  if (lines.length && fenceLine.test(lines[lines.length - 1])) lines.pop();
+  code = lines.filter(l => !/^\s*```[a-zA-Z]+\s*$/.test(l)).join('\n');
 
   return code;
 }
@@ -75,9 +84,27 @@ Output the complete fixed module now.`;
  * the cooked form catches client-JS syntax errors the raw source hides.
  */
 export function cookTemplateLiteral(body: string): string {
-  const noInterp = body.replace(/(^|[^\\])\$\{[^}]*\}/g, '$1(0)');
+  // Collapse each (unescaped, brace-balanced) ${…} to a neutral literal. A regex can't
+  // do this: [^}]* breaks on nested braces and a [^\\] guard consumes the char between
+  // adjacent interpolations. Scan with a depth counter instead.
+  let out = '';
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] === '$' && body[i + 1] === '{') {
+      let bs = 0, k = i - 1;
+      while (k >= 0 && body[k] === '\\') { bs++; k--; }
+      if (bs % 2 === 1) { out += body[i]; continue; } // escaped \${ — literal
+      let depth = 1, j = i + 2;
+      for (; j < body.length && depth > 0; j++) {
+        if (body[j] === '{') depth++;
+        else if (body[j] === '}') depth--;
+      }
+      if (depth === 0) { out += '(0)'; i = j - 1; continue; }
+      // unbalanced — fall through and keep the literal text
+    }
+    out += body[i];
+  }
   const map: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
-  return noInterp.replace(/\\([\s\S])/g, (_, c: string) => map[c] ?? c);
+  return out.replace(/\\([\s\S])/g, (_, c: string) => map[c] ?? c);
 }
 
 /**
@@ -87,10 +114,14 @@ export function cookTemplateLiteral(body: string): string {
  * vm.Script only parses; it never runs, so browser globals are irrelevant.
  */
 export function validateInlineScripts(code: string): string | null {
-  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+  // Capture the attribute string so we can tell a genuine EXTERNAL script (real src=
+  // attribute) from an inline script that merely contains "src=" inside some other
+  // attribute value (e.g. data-x="src=").
+  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(code))) {
-    const body = m[1];
+    if (/(^|\s)src\s*=/i.test(m[1])) continue; // genuine external script
+    const body = m[2];
     if (!body.trim()) continue;
     try {
       new vm.Script(cookTemplateLiteral(body));
