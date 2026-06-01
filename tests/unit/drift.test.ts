@@ -81,7 +81,7 @@ describe('detectDrift', () => {
     const waiver: DriftWaiver = {
       kind: 'temporary_patch',
       reason: 'Hotfix for production issue',
-      expires: '2026-03-01',
+      expires: '2099-03-01', // far future — an active (unexpired) waiver
     };
     const waivers = new Map([['src/auth.ts', waiver]]);
 
