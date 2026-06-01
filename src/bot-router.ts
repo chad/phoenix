@@ -63,19 +63,19 @@ export function parseCommand(raw: string): BotCommand | { error: string } {
     return { error: `Unknown command: ${botName}: ${action}. Try: ${botName}: help` };
   }
 
-  // Parse key=value args
+  // Parse key=value args. The value may be "quoted with spaces", empty (key=), or bare;
+  // leftover tokens are captured as the positional '_' arg instead of being dropped.
   const args: Record<string, string> = {};
   if (argsStr) {
-    const parts = argsStr.match(/(\w+)=([^\s]+)/g);
-    if (parts) {
-      for (const part of parts) {
-        const [key, ...val] = part.split('=');
-        args[key] = val.join('=');
-      }
-    } else {
-      // Single positional arg
-      args['_'] = argsStr;
+    const kvRe = /(\w+)=(?:"([^"]*)"|'([^']*)'|(\S*))/g;
+    let rest = argsStr;
+    let m: RegExpExecArray | null;
+    while ((m = kvRe.exec(argsStr)) !== null) {
+      args[m[1]] = m[2] ?? m[3] ?? m[4] ?? '';
+      rest = rest.replace(m[0], '');
     }
+    const positional = rest.trim().replace(/\s+/g, ' ');
+    if (positional) args['_'] = positional;
   }
 
   return { bot: botName, action, args, raw: trimmed };

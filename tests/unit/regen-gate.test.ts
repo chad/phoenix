@@ -47,8 +47,8 @@ function makeCoverage(overrides: Partial<EvaluationCoverage> = {}): EvaluationCo
 describe('massOfIU', () => {
   it('sums contract concepts, deps, side channels, canon nodes, files', () => {
     const iu = makeIU();
-    // contract 2+1+1 + deps 1 + side 0 + canon 2 = 7
-    expect(massOfIU(iu)).toBe(7);
+    // contract 2+1+1 + deps 1 + side 0 + canon 2 + 1 file = 8
+    expect(massOfIU(iu)).toBe(8);
   });
 
   it('counts side channels into mass', () => {
@@ -56,7 +56,7 @@ describe('massOfIU', () => {
     bp.side_channels.databases = ['main'];
     bp.side_channels.caches = ['redis'];
     const iu = makeIU({ boundary_policy: bp });
-    expect(massOfIU(iu)).toBe(9); // previous 7 + 2 side channels
+    expect(massOfIU(iu)).toBe(10); // 8 + 2 side channels
   });
 });
 
@@ -96,7 +96,7 @@ describe('gateIU (warn-first)', () => {
   });
 
   it('flags a ratchet violation when mass grows across cycles', () => {
-    const iu = makeIU(); // mass 7
+    const iu = makeIU(); // mass 8
     const verdict = gateIU({
       iu,
       allIUs: [iu],
@@ -104,19 +104,19 @@ describe('gateIU (warn-first)', () => {
       negativeKnowledge: [],
       previousMass: 5,
     });
-    expect(verdict.mass).toBe(7);
-    expect(verdict.mass_delta).toBe(2);
+    expect(verdict.mass).toBe(8);
+    expect(verdict.mass_delta).toBe(3);
     expect(verdict.ratchet_violation).toBe(true);
   });
 
   it('does not flag a ratchet violation when mass shrinks or holds', () => {
-    const iu = makeIU(); // mass 7
+    const iu = makeIU(); // mass 8
     const verdict = gateIU({
       iu,
       allIUs: [iu],
       evalCoverage: makeCoverage(),
       negativeKnowledge: [],
-      previousMass: 7,
+      previousMass: 8,
     });
     expect(verdict.ratchet_violation).toBe(false);
   });
@@ -133,7 +133,7 @@ describe('failedGenerationKnowledge', () => {
     };
     const a = failedGenerationKnowledge(base);
     const b = failedGenerationKnowledge({ ...base, reason: 'different reason' });
-    expect(a.nk_id).toBe('failgen:iu-1:abcdef12');
+    expect(a.nk_id).toBe('failgen:iu-1:abcdef12:anthropic/claude');
     expect(b.nk_id).toBe(a.nk_id); // same signature → same id → store updates in place
   });
 

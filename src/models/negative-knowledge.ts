@@ -56,7 +56,9 @@ export function failedGenerationKnowledge(params: {
 }): NegativeKnowledge {
   const shortHash = params.promptpack_hash.slice(0, 8);
   return {
-    nk_id: `failgen:${params.iu_id}:${shortHash}`,
+    // Include model_id so a different model's failure of the same contract is a DISTINCT
+    // immune-memory record (was overwriting → losing real negative knowledge).
+    nk_id: `failgen:${params.iu_id}:${shortHash}:${params.model_id}`,
     kind: 'failed_generation',
     subject_id: params.iu_id,
     subject_type: 'iu',

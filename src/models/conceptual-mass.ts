@@ -51,7 +51,8 @@ export function computeConceptualMass(params: {
   file_count: number;
 }): number {
   const contractConcepts = params.contract_inputs + params.contract_outputs + params.contract_invariants;
-  return contractConcepts + params.dependency_count + params.side_channel_count + params.canon_node_count;
+  // file_count IS part of mass (output-file growth must be visible to the ratchet/score).
+  return contractConcepts + params.dependency_count + params.side_channel_count + params.canon_node_count + params.file_count;
 }
 
 /**
