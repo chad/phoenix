@@ -66,8 +66,17 @@ export async function runCompileGate(
   const iuFor = (file: string): ImplementationUnit | undefined =>
     opts.ius?.find(iu => iu.output_files.includes(file));
 
+  // A module can typecheck clean yet ship a browser-fatal inline <script>, so the
+  // target's source gate is part of EVERY round's error set — it must be repairable in
+  // the loop too, not merely reported once the loop has already given up.
+  const runChecks = (): CompileError[] => {
+    const base = typecheck(projectRoot);
+    const src = rt?.validateSource ? collectSourceGateErrors(projectRoot, rt.validateSource, owns, opts.ius) : [];
+    return [...base, ...src];
+  };
+
   let round = 0;
-  let errors = typecheck(projectRoot);
+  let errors = runChecks();
 
   while (errors.length > 0 && round < maxRounds) {
     opts.onRound?.(round + 1, errors);
@@ -94,7 +103,10 @@ export async function runCompileGate(
       } catch {
         continue; // transient LLM failure — leave the file, try next round
       }
-      if (!fixed.trim() || fixed === code) continue;
+      // No-op echo: `fixed` is already cleanCodeResponse'd, so a verbatim echo of the
+      // on-disk file differs only by the trailing newline cleanCodeResponse strips —
+      // treat that as no progress (don't rewrite, don't claim repaired).
+      if (!fixed.trim() || fixed === code || fixed === cleanCodeResponse(code)) continue;
       writeFileSync(full, fixed, 'utf8');
       repaired.add(file);
       madeEdit = true;
@@ -103,32 +115,29 @@ export async function runCompileGate(
 
     if (!madeEdit) break;   // nothing changed — re-checking would loop forever
     round++;
-    errors = typecheck(projectRoot);
+    errors = runChecks();
   }
 
-  // The target's extra source gate (e.g. inline-<script> validation) is part of "does
-  // the system actually work" — fold its findings into the unresolved set.
-  const inlineErrors = rt?.validateSource ? collectSourceGateErrors(projectRoot, rt.validateSource, opts.ius) : [];
-
-  const unresolved = [...errors, ...inlineErrors];
-  return { ok: unresolved.length === 0, rounds: round, repaired: [...repaired], unresolved };
+  return { ok: errors.length === 0, rounds: round, repaired: [...repaired], unresolved: errors };
 }
 
-/** Run the target's optional extra source gate over every generated file. */
+/** Run the target's optional extra source gate over every OWNED generated file, once. */
 function collectSourceGateErrors(
   projectRoot: string,
   validate: (code: string) => string | null,
+  owns: (file: string) => boolean,
   ius?: ImplementationUnit[],
 ): CompileError[] {
   const out: CompileError[] = [];
+  const seen = new Set<string>();
   for (const iu of ius ?? []) {
     for (const file of iu.output_files) {
+      if (seen.has(file) || !owns(file)) continue;  // dedup shared files; skip non-owned
+      seen.add(file);
       const full = join(projectRoot, file);
       if (!existsSync(full)) continue;
       const err = validate(readFileSync(full, 'utf8'));
-      if (err) {
-        out.push({ file, line: 0, col: 0, code: 'SOURCE_GATE', message: err.split('.')[0], raw: `${file}: ${err.split('.')[0]}` });
-      }
+      if (err) out.push({ file, line: 0, col: 0, code: 'SOURCE_GATE', message: err, raw: `${file}: ${err}` });
     }
   }
   return out;
