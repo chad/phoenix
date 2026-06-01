@@ -24,12 +24,11 @@ export interface ScaffoldResult {
  */
 export function deriveServices(ius: ImplementationUnit[]): ServiceDescriptor[] {
   const serviceMap = new Map<string, ServiceDescriptor>();
-  let nextPort = 3000;
 
   for (const iu of ius) {
     for (const outputFile of iu.output_files) {
       // outputFile is like "src/generated/api-gateway/authentication.ts"
-      const parts = outputFile.replace('src/generated/', '').split('/');
+      const parts = outputFile.replace(/^src\/generated\//, '').split('/');
       if (parts.length < 2) continue;
 
       const dir = parts[0];
@@ -37,21 +36,24 @@ export function deriveServices(ius: ImplementationUnit[]): ServiceDescriptor[] {
 
       let svc = serviceMap.get(dir);
       if (!svc) {
-        svc = {
-          name: dirToName(dir),
-          dir,
-          modules: [],
-          ius: [],
-          port: nextPort++,
-        };
+        svc = { name: dirToName(dir), dir, modules: [], ius: [], port: 0 };
         serviceMap.set(dir, svc);
       }
-      svc.modules.push(moduleFile);
-      svc.ius.push(iu);
+      // Dedup: two IUs targeting the same module file must not produce duplicate
+      // module entries (→ duplicate import/export identifiers). Keep modules/ius
+      // index-aligned by guarding both pushes together.
+      if (!svc.modules.includes(moduleFile)) {
+        svc.modules.push(moduleFile);
+        svc.ius.push(iu);
+      }
     }
   }
 
-  return [...serviceMap.values()].sort((a, b) => a.dir.localeCompare(b.dir));
+  // Assign ports AFTER sorting so they're deterministic w.r.t. the returned order,
+  // independent of IU input order.
+  const sorted = [...serviceMap.values()].sort((a, b) => a.dir.localeCompare(b.dir));
+  sorted.forEach((s, i) => { s.port = 3000 + i; });
+  return sorted;
 }
 
 /**
@@ -79,19 +81,34 @@ export function nodeScaffold(
     // Generate architecture-specific server entry point that mounts all generated modules
     const routeImports: string[] = [];
     const routeMounts: string[] = [];
+    const usedNames = new Set<string>();
+    const usedPrefixes = new Set<string>();
+    let webRootTaken = false;
     for (const svc of services) {
       for (let i = 0; i < svc.modules.length; i++) {
         const mod = svc.modules[i];
         const iu = svc.ius[i];
-        const modName = mod.replace('.ts', '').replace(/-/g, '_').replace(/[^a-zA-Z0-9_]/g, '_');
-        const importPath = `./generated/${svc.dir}/${mod.replace('.ts', '.js')}`;
+        const baseName = mod.replace(/\.ts$/, '');           // anchored — keep names like a.tsconfig
+        let modName = baseName.replace(/-/g, '_').replace(/[^a-zA-Z0-9_]/g, '_').replace(/^(\d)/, '_$1');
+        while (usedNames.has(modName)) modName = modName + '_';
+        usedNames.add(modName);
+        const importPath = `./generated/${svc.dir}/${mod.replace(/\.ts$/, '.js')}`;
         routeImports.push(`import ${modName} from '${importPath}';`);
-        // Derive mount path from IU name: "Todos" → "/todos", "Categories" → "/categories"
-        const iuName = iu?.name ?? mod.replace('.ts', '');
+        // Mount path from IU name: "Todos" → "/todos". Unicode-normalize before stripping;
+        // fall back to the module name when the slug is empty; dedupe per server.
+        const iuName = iu?.name ?? baseName;
         const lowerName = iuName.toLowerCase();
-        // Web interface / UI modules mount at root
         const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
-        const prefix = isWebUI ? '' : '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        let prefix: string;
+        if (isWebUI && !webRootTaken) { prefix = ''; webRootTaken = true; }
+        else {
+          let slug = lowerName.normalize('NFKD').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          if (!slug) slug = baseName.toLowerCase().replace(/[^a-z0-9-]/g, '-') || 'mod';
+          let p = '/' + slug;
+          while (usedPrefixes.has(p)) p = p + '-2';
+          usedPrefixes.add(p);
+          prefix = p;
+        }
         routeMounts.push(`mount('${prefix}', ${modName});`);
       }
     }
@@ -167,15 +184,15 @@ function generateArchTests(svc: ServiceDescriptor): string {
   lines.push(`import { describe, it, expect } from 'vitest';`);
 
   for (const mod of svc.modules) {
-    const importName = mod.replace('.ts', '').replace(/-/g, '_');
-    lines.push(`import ${importName} from '../${mod.replace('.ts', '.js')}';`);
+    const importName = toCamelCase(mod.replace(/\.ts$/, ''));
+    lines.push(`import ${importName} from '../${mod.replace(/\.ts$/, '.js')}';`);
   }
 
   lines.push(``);
   lines.push(`describe('${svc.name} modules', () => {`);
 
   for (const mod of svc.modules) {
-    const importName = mod.replace('.ts', '').replace(/-/g, '_');
+    const importName = toCamelCase(mod.replace(/\.ts$/, ''));
     const displayName = mod.replace('.ts', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     lines.push(`  describe('${displayName}', () => {`);
     lines.push(`    it('exports a Hono router as default', () => {`);
@@ -203,9 +220,12 @@ function generateServiceIndex(svc: ServiceDescriptor): string {
   lines.push(` */`);
   lines.push('');
 
+  const used = new Set<string>();
   for (const mod of svc.modules) {
     const modName = mod.replace(/\.ts$/, '');
-    const importName = toCamelCase(modName);
+    let importName = toCamelCase(modName);
+    while (used.has(importName)) importName = importName + '2';   // disambiguate collisions
+    used.add(importName);
     lines.push(`export * as ${importName} from './${modName}.js';`);
   }
   lines.push('');
@@ -476,7 +496,7 @@ function generateWebClientServer(svc: ServiceDescriptor): string {
 
   for (const mod of uiModules) {
     const importName = toCamelCase(mod.replace(/\.ts$/, ''));
-    const displayName = mod.replace(/\.ts$/, '').split('-').map((w: string) => w[0].toUpperCase() + w.slice(1)).join(' ');
+    const displayName = mod.replace(/\.ts$/, '').split('-').map((w: string) => (w ? w[0].toUpperCase() + w.slice(1) : '')).filter(Boolean).join(' ');
     lines.push(`  try {`);
     lines.push(`    const uiMod = ${importName} as Record<string, unknown>;`);
     lines.push(`    for (const key of Object.keys(uiMod)) {`);
