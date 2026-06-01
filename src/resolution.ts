@@ -197,7 +197,7 @@ function inferTypedEdges(nodes: CanonicalNode[], idf: Map<string, number>): void
         const key = i < j ? `${i}:${j}` : `${j}:${i}`;
         const entry = pairScores.get(key) ?? { i: Math.min(i, j), j: Math.max(i, j), sharedNonTrivial: 0, sharedTags: [] };
         const tagIdf = idf.get(tag) ?? 0;
-        if (tagIdf > idfThreshold) {
+        if (tagIdf >= idfThreshold) {
           entry.sharedNonTrivial++;
         }
         entry.sharedTags.push(tag);
@@ -261,8 +261,14 @@ function inferEdgeType(from: CanonicalNode, to: CanonicalNode): EdgeType {
 }
 
 function reverseEdgeType(type: EdgeType): EdgeType {
-  // Most edge types are symmetric in our model
-  return type;
+  // Directional relations must invert on the reverse edge so a REQUIREMENT does not
+  // claim to 'define' the DEFINITION it merely refines. Symmetric ones stay.
+  switch (type) {
+    case 'defines': return 'refines';
+    case 'constrains': return 'refines';
+    case 'invariant_of': return 'relates_to';
+    default: return type;
+  }
 }
 
 function addEdge(from: CanonicalNode, to: CanonicalNode, type: EdgeType): void {
@@ -277,14 +283,16 @@ function addEdge(from: CanonicalNode, to: CanonicalNode, type: EdgeType): void {
 
 function inferHierarchy(nodes: CanonicalNode[], clauseMap: Map<string, Clause>): void {
   // Group nodes by source document
-  const byDoc = new Map<string, CanonicalNode[]>();
+  // Track WHICH clause placed each node into each doc group — a node spanning multiple
+  // docs must use that doc's clause for depth/path, not always source_clause_ids[0].
+  const byDoc = new Map<string, { node: CanonicalNode; clauseId: string }[]>();
   for (const node of nodes) {
     for (const clauseId of node.source_clause_ids) {
       const clause = clauseMap.get(clauseId);
       if (!clause) continue;
       const docId = clause.source_doc_id;
       const list = byDoc.get(docId) ?? [];
-      list.push(node);
+      list.push({ node, clauseId });
       byDoc.set(docId, list);
     }
   }
@@ -293,8 +301,8 @@ function inferHierarchy(nodes: CanonicalNode[], clauseMap: Map<string, Clause>):
     // Build entries with section depth for all nodes
     const entries: { node: CanonicalNode; depth: number; sectionPath: string[] }[] = [];
 
-    for (const node of docNodes) {
-      const clause = clauseMap.get(node.source_clause_ids[0]);
+    for (const { node, clauseId } of docNodes) {
+      const clause = clauseMap.get(clauseId);
       if (!clause) continue;
       entries.push({ node, depth: clause.section_path.length, sectionPath: clause.section_path });
     }
@@ -311,7 +319,9 @@ function inferHierarchy(nodes: CanonicalNode[], clauseMap: Map<string, Clause>):
       for (const candidate of entries) {
         if (candidate.node.canon_id === child.node.canon_id) continue;
         if (candidate.depth >= child.depth) continue;
-        if (candidate.depth <= bestDepth) continue;
+        // Only reject strictly-shallower candidates — a SAME-depth candidate must reach
+        // the CONTEXT-preference check below so a CONTEXT parent can win at equal depth.
+        if (candidate.depth < bestDepth) continue;
 
         const prefixMatch = candidate.sectionPath.every((seg, i) => child.sectionPath[i] === seg);
         if (!prefixMatch) continue;
@@ -345,6 +355,7 @@ function computeAnchors(nodes: CanonicalNode[]): void {
 // ─── Step 7: Enforce max degree ──────────────────────────────────────────────
 
 function enforceMaxDegree(nodes: CanonicalNode[], idf: Map<string, number>): void {
+  const nodeIndex = new Map(nodes.map(n => [n.canon_id, n]));
   for (const node of nodes) {
     // Count non-duplicate edges
     const edges = node.linked_canon_ids.filter(
@@ -380,12 +391,19 @@ function enforceMaxDegree(nodes: CanonicalNode[], idf: Map<string, number>): voi
       if (node.link_types?.[id] === 'duplicates') keep.add(id);
     }
 
-    // Filter
+    // Filter — and keep the graph SYMMETRIC by dropping each pruned edge's reverse half.
+    const pruned = node.linked_canon_ids.filter(id => !keep.has(id));
     node.linked_canon_ids = node.linked_canon_ids.filter(id => keep.has(id));
     if (node.link_types) {
       for (const id of Object.keys(node.link_types)) {
         if (!keep.has(id)) delete node.link_types[id];
       }
+    }
+    for (const id of pruned) {
+      const target = nodeIndex.get(id);
+      if (!target) continue;
+      target.linked_canon_ids = target.linked_canon_ids.filter(x => x !== node.canon_id);
+      if (target.link_types) delete target.link_types[node.canon_id];
     }
   }
 }
