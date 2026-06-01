@@ -32,27 +32,21 @@ router.get('/', (c) => {
   const params: unknown[] = [];
   
   const sprintId = c.req.query('sprint_id');
-  if (sprintId !== undefined) {
-    conditions.push('issues.sprint_id = ?');
-    params.push(Number(sprintId));
+  if (sprintId !== undefined) { 
+    conditions.push('issues.sprint_id = ?'); 
+    params.push(sprintId === 'null' ? null : Number(sprintId)); 
   }
   
   const assignee = c.req.query('assignee');
-  if (assignee !== undefined) {
-    conditions.push('issues.assignee = ?');
-    params.push(assignee);
-  }
+  if (assignee !== undefined) { conditions.push('issues.assignee = ?'); params.push(assignee); }
   
   const status = c.req.query('status');
-  if (status !== undefined) {
-    conditions.push('issues.status = ?');
-    params.push(status);
-  }
+  if (status !== undefined) { conditions.push('issues.status = ?'); params.push(status); }
   
   const search = c.req.query('search');
-  if (search !== undefined) {
-    conditions.push('(issues.title LIKE ? OR issues.description LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`);
+  if (search !== undefined) { 
+    conditions.push('(issues.title LIKE ? OR issues.description LIKE ?)'); 
+    params.push(`%${search}%`, `%${search}%`); 
   }
   
   if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
@@ -75,8 +69,9 @@ router.get('/:id', (c) => {
 });
 
 router.post('/', async (c) => {
-  let body;
-  try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  let body; 
+  try { body = await c.req.json(); } 
+  catch { return c.json({ error: 'Invalid JSON' }, 400); }
   
   const result = CreateIssueSchema.safeParse(body);
   if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
@@ -111,8 +106,9 @@ router.patch('/:id', async (c) => {
   const existing = db.prepare('SELECT * FROM issues WHERE id = ?').get(id) as any;
   if (!existing) return c.json({ error: 'Not found' }, 404);
   
-  let body;
-  try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON' }, 400); }
+  let body; 
+  try { body = await c.req.json(); } 
+  catch { return c.json({ error: 'Invalid JSON' }, 400); }
   
   const result = UpdateIssueSchema.safeParse(body);
   if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
@@ -124,7 +120,7 @@ router.patch('/:id', async (c) => {
     return c.json({ error: 'Duplicate labels not allowed' }, 400);
   }
   
-  // Status change validation
+  // Status transition validation
   if (u.status !== undefined) {
     const currentStatus = existing.status;
     const newStatus = u.status;
@@ -136,7 +132,7 @@ router.patch('/:id', async (c) => {
       'done': ['backlog', 'inreview']
     };
     
-    if (newStatus !== currentStatus && !validTransitions[currentStatus]?.includes(newStatus)) {
+    if (currentStatus !== newStatus && !validTransitions[currentStatus]?.includes(newStatus)) {
       return c.json({ error: 'Invalid status transition' }, 400);
     }
     
@@ -155,32 +151,26 @@ router.patch('/:id', async (c) => {
   // Update fields
   if (u.title !== undefined) db.prepare("UPDATE issues SET title = ?, updated_at = datetime('now') WHERE id = ?").run(u.title, id);
   if (u.description !== undefined) db.prepare("UPDATE issues SET description = ?, updated_at = datetime('now') WHERE id = ?").run(u.description ?? '', id);
-  if (u.priority !== undefined) db.prepare("UPDATE issues SET priority = ?, updated_at = datetime('now') WHERE id = ?").run(u.priority, id);
-  if (u.point_estimate !== undefined) db.prepare("UPDATE issues SET point_estimate = ?, updated_at = datetime('now') WHERE id = ?").run(u.point_estimate, id);
-  if (u.assignee !== undefined) db.prepare("UPDATE issues SET assignee = ?, updated_at = datetime('now') WHERE id = ?").run(u.assignee, id);
-  if (u.labels !== undefined) db.prepare("UPDATE issues SET labels = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(u.labels || []), id);
-  if (u.sprint_id !== undefined) db.prepare("UPDATE issues SET sprint_id = ?, updated_at = datetime('now') WHERE id = ?").run(u.sprint_id, id);
-  
   if (u.status !== undefined) {
-    const wasInDone = existing.status === 'done';
-    const nowInDone = u.status === 'done';
-    
-    if (!wasInDone && nowInDone) {
-      // Entering done status - set completion timestamp
+    // Handle completion timestamp
+    if (u.status === 'done' && existing.status !== 'done') {
       db.prepare("UPDATE issues SET status = ?, completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(u.status, id);
-    } else if (wasInDone && !nowInDone) {
-      // Leaving done status - clear completion timestamp
+    } else if (u.status !== 'done' && existing.status === 'done') {
       db.prepare("UPDATE issues SET status = ?, completed_at = NULL, updated_at = datetime('now') WHERE id = ?").run(u.status, id);
     } else {
-      // Status change but not involving done
       db.prepare("UPDATE issues SET status = ?, updated_at = datetime('now') WHERE id = ?").run(u.status, id);
     }
   }
+  if (u.priority !== undefined) db.prepare("UPDATE issues SET priority = ?, updated_at = datetime('now') WHERE id = ?").run(u.priority, id);
+  if (u.point_estimate !== undefined) db.prepare("UPDATE issues SET point_estimate = ?, updated_at = datetime('now') WHERE id = ?").run(u.point_estimate, id);
+  if (u.assignee !== undefined) db.prepare("UPDATE issues SET assignee = ?, updated_at = datetime('now') WHERE id = ?").run(u.assignee, id);
+  if (u.labels !== undefined) db.prepare("UPDATE issues SET labels = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(u.labels ?? []), id);
+  if (u.sprint_id !== undefined) db.prepare("UPDATE issues SET sprint_id = ?, updated_at = datetime('now') WHERE id = ?").run(u.sprint_id, id);
   
-  const issue = db.prepare('SELECT issues.*, sprints.name as sprint_name FROM issues LEFT JOIN sprints ON issues.sprint_id = sprints.id WHERE issues.id = ?').get(id) as any;
+  const updated = db.prepare('SELECT issues.*, sprints.name as sprint_name FROM issues LEFT JOIN sprints ON issues.sprint_id = sprints.id WHERE issues.id = ?').get(id) as any;
   return c.json({
-    ...issue,
-    labels: JSON.parse(issue.labels as string)
+    ...updated,
+    labels: JSON.parse(updated.labels as string)
   });
 });
 
