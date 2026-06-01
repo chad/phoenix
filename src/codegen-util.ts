@@ -10,6 +10,19 @@
 
 import vm from 'node:vm';
 
+/**
+ * Fix SQLite string-literal quoting in generated SQL. SQLite treats "x" as an
+ * identifier, not a string — so `datetime("now")` / `DEFAULT "todo"` are bugs in ANY
+ * host language. Host-independent, shared by every target that emits SQLite SQL.
+ */
+export function fixSqliteQuotes(code: string): string {
+  return code
+    .replace(/datetime\s*\(\s*"now"\s*\)/g, "datetime('now')")
+    .replace(/date\s*\(\s*"now"\s*\)/g, "date('now')")
+    .replace(/WHEN "(\w+)" THEN/g, "WHEN '$1' THEN")
+    .replace(/DEFAULT "([^"]+)"/g, "DEFAULT '$1'");
+}
+
 /** Strip markdown code fences from an LLM response. */
 export function cleanCodeResponse(raw: string): string {
   let code = raw.trim();

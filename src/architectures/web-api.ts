@@ -59,5 +59,5 @@ This system is an API-driven web application with the following architectural co
 - "Expose a programmatic interface" → the REST API IS the programmatic interface
 `,
 
-  runtimeTargets: ['node-typescript'],
+  runtimeTargets: ['node-typescript', 'python-fastapi'],
 };

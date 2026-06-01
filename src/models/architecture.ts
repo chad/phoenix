@@ -122,8 +122,11 @@ export interface RuntimeTarget {
 
   /** Module template — the LLM fills in marked sections, structure is guaranteed */
   moduleTemplate: string;
-  /** LLM prompt extension — language/framework-specific rules */
+  /** LLM prompt extension — language/framework-specific rules (system prompt) */
   promptExtension: string;
+  /** Per-module generation guide injected into the user prompt: mandatory imports,
+   *  schema/validation conventions, and browser-code rules for this stack. */
+  moduleGuide: string;
   /** Few-shot code examples showing the exact patterns */
   codeExamples: string;
 

@@ -217,27 +217,9 @@ export function buildPrompt(
     lines.push('');
   }
 
-  // For architecture mode, inject the mandatory imports at the top of the prompt
+  // Per-module generation guide — mandatory imports + conventions for THIS target.
   if (target) {
-    lines.push('## MANDATORY: Your module MUST start with these exact imports');
-    lines.push('```');
-    lines.push(`import { Hono } from 'hono';`);
-    lines.push(`import { db, registerMigration } from '../../db.js';`);
-    lines.push(`import { z } from 'zod';`);
-    lines.push('```');
-    lines.push('Do NOT import Database from better-sqlite3. Do NOT create new Database(). Use the db import above.');
-    lines.push('');
-    lines.push('## Schema conventions');
-    lines.push('- In create/update schemas, optional string and number fields must accept null as well as undefined: use `.nullable().optional()`. Clients send null for cleared fields, so a field that is only `.optional()` will reject valid requests.');
-    lines.push('- Use snake_case for all field and column names, and keep field names identical between the create schema, the update schema, the DB columns, and the JSON you return.');
-    lines.push('- For an enumerated set of NUMBERS (e.g. allowed point values 1,2,3,5,8,13), use `z.union([z.literal(1), z.literal(2), ...])` or `z.number().refine(v => [1,2,3,5,8,13].includes(v))`. NEVER use `z.enum([...])` with numbers — `z.enum` accepts string literals only and will not compile.');
-    lines.push("- Call SQL functions like `datetime('now')` directly inside the SQL string (e.g. `SET completed_at = datetime('now')`). NEVER pass them as a bound `?` parameter — that stores the literal text \"datetime('now')\" instead of a timestamp.");
-    lines.push('- Narrow nullable values INLINE at each use. TypeScript does NOT carry a narrowing through a stored boolean: `const over = sprint.capacity != null && pts > sprint.capacity; const by = over ? pts - sprint.capacity : 0;` FAILS (`sprint.capacity` is still possibly undefined on the second line). Instead capture the value once: `const cap = sprint.capacity ?? null; const by = cap != null && pts > cap ? pts - cap : 0;`');
-    lines.push('');
-    lines.push('## Browser code (only if this module returns an HTML page via c.html(`...`))');
-    lines.push('The HTML you emit is executed by a real browser, so it must be valid JS/HTML — not merely a valid TypeScript string (TypeScript will not catch errors inside the page).');
-    lines.push('- Do NOT build inline event handlers (onclick="…") with string concatenation; nested quotes break and blank the page. Instead render elements with data-* attributes (data-id, data-status, …) and attach behaviour with addEventListener after inserting the HTML.');
-    lines.push('- Keep client-side state field names identical to the API contract (e.g. point_estimate, labels as an array).');
+    lines.push(target.runtime.moduleGuide);
     lines.push('');
   }
 

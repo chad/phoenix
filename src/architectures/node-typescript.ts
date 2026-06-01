@@ -12,7 +12,7 @@ import type {
   RuntimeTarget, CompileError, AggregateRole, AggregateRecognition, ServiceDescriptor,
 } from '../models/architecture.js';
 import type { ImplementationUnit } from '../models/iu.js';
-import { cleanCodeResponse, validateInlineScripts } from '../codegen-util.js';
+import { cleanCodeResponse, validateInlineScripts, fixSqliteQuotes } from '../codegen-util.js';
 import { nodeScaffold } from '../scaffold.js';
 
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/;
@@ -152,6 +152,30 @@ router.delete('/:id', (c) => { ... });
 - Use fetch('/resource-name') to call sibling API modules (no /api/ prefix)
 - Include ALL CSS and JavaScript inline
 `;
+
+// ─── Per-module generation guide (injected into the user prompt) ────────────
+
+const MODULE_GUIDE = [
+  '## MANDATORY: Your module MUST start with these exact imports',
+  '```',
+  `import { Hono } from 'hono';`,
+  `import { db, registerMigration } from '../../db.js';`,
+  `import { z } from 'zod';`,
+  '```',
+  'Do NOT import Database from better-sqlite3. Do NOT create new Database(). Use the db import above.',
+  '',
+  '## Schema conventions',
+  '- In create/update schemas, optional string and number fields must accept null as well as undefined: use `.nullable().optional()`. Clients send null for cleared fields, so a field that is only `.optional()` will reject valid requests.',
+  '- Use snake_case for all field and column names, and keep field names identical between the create schema, the update schema, the DB columns, and the JSON you return.',
+  '- For an enumerated set of NUMBERS (e.g. allowed point values 1,2,3,5,8,13), use `z.union([z.literal(1), z.literal(2), ...])` or `z.number().refine(v => [1,2,3,5,8,13].includes(v))`. NEVER use `z.enum([...])` with numbers — `z.enum` accepts string literals only and will not compile.',
+  "- Call SQL functions like `datetime('now')` directly inside the SQL string (e.g. `SET completed_at = datetime('now')`). NEVER pass them as a bound `?` parameter — that stores the literal text \"datetime('now')\" instead of a timestamp.",
+  '- Narrow nullable values INLINE at each use. TypeScript does NOT carry a narrowing through a stored boolean: `const over = sprint.capacity != null && pts > sprint.capacity; const by = over ? pts - sprint.capacity : 0;` FAILS (`sprint.capacity` is still possibly undefined on the second line). Instead capture the value once: `const cap = sprint.capacity ?? null; const by = cap != null && pts > cap ? pts - cap : 0;`',
+  '',
+  '## Browser code (only if this module returns an HTML page via c.html(`...`))',
+  'The HTML you emit is executed by a real browser, so it must be valid JS/HTML — not merely a valid TypeScript string (TypeScript will not catch errors inside the page).',
+  '- Do NOT build inline event handlers (onclick="…") with string concatenation; nested quotes break and blank the page. Instead render elements with data-* attributes (data-id, data-status, …) and attach behaviour with addEventListener after inserting the HTML.',
+  '- Keep client-side state field names identical to the API contract (e.g. point_estimate, labels as an array).',
+].join('\n');
 
 // ─── Code examples ──────────────────────────────────────────────────────────
 
@@ -308,14 +332,7 @@ export const _phoenix = {
   canon_ids: [${iu.source_canon_ids.length} as const],
 } as const;`;
 
-  body = body.replace(/datetime\("now"\)/g, "datetime('now')");
-  body = body.replace(/date\("now"\)/g, "date('now')");
-  body = body.replace(/WHEN "(\w+)" THEN/g, "WHEN '$1' THEN");
-  body = body.replace(/DEFAULT "([^"]+)"/g, "DEFAULT '$1'");
-  body = body.replace(/< datetime\("now"\)/g, "< datetime('now')");
-  body = body.replace(/< date\("now"\)/g, "< date('now')");
-  body = body.replace(/datetime\s*\(\s*"now"\s*\)/g, "datetime('now')");
-  body = body.replace(/date\s*\(\s*"now"\s*\)/g, "date('now')");
+  body = fixSqliteQuotes(body);
 
   return `${templateHeader}\n\n${body}\n\nexport default router;\n\n${phoenixMeta}\n`;
 }
@@ -458,6 +475,7 @@ export const nodeTypescript: RuntimeTarget = {
 
   moduleTemplate: MODULE_TEMPLATE,
   promptExtension: PROMPT_EXTENSION,
+  moduleGuide: MODULE_GUIDE,
   codeExamples: CODE_EXAMPLES,
 
   sharedFiles: {
