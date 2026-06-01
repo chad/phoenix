@@ -28,11 +28,15 @@ export interface SignalVerdict {
 }
 
 const SPEAKER_LABEL = /^\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s*:\s+(?=\S)/; // "John:", "Mary Smith: "
+const BARE_SPEAKER_LABEL = /^\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s*:\s*$/; // "Mary Smith: " with no content
+// Domain/section/field nouns that share the "Word:" shape but are NOT speaker labels.
+const NOT_SPEAKER = /^(?:account|search|status|error|warning|note|notes|example|summary|overview|user|users|system|api|admin|client|server|config|database|payment|order|product|report|dashboard|page|view|field|section|feature|priority|severity|todo|done|input|output|result|response|request|name|email|password|title|description|tag|label|goal|scope|context)$/i;
 
 // ── Hard noise — always drop (unambiguous structural / conversational) ───────
 const HARD_NOISE: { re: RegExp; reason: string }[] = [
   { re: /^\s*(?:hi|hello|hey|yo|good (?:morning|afternoon|evening)|thanks|thank you|cheers|regards|best|bye|see you|ttyl)\b/i, reason: 'greeting' },
-  { re: /^\s*\[?\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?\]?/i, reason: 'timestamp' },
+  // Only a VALIDATED clock time (00-23:00-59[:00-59]) — not '16:9' or '99:99'.
+  { re: /^\s*\[?(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\s*(?:am|pm)?\]?(?=\s|$)/i, reason: 'timestamp' },
   { re: /^\s*@\w+/, reason: 'mention' },
   { re: /^\s*(?:ok(?:ay)?|yeah|yep|yup|sure|sounds good|got it|makes sense|agreed|nice|cool|lol|haha|\+1|\^|same|ditto)[.! ]*$/i, reason: 'reaction' },
   { re: /^\s*(?:um+|uh+|hmm+|so,? ?|well,? ?|btw,? ?|fyi,? ?)\b/i, reason: 'filler' },
@@ -40,31 +44,39 @@ const HARD_NOISE: { re: RegExp; reason: string }[] = [
 
 // ── Soft noise — process/deferral; dropped UNLESS a strong requirement is present ─
 const SOFT_NOISE: { re: RegExp; reason: string }[] = [
-  { re: /\b(?:agenda|attendees|minutes|action items?|next steps|parking lot|sidebar|housekeeping|round[- ]?table)\b/i, reason: 'meeting-meta' },
-  { re: /\b(?:circle back|look(?:ing)? at (?:this|it|that) later|come back to (?:this|it|that)|revisit(?: this| it| that| later)?|table (?:this|it|that)|punt(?: on)?|follow up (?:later|offline)|take(?:n)? (?:this )?offline|discuss(?: this| it)? (?:later|offline)|sync (?:up )?(?:later|offline)|moving on|anyway)\b/i, reason: 'deferral' },
+  // 'minutes'/'sidebar' removed — they're common domain words (a 30-minute timeout, a UI sidebar).
+  { re: /\b(?:agenda|attendees|action items?|next steps|parking lot|housekeeping|round[- ]?table)\b/i, reason: 'meeting-meta' },
+  // 'revisit'/'table' require their deferral object and (for table) must not be the noun 'the table'.
+  { re: /\b(?:circle back|look(?:ing)? at (?:this|it|that) later|come back to (?:this|it|that)|revisit (?:this|it|that|later)|(?<!the )table (?:this|it|that)|punt(?: on)?|follow up (?:later|offline)|take(?:n)? (?:this )?offline|discuss(?: this| it)? (?:later|offline)|sync (?:up )?(?:later|offline)|moving on|anyway)\b/i, reason: 'deferral' },
 ];
 
 // ── Strong signal — a genuine requirement/constraint/definition/decision ─────
 const SIGNAL_PATTERNS: RegExp[] = [
   /\b(?:must|must not|shall|may not|cannot|can(?:'|no)t|required to|has to|is required)\b/i,
   /\b(?:the system|the app(?:lication)?|the service|users?|admins?|clients?|the api)\b[^?]*\b(?:can|must|will|should|shall|may|are able to)\b/i,
-  /\b(?:is|are) (?:defined as|a |an )|\bmeans\b|\brefers to\b|\bconsists of\b/i,                 // definitions
+  /\b(?:is|are) defined as\b|\bmeans\b|\brefers to\b|\bconsists of\b/i,                 // definitions (not bare 'is a')
   /\b(?:we (?:decided|agreed|will use|chose|picked|settled on|are going with)|decision:|let's use)\b/i, // decisions
   /\b(?:at most|at least|no more than|no fewer than|maximum|minimum|limited to|up to|exactly|between)\b.*\b\d/i, // numeric constraints
   /\b(?:create|read|update|delete|edit|view|list|search|filter|validate|assign|move|track|store|compute)\b/i, // CRUD/ops verbs
 ];
 
-/** Remove a leading speaker label so it doesn't leak into the canonical statement. */
+/** Remove a leading speaker label so it doesn't leak into the canonical statement —
+ *  but NOT when the prefix is a domain/section noun ('Account:', 'Search:'). */
 export function stripSpeakerLabel(text: string): string {
+  if (!SPEAKER_LABEL.test(text)) return text.trim();
+  const label = text.slice(0, text.indexOf(':')).trim();
+  if (NOT_SPEAKER.test(label) || NOT_SPEAKER.test(label.split(/\s+/)[0])) return text.trim();
   return text.replace(SPEAKER_LABEL, '').trim();
 }
 
+// Explicit, strong requirement patterns that outrank any noise rule.
+const STRONG_SIGNAL: RegExp[] = [SIGNAL_PATTERNS[0], SIGNAL_PATTERNS[1]];
 const STRONG_RE = /\b(?:must|must not|shall|cannot|can(?:'|no)t|create|read|update|delete|edit|view|list|search|filter|validate|assign|move|track|store|compute|defined as|means|refers to)\b/i;
 const LEAD_IN_RE = /^(?:anyway|so|well|ok(?:ay)?|moving on|actually|right|um+|uh+|hmm+)\b/i;
 
 function isLeadInNoise(seg: string): boolean {
   const s = seg.trim();
-  if (s.length < 2) return true;
+  if (s.length === 0) return true; // empty only — a 1-char segment may be a meaningful identifier
   return SOFT_NOISE.some(p => p.re.test(s)) || LEAD_IN_RE.test(s);
 }
 
@@ -94,13 +106,19 @@ export function stripLeadingNoise(text: string): string {
 export function classifySignal(text: string): SignalVerdict {
   const t = text.trim();
   if (t.length < 3 || !/[a-z]/i.test(t)) return { signal: false, reason: 'empty' };
-
-  for (const { re, reason } of HARD_NOISE) if (re.test(t)) return { signal: false, reason };
+  // A line that is ONLY a dangling speaker label carries no intent.
+  if (BARE_SPEAKER_LABEL.test(t)) return { signal: false, reason: 'speaker-label' };
 
   const s = stripSpeakerLabel(t);
+
+  // An EXPLICIT, strong requirement (must/shall/subject+modal) wins over EVERY noise
+  // rule — a real requirement that merely opens with 'So '/'Best '/'16:9 ' must survive.
+  for (const re of STRONG_SIGNAL) if (re.test(s) || re.test(t)) return { signal: true, reason: 'normative' };
+
+  for (const { re, reason } of HARD_NOISE) if (re.test(t)) return { signal: false, reason };
   for (const { re, reason } of HARD_NOISE) if (re.test(s)) return { signal: false, reason };
 
-  // A strong requirement wins, even on a line that also contains process chatter.
+  // Weaker signal patterns (definitions, decisions, numeric, CRUD) keep the line.
   for (const re of SIGNAL_PATTERNS) if (re.test(s)) return { signal: true, reason: 'normative' };
 
   // Soft noise judged on the original line too (a speaker-label strip can remove a
