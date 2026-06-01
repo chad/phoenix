@@ -58,7 +58,7 @@ export function defaultPaceLayerMetadata(): PaceLayerMetadata {
     classification_rationale: 'Default classification — needs review',
     dependency_weight: 0,
     expected_change_cadence: 'monthly',
-    last_reviewed: new Date().toISOString(),
+    last_reviewed: '', // deterministic default — set at an explicit review step
   };
 }
 

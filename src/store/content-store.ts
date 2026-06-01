@@ -20,6 +20,8 @@ export class ContentStore {
    * Store an object by its ID. ID is expected to be a hex hash.
    */
   put(id: string, data: unknown): void {
+    // Reject empty/short ids — an empty id would resolve to the objects directory (EISDIR).
+    if (!id || id.length < 2) throw new Error(`ContentStore.put: invalid id ${JSON.stringify(id)}`);
     // Use first 2 chars as subdirectory for fan-out
     const subDir = join(this.objectsDir, id.slice(0, 2));
     mkdirSync(subDir, { recursive: true });

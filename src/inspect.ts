@@ -178,16 +178,20 @@ export function collectInspectData(
     };
   });
 
-  // Canon nodes + clause→canon + canon→canon + canon→parent edges
+  // Canon nodes + clause→canon + canon→canon + canon→parent edges. Only emit canon→canon
+  // / canon→parent edges to KNOWN nodes — a dangling/stale link id has no client `items`
+  // entry and would crash the Provenance panel on lookup.
+  const knownCanon = new Set(canonNodes.map(n => n.canon_id));
   const canonInfos: CanonNodeInfo[] = canonNodes.map(n => {
     for (const clauseId of n.source_clause_ids) {
       edges.push({ from: `clause:${clauseId}`, to: `canon:${n.canon_id}`, type: 'clause→canon' });
     }
     for (const linkedId of n.linked_canon_ids) {
+      if (!knownCanon.has(linkedId)) continue; // skip dangling link
       const edgeType = n.link_types?.[linkedId];
       edges.push({ from: `canon:${n.canon_id}`, to: `canon:${linkedId}`, type: 'canon→canon', edgeType });
     }
-    if (n.parent_canon_id) {
+    if (n.parent_canon_id && knownCanon.has(n.parent_canon_id)) {
       edges.push({ from: `canon:${n.parent_canon_id}`, to: `canon:${n.canon_id}`, type: 'canon→parent' });
     }
     return {

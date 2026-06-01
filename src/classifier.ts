@@ -135,8 +135,10 @@ export function classifyChange(
   // Compute confidence and classify
   if (normDiff < CONFIG.CLASS_A_NORM_DIFF && termDelta < CONFIG.CLASS_A_TERM_DELTA) {
     // Check if numeric values changed — that's semantically significant even with small edit distance
-    const beforeNums = (before.normalized_text.match(/\d+/g) ?? []).join(',');
-    const afterNums = (after.normalized_text.match(/\d+/g) ?? []).join(',');
+    // Capture full numbers (incl. decimals/separators) and join with a non-numeric
+    // delimiter so '1.5' vs '1,5' vs '1 5' don't collide.
+    const beforeNums = (before.normalized_text.match(/\d+(?:[.,]\d+)*/g) ?? []).join('\x00');
+    const afterNums = (after.normalized_text.match(/\d+(?:[.,]\d+)*/g) ?? []).join('\x00');
     if (beforeNums !== afterNums) {
       return {
         change_class: ChangeClass.B,
@@ -166,8 +168,12 @@ export function classifyChange(
     };
   }
 
-  // Contextual shift: section structure changed OR high canonical impact
-  if (sectionDelta || canonImpact > 2) {
+  // Contextual shift: section structure changed OR high canonical impact — UNLESS anchors
+  // strongly match a heavily-reworded clause (same concept), which should fall through to
+  // the anchor rescue (B), not be forced to C.
+  const anchorRescues = anchorMatch > CONFIG.ANCHOR_MATCH_THRESHOLD
+    && (normDiff > CONFIG.CLASS_D_HIGH_CHANGE || termDelta > CONFIG.CLASS_D_HIGH_CHANGE);
+  if ((sectionDelta || canonImpact > 2) && !anchorRescues) {
     const confidence = canonImpact > 2 ? 0.9 : 0.7;
     return {
       change_class: ChangeClass.C,

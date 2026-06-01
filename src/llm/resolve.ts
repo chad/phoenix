@@ -44,7 +44,7 @@ export function resolveProvider(phoenixDir?: string): LLMProvider | null {
   if (!provider) return null;
 
   // 5. Save preference if we detected it (and have a phoenix dir)
-  if (phoenixDir && !config.llm) {
+  if (phoenixDir && !config.llm && !envProvider && !envModel) {
     saveConfig(phoenixDir, {
       ...config,
       llm: { provider: providerName, model },

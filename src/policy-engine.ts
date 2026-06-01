@@ -53,7 +53,7 @@ export function evaluatePolicy(
     iu_id: iu.iu_id,
     iu_name: iu.name,
     risk_tier: iu.risk_tier,
-    required,
+    required: [...required],
     satisfied,
     missing,
     failed,

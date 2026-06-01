@@ -4,3 +4,6 @@ dist/
 *.tsbuildinfo
 .DS_Store
 examples/*/data/
+
+# Adversarial review scratch (throwaway repro scripts)
+.adversarial/

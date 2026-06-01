@@ -210,7 +210,8 @@ function assessEvaluationCoverage(
   coverage: EvaluationCoverage,
   blockers: AuditBlocker[],
 ): AuditDimension {
-  let score = Math.round(coverage.coverage_ratio * 60);
+  const ratio = Math.min(1, Math.max(0, coverage.coverage_ratio)); // clamp — no >100% over-credit
+  let score = Math.round(ratio * 60);
 
   // Bonus for diversity of evaluation bindings
   const bindingCount = Object.values(coverage.by_binding).filter(v => v > 0).length;
@@ -240,7 +241,7 @@ function assessEvaluationCoverage(
     name: 'Evaluation Coverage',
     score,
     status: score >= 70 ? 'good' : score >= 40 ? 'warning' : 'critical',
-    detail: `${coverage.total_evaluations} evaluations, ${Math.round(coverage.coverage_ratio * 100)}% canon coverage, ${coverage.gaps.length} gaps`,
+    detail: `${coverage.total_evaluations} evaluations, ${Math.round(ratio * 100)}% canon coverage, ${coverage.gaps.length} gaps`,
   };
 }
 
