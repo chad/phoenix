@@ -50,10 +50,13 @@ const STOP_ANCHORS = new Set([
   'email', 'isbn', 'author', 'address', 'phone', 'amount', 'quantity', 'price',
 ]);
 
-function singular(t: string): string {
+export function singular(t: string): string {
+  // Leave non-plural endings intact so the canonical tag vocabulary isn't corrupted
+  // (status, analysis, analytics, class, bus, series) — these also appear in the marker
+  // and stop-anchor sets, so over-stripping would break membership tests.
+  if (/(?:ss|us|is|ics|series)$/.test(t)) return t;
   if (t.endsWith('ies')) return t.slice(0, -3) + 'y';
-  if (t.endsWith('sses')) return t.slice(0, -2);
-  if (t.endsWith('s') && !t.endsWith('ss')) return t.slice(0, -1);
+  if (t.endsWith('s')) return t.slice(0, -1);
   return t;
 }
 
@@ -158,11 +161,18 @@ function mergeTiny(clusters: CanonCluster[], tagsOf: Map<string, string[]>): Can
   const big = clusters.filter(c => c.nodes.length >= MIN_CLUSTER);
   if (tiny.length === 0 || big.length === 0) return clusters;
   const bigTags = big.map(c => clusterTags(c, tagsOf));
+  // Deterministic fallback for a zero-overlap orphan: the LARGEST cluster (tiebreak by
+  // anchor codepoint) — absorbs noise singletons without depending on input order.
+  let fallback = 0;
+  big.forEach((c, i) => {
+    if (c.nodes.length > big[fallback].nodes.length ||
+        (c.nodes.length === big[fallback].nodes.length && c.anchor < big[fallback].anchor)) fallback = i;
+  });
   for (const t of tiny) {
     const tt = clusterTags(t, tagsOf);
-    let best = 0, bestIdx = 0;
+    let best = 0, bestIdx = -1;
     bigTags.forEach((bt, i) => { const j = jaccard(tt, bt); if (j > best) { best = j; bestIdx = i; } });
-    big[bestIdx].nodes.push(...t.nodes);
+    big[bestIdx >= 0 ? bestIdx : fallback].nodes.push(...t.nodes);
   }
   return big;
 }
@@ -178,7 +188,11 @@ function splitOversized(c: CanonCluster, tagsOf: Map<string, string[]>, freq: Ma
     sub.get(key)!.push(n);
   }
   if (sub.size <= 1) return [c]; // can't split meaningfully
-  return mergeTiny([...sub].map(([anchor, nodes]) => ({ anchor, nodes })), tagsOf);
+  const result = mergeTiny([...sub].map(([anchor, nodes]) => ({ anchor, nodes })), tagsOf);
+  // If every sub-bucket is a singleton, mergeTiny is a no-op and we'd emit only singletons
+  // (violating MIN_CLUSTER) — keep the original cluster intact instead of exploding it.
+  if (result.every(r => r.nodes.length < MIN_CLUSTER)) return [c];
+  return result;
 }
 
 /**
