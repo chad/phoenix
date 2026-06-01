@@ -199,18 +199,20 @@ def delete_note(note_id: int):
 function assemblePy(llmResponse: string, iu: ImplementationUnit): string {
   let code = fixSqliteQuotes(cleanCodeResponse(llmResponse));
 
-  // Ensure a router exists (the app mounts `router`).
-  if (!/\brouter\s*=\s*APIRouter\(/.test(code)) {
+  // Ensure a router exists (the app mounts `router`). Count only a real statement-
+  // position assignment, not a mention in a comment/string.
+  if (!/^\s*router\s*=\s*APIRouter\(/m.test(code)) {
     code = 'from fastapi import APIRouter\nrouter = APIRouter()\n\n' + code;
   }
-  // Provenance metadata.
-  if (!/\b_phoenix\s*=/.test(code)) {
+  // Provenance metadata (statement-position assignment only). canon_ids carries the
+  // actual ids, not their count.
+  if (!/^\s*_phoenix\s*=/m.test(code)) {
     code = code.replace(/\s*$/, '\n') + `\n# @internal Phoenix VCS traceability — do not remove.
 _phoenix = {
     "iu_id": "${iu.iu_id}",
     "name": "${iu.name.replace(/"/g, '\\"')}",
     "risk_tier": "${iu.risk_tier}",
-    "canon_ids": ${iu.source_canon_ids.length},
+    "canon_ids": [${iu.source_canon_ids.map(id => JSON.stringify(id)).join(', ')}],
 }
 `;
   }
@@ -233,7 +235,7 @@ _phoenix = {
     "iu_id": "${iu.iu_id}",
     "name": "${iu.name.replace(/"/g, '\\"')}",
     "risk_tier": "${iu.risk_tier}",
-    "canon_ids": ${iu.source_canon_ids.length},
+    "canon_ids": [${iu.source_canon_ids.map(id => JSON.stringify(id)).join(', ')}],
 }
 `;
 }
@@ -294,17 +296,21 @@ function pyCompile(projectRoot: string): CompileError[] {
     execSync(`python3 ${JSON.stringify(checker)}`, { cwd: projectRoot, stdio: 'pipe', timeout: 60_000 });
     return [];
   } catch (err: unknown) {
-    const e = err as { stdout?: Buffer; stderr?: Buffer };
+    const e = err as { stdout?: Buffer; stderr?: Buffer; signal?: string; message?: string };
     const out = (e.stdout?.toString() ?? '') + (e.stderr?.toString() ?? '');
     const errors: CompileError[] = [];
     for (const line of out.split('\n')) {
       const m = line.match(PY_ERR_RE);
       if (m) errors.push({ file: m[1].trim(), line: +m[2], col: +m[3], code: m[4], message: m[5].trim(), raw: line.trim() });
     }
-    // The checker itself failed to run (e.g. python3 missing) — surface, don't claim clean.
-    if (errors.length === 0 && out.trim()) {
-      const first = out.trim().split('\n')[0];
-      errors.push({ file: 'src', line: 0, col: 0, code: 'PYCHECK', message: first, raw: first });
+    // The checker failed to run or was killed (python3 missing, timeout/SIGTERM, OOM,
+    // non-zero exit with no output) — surface a PYCHECK error; NEVER claim a clean
+    // compile from the catch path (the empty-output case is the dangerous one).
+    if (errors.length === 0) {
+      const msg = out.trim().split('\n')[0]
+        || (e.signal === 'SIGTERM' ? 'python3 syntax check timed out (no module parsed)'
+            : (e.message ?? 'python3 syntax check failed to run'));
+      errors.push({ file: 'src', line: 0, col: 0, code: 'PYCHECK', message: msg, raw: msg });
     }
     return errors;
   }
@@ -321,14 +327,25 @@ const FORBIDDEN_IMPORTS = new Set([
 
 /** Source gate: inline-<script> validation PLUS a forbidden-import check (Python can't
  *  catch a missing module until import time; the syntax gate won't see it). */
+function forbiddenImportMsg(name: string): string {
+  return `Module imports the unavailable third-party package "${name}". Use ONLY the standard library plus fastapi and pydantic. `
+    + 'To read another entity\'s data, query the shared `db` directly (JOIN or a second query) — backend modules must NOT make HTTP calls to sibling modules.';
+}
+
 function pythonValidateSource(code: string): string | null {
   const inline = validateInlineScripts(code);
   if (inline) return inline;
   for (const line of code.split('\n')) {
-    const m = line.match(/^\s*(?:import|from)\s+([a-zA-Z0-9_]+)/);
-    if (m && FORBIDDEN_IMPORTS.has(m[1])) {
-      return `Module imports the unavailable third-party package "${m[1]}". Use ONLY the standard library plus fastapi and pydantic. `
-        + 'To read another entity\'s data, query the shared `db` directly (JOIN or a second query) — backend modules must NOT make HTTP calls to sibling modules.';
+    // `from X import ...` — single top-level module.
+    const fromM = line.match(/^\s*from\s+([a-zA-Z0-9_]+)/);
+    if (fromM && FORBIDDEN_IMPORTS.has(fromM[1])) return forbiddenImportMsg(fromM[1]);
+    // `import a, b.c as d, e` — check EVERY comma-separated module's top segment.
+    const impM = line.match(/^\s*import\s+(.+)/);
+    if (impM) {
+      for (const part of impM[1].split(',')) {
+        const top = part.trim().split(/[.\s]/)[0];
+        if (top && FORBIDDEN_IMPORTS.has(top)) return forbiddenImportMsg(top);
+      }
     }
   }
   return null;
@@ -370,15 +387,17 @@ const migrationRole: AggregateRole = {
     let m: RegExpExecArray | null;
     MIGRATION_RE.lastIndex = 0;
     while ((m = MIGRATION_RE.exec(content))) {
+      const nameQuote = m[1];   // preserve the original ' or " so a name with the other quote stays valid
       const table = m[2];
       const q = m[3];
-      contributions.push({ key: table, body: `register_migration("${table}", ${q}${m[4]}${q})` });
+      contributions.push({ key: table, body: `register_migration(${nameQuote}${table}${nameQuote}, ${q}${m[4]}${q})` });
       const startLine = lineAt(m.index);
       const endLine = lineAt(m.index + m[0].length - 1);
       for (let i = startLine; i <= endLine; i++) removed.add(i);
     }
     for (let i = 0; i < lines.length; i++) {
-      if (/Database migrations/.test(lines[i])) removed.add(i);
+      // Only the decorative section-header comment, not real code/comments mentioning it.
+      if (/^\s*#\s*[─\-= ]*Database migrations[─\-= ]*\s*$/.test(lines[i])) removed.add(i);
     }
     for (let i = 1; i < lines.length; i++) {
       if (!removed.has(i) && removed.has(i - 1) && lines[i].trim() === '') removed.add(i);
@@ -395,8 +414,12 @@ function pruneMigrationImport(content: string): string {
   if (content.includes('register_migration(')) return content;
   return content.replace(
     /from\s+src\.db\s+import\s+([^\n]+)/g,
-    (_full, names: string) => {
-      const kept = names.split(',').map(s => s.trim()).filter(Boolean).filter(n => n !== 'register_migration');
+    (_full, raw: string) => {
+      // Drop a trailing `# ...` comment and any surrounding parentheses, and compare on
+      // the base name (ignoring `as alias`).
+      const names = raw.replace(/#.*$/, '').replace(/[()]/g, '');
+      const baseName = (tok: string): string => tok.split(/\s+as\s+/)[0].trim();
+      const kept = names.split(',').map(s => s.trim()).filter(Boolean).filter(n => baseName(n) !== 'register_migration');
       if (kept.length === 0) return '';
       return `from src.db import ${kept.join(', ')}`;
     },
@@ -416,6 +439,7 @@ function pythonScaffold(services: ServiceDescriptor[], projectName: string, shar
 
   const imports: string[] = [];
   const mounts: string[] = [];
+  let webRootTaken = false; // only ONE module may own the root ('') mount
   for (const svc of services) {
     files.set(`src/generated/${svc.dir}/__init__.py`, '');
     for (const mod of svc.modules) {
@@ -424,9 +448,12 @@ function pythonScaffold(services: ServiceDescriptor[], projectName: string, shar
       imports.push(`from src.generated.${svc.dir}.${modName} import router as ${alias}`);
       // Normalize separators so web-detection works on snake_case dirs (board_ui).
       const isWeb = WEB_RE.test(`${svc.name} ${svc.dir}`.replace(/[_-]/g, ' ').toLowerCase());
-      // URL prefixes use hyphens (web convention; matches sibling contract mount paths);
-      // the Python package dir uses underscores.
-      const prefix = isWeb ? '' : '/' + svc.dir.replace(/_/g, '-');
+      // URL prefixes use hyphens (web convention); the Python package dir uses underscores.
+      // Only the first web module keeps the root mount; later web modules fall back to
+      // '/'+dir so their routes (e.g. GET /) stay reachable instead of colliding at root.
+      let prefix: string;
+      if (isWeb && !webRootTaken) { prefix = ''; webRootTaken = true; }
+      else prefix = '/' + svc.dir.replace(/_/g, '-');
       mounts.push(`app.include_router(${alias}, prefix="${prefix}")`);
     }
   }
