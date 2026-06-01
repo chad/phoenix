@@ -50,7 +50,10 @@ function emptyScores(): TypeScores {
 /** Score a sentence across all types; highest score wins.
  * Scores from the statement's own content only — document structure (the heading
  * it happened to fall under) must not change a statement's semantic type. */
-function scoreSentence(text: string): { type: CanonicalType; confidence: number } {
+export function scoreSentence(text: string): { type: CanonicalType; confidence: number } {
+  // Normalize curly/typographic apostrophes to ASCII so contraction patterns like
+  // "can't" match smart-quote autocorrected input ("can’t"). Scoring-only.
+  text = text.replace(/[‘’ʼ‛]/g, "'");
   const scores = emptyScores();
   const lower = text.toLowerCase();
 
