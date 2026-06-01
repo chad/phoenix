@@ -20,8 +20,8 @@ const TSC_LINE = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/;
 /** Parse `tsc --noEmit` output into structured compile errors. */
 export function parseTscOutput(output: string): CompileError[] {
   const errors: CompileError[] = [];
-  for (const line of output.split('\n')) {
-    const m = line.match(TSC_LINE);
+  for (const line of output.split(/\r?\n/)) {
+    const m = line.replace(/\r$/, '').match(TSC_LINE);
     if (m) errors.push({ file: m[1].trim(), line: +m[2], col: +m[3], code: m[4], message: m[5].trim(), raw: line.trim() });
   }
   return errors;
@@ -293,34 +293,30 @@ function assembleFromTemplate(llmResponse: string, iu: ImplementationUnit): stri
   const templateHeader = templateLines.slice(0, Math.max(headerEnd, 0)).join('\n');
 
   const codeLines = code.split('\n');
+  // Strip ONLY the boilerplate framework imports the template header re-supplies —
+  // match the whole module specifier, not a substring (so a user import path that
+  // merely contains 'zod'/'hono'/'db.js' is preserved).
+  const FRAMEWORK_IMPORT = /from\s*['"](hono(\/.*)?|zod|better-sqlite3|(\.\.?\/)+db\.js)['"]/;
   const bodyLines = codeLines.filter(line => {
     const trimmed = line.trim();
-    if (trimmed.startsWith('import ') && (
-      trimmed.includes('hono') || trimmed.includes('db.js') ||
-      trimmed.includes('better-sqlite3') || trimmed.includes('zod')
-    )) return false;
+    if (trimmed.startsWith('import ') && FRAMEWORK_IMPORT.test(trimmed)) return false;
     return true;
   });
   let body = bodyLines.join('\n').trim();
 
-  const routerDecls = (body.match(/const router\s*=\s*new Hono\(\)/g) ?? []).length;
-  if (routerDecls > 1) {
-    let found = false;
-    body = body.split('\n').filter(line => {
-      if (line.includes('const router') && line.includes('new Hono()')) {
-        if (found) return false;
-        found = true;
-      }
-      return true;
-    }).join('\n');
-  }
+  // Keep the first `const router = new Hono()` and drop any later one, regardless of
+  // line layout (handles two decls on one line, or one split across lines).
+  let routerSeen = 0;
+  body = body.replace(/const\s+router\s*=\s*new Hono\(\)\s*;?/g, m => (routerSeen++ ? '' : m));
 
-  body = body.replace(/\nexport\s+default\s+router\s*;?\s*/g, '\n');
+  body = body.replace(/(^|\n)\s*export\s+default\s+router\s*;?/g, '\n');
   body = body.replace(/\/\*\*[^]*?_phoenix[^]*?\*\/\s*export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
   body = body.replace(/export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
   body = body.replace(/\/\*\* @internal Phoenix VCS traceability[^]*?\*\/\s*/g, '');
 
-  if (!body.includes('const router') && !body.includes('new Hono()')) {
+  // The template unconditionally appends `export default router;`, so the body MUST
+  // declare `router` — gate on the actual declaration, not on any `new Hono()`.
+  if (!/const\s+router\s*=\s*new Hono\(\)/.test(body)) {
     body = 'const router = new Hono();\n\n' + body;
   }
 
@@ -329,7 +325,7 @@ export const _phoenix = {
   iu_id: '${iu.iu_id}',
   name: '${iu.name}',
   risk_tier: '${iu.risk_tier}',
-  canon_ids: [${iu.source_canon_ids.length} as const],
+  canon_ids: [${iu.source_canon_ids.map(id => JSON.stringify(id)).join(', ')}] as const,
 } as const;`;
 
   body = fixSqliteQuotes(body);
@@ -352,7 +348,7 @@ export const _phoenix = {
   iu_id: '${iu.iu_id}',
   name: '${iu.name}',
   risk_tier: '${iu.risk_tier}',
-  canon_ids: [${iu.source_canon_ids.length} as const],
+  canon_ids: [${iu.source_canon_ids.map(id => JSON.stringify(id)).join(', ')}] as const,
 } as const;
 `;
 }
@@ -423,7 +419,9 @@ const migrationRole: AggregateRole = {
       for (let i = startLine; i <= endLine; i++) removed.add(i);
     }
     for (let i = 0; i < lines.length; i++) {
-      if (/Database migrations/.test(lines[i])) removed.add(i);
+      // Drop only the template's decorative section-header comment, not real code or
+      // comments that merely mention the phrase.
+      if (/^\s*\/\/\s*[─\-= ]*Database migrations[─\-= ]*\s*$/.test(lines[i])) removed.add(i);
     }
     // collapse a blank line left immediately after a removed block
     for (let i = 1; i < lines.length; i++) {
