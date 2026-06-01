@@ -184,11 +184,14 @@ function orderForGeneration(ius: ImplementationUnit[]): ImplementationUnit[] {
   return [...ius].sort((a, b) => (isUiIU(a) ? 1 : 0) - (isUiIU(b) ? 1 : 0));
 }
 
-function isUiIU(iu: ImplementationUnit): boolean {
+export function isUiIU(iu: ImplementationUnit): boolean {
   const name = iu.name.toLowerCase();
   const path = (iu.output_files[0] ?? '').toLowerCase();
-  return /\b(web|ui|frontend|interface|page|dashboard|board|design|screen|view)\b/.test(name)
-    || /(?:^|\/)(web|ui|frontend|board|dashboard)\//.test(path);
+  // Strong UI signals only — the generic single words interface/page/design/view/board
+  // mis-classify backend modules (Page Cache, Interface Adapter, View Counter).
+  return /\b(web ?ui|frontend|dashboard|screen|web app|web page|ui component|user interface)\b/.test(name)
+    || /\bui\b/.test(name)
+    || /(?:^|\/)(web|ui|frontend|dashboard)\//.test(path);
 }
 
 // ─── LLM Generation ─────────────────────────────────────────────────────────
@@ -296,9 +299,9 @@ function firstLine(text: string): string {
 /**
  * Generate a natural TypeScript module from an IU contract.
  */
-function generateModule(iu: ImplementationUnit): string {
+export function generateModule(iu: ImplementationUnit): string {
   const lines: string[] = [];
-  const moduleName = toPascalCase(iu.name);
+  const moduleName = toPascalCase(iu.name) || 'Module';
   const configName = `${moduleName}Config`;
 
   // Header
@@ -387,7 +390,7 @@ function generateModule(iu: ImplementationUnit): string {
     }
   } else {
     // Fallback: single entry-point function
-    const funcName = toCamelCase(iu.name);
+    const funcName = toCamelCase(iu.name) || 'run';
     const params = iu.contract.inputs.length > 0
       ? `input: ${inputTypeName}`
       : '';
@@ -408,7 +411,7 @@ function generateModule(iu: ImplementationUnit): string {
   lines.push(`  iu_id: '${iu.iu_id}',`);
   lines.push(`  name: '${iu.name}',`);
   lines.push(`  risk_tier: '${iu.risk_tier}',`);
-  lines.push(`  canon_ids: [${iu.source_canon_ids.length} as const],`);
+  lines.push(`  canon_ids: [${iu.source_canon_ids.map(id => `'${id}'`).join(', ')}] as const,`);
   lines.push('} as const;');
   lines.push('');
 
@@ -461,7 +464,7 @@ function extractOperations(iu: ImplementationUnit): Operation[] {
 
   // Group requirements by detected verb
   const verbGroups = new Map<string, string[]>();
-  const moduleName = toPascalCase(iu.name);
+  const moduleName = toPascalCase(iu.name) || 'Module';
 
   for (const statement of iu.contract.description.split('. ').filter(Boolean)) {
     for (const { pattern, verb } of patterns) {
@@ -507,7 +510,16 @@ function extractOperations(iu: ImplementationUnit): Operation[] {
  * "the service must validate JWT tokens" → "token"
  * "the gateway must reject expired tokens" → "token"
  */
-function extractSubject(statement: string, verb: string): string | null {
+/** Singularize a simple English plural, leaving ss/us/is words (class, bus, status) alone. */
+export function singularize(w: string): string {
+  if (/(?:ss|us|is)$/i.test(w)) return w;                          // class, bus, analysis, status
+  if (/[^aeiou]ies$/i.test(w)) return w.replace(/ies$/i, 'y');     // policies -> policy
+  if (/(?:ses|xes|zes|ches|shes)$/i.test(w)) return w.replace(/es$/i, ''); // addresses->address, boxes->box
+  if (/s$/i.test(w)) return w.replace(/s$/i, '');                  // tokens -> token
+  return w;
+}
+
+export function extractSubject(statement: string, verb: string): string | null {
   // Pattern: "must <verb> <object>"
   const regex = new RegExp(`must\\s+(?:support\\s+|handle\\s+)?${verb}\\w*\\s+(.+?)(?:\\s+(?:with|from|to|for|on|in|at|by|using|via|when|after|before)\\b|[.;,]|$)`, 'i');
   const match = statement.match(regex);
@@ -521,9 +533,7 @@ function extractSubject(statement: string, verb: string): string | null {
       .filter(w => w.length > 1)
       .slice(0, 2);
     if (words.length > 0) {
-      // Singularize simple plurals
-      const noun = words[words.length - 1].replace(/s$/, '');
-      words[words.length - 1] = noun;
+      words[words.length - 1] = singularize(words[words.length - 1]);
       return words.join(' ');
     }
   }
@@ -602,20 +612,22 @@ function extractTypeRefs(params: string, returnType: string): string[] {
 
 // ─── Naming Utilities ────────────────────────────────────────────────────────
 
-function toCamelCase(str: string): string {
-  return str
-    .replace(/[^a-zA-Z0-9 ]/g, ' ')
+export function toCamelCase(str: string): string {
+  const out = str
+    .replace(/[^\p{L}\p{N} ]/gu, ' ')   // keep unicode letters/digits (valid JS id chars)
     .split(/\s+/)
     .filter(Boolean)
     .map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join('');
+  return out || 'value';
 }
 
-function toPascalCase(str: string): string {
-  return str
-    .replace(/[^a-zA-Z0-9 ]/g, ' ')
+export function toPascalCase(str: string): string {
+  const out = str
+    .replace(/[^\p{L}\p{N} ]/gu, ' ')
     .split(/\s+/)
     .filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join('');
+  return out || 'Value';
 }
