@@ -38,8 +38,9 @@ export function contextSemhashWarm(
     linkedIds.add(node.canon_id);
     for (const linkedId of node.linked_canon_ids) {
       const edgeType = node.link_types?.[linkedId];
-      // Include all typed edges except weak 'relates_to'
-      if (!edgeType || edgeType !== 'relates_to') {
+      // Include only REAL typed edges except weak 'relates_to' — an untyped/unknown edge
+      // is excluded per the "only typed edges" contract (was including undefined-type).
+      if (edgeType && edgeType !== 'relates_to') {
         linkedIds.add(linkedId);
       }
     }
@@ -48,11 +49,13 @@ export function contextSemhashWarm(
   // Collect types of related nodes
   const types = new Set(relatedNodes.map(n => n.type));
 
+  // JSON-encode the variable-length arrays so element boundaries can't collide (an id,
+  // type, or heading containing a comma/'/' no longer aliases distinct sets/paths).
   const parts = [
     clause.normalized_text,
-    clause.section_path.join('/'),
-    [...linkedIds].sort().join(','),
-    [...types].sort().join(','),
+    JSON.stringify(clause.section_path),
+    JSON.stringify([...linkedIds].sort()),
+    JSON.stringify([...types].sort()),
   ];
 
   return sha256(parts.join('\x00'));
