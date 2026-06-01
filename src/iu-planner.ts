@@ -40,16 +40,26 @@ export async function planIUsAuto(
   return buildIUsFromClusters(clusters, target);
 }
 
-function buildIUsFromClusters(clusters: CanonCluster[], target?: ResolvedTarget | null): ImplementationUnit[] {
+export function buildIUsFromClusters(clusters: CanonCluster[], target?: ResolvedTarget | null): ImplementationUnit[] {
   const ius: ImplementationUnit[] = [];
+  const usedPaths = new Set<string>();
+  const pathFor = (slug: string): string =>
+    target?.runtime.outputPathFor(slug) ?? `src/generated/${slug}/${slug}.ts`;
   for (const cluster of clusters) {
     const nodes = cluster.nodes;
     if (nodes.length === 0) continue;
 
     const name = cleanName(cluster.anchor.replace(/-/g, ' '));
-    const serviceName = slugify(cluster.anchor);
-    const outputPath = target?.runtime.outputPathFor(serviceName)
-      ?? `src/generated/${serviceName}/${serviceName}.ts`;
+    const baseSlug = slugify(cluster.anchor);
+    // Distinct clusters whose anchors slugify identically (or to empty) must NOT share
+    // an output file — disambiguate with a stable numeric suffix.
+    let serviceName = baseSlug;
+    let outputPath = pathFor(serviceName);
+    for (let n = 2; usedPaths.has(outputPath); n++) {
+      serviceName = `${baseSlug}-${n}`;
+      outputPath = pathFor(serviceName);
+    }
+    usedPaths.add(outputPath);
     const riskTier = deriveRiskTier(nodes);
     const canonIds = nodes.map(n => n.canon_id);
 
@@ -58,7 +68,9 @@ function buildIUsFromClusters(clusters: CanonCluster[], target?: ResolvedTarget 
     const constraints = nodes.filter(n => n.type === 'CONSTRAINT' || n.type === 'INVARIANT');
     const description = requirements.map(n => n.statement).join('. ');
 
-    const iuId = sha256(['iu', serviceName, name, ...canonIds.sort()].join('\x00'));
+    // Sort a COPY for the order-independent hash; keep canonIds (source_canon_ids) in
+    // original node/document order so provenance ordering is preserved.
+    const iuId = sha256(['iu', serviceName, name, ...[...canonIds].sort()].join('\x00'));
 
     // Derive typed inputs/outputs from node statements
     const { inputs, outputs } = deriveContract(nodes, name);
@@ -85,8 +97,9 @@ function buildIUsFromClusters(clusters: CanonCluster[], target?: ResolvedTarget 
     });
   }
 
-  // Sort for deterministic output
-  ius.sort((a, b) => a.output_files[0].localeCompare(b.output_files[0]));
+  // Sort for deterministic output — codepoint order is locale/ICU-independent and
+  // portable across Node builds (full-icu vs small/no-icu); localeCompare is not.
+  ius.sort((a, b) => (a.output_files[0] < b.output_files[0] ? -1 : a.output_files[0] > b.output_files[0] ? 1 : 0));
 
   return ius;
 }
@@ -141,7 +154,7 @@ function deriveContract(
   if (/\buser\b/i.test(allStatements) && /\b(?:create|account|authenticate)\b/i.test(allStatements)) inputs.push('user');
   if (/\btoken\b/i.test(allStatements)) inputs.push('token');
   if (/\btemplate\b/i.test(allStatements)) inputs.push('template');
-  if (/\bnotification|message\b/i.test(allStatements)) inputs.push('notification');
+  if (/\b(?:notification|message)\b/i.test(allStatements)) inputs.push('notification');
   if (/\bconfig\b/i.test(allStatements)) inputs.push('config');
 
   if (/\bresponse\b/i.test(allStatements)) outputs.push('response');
@@ -177,5 +190,5 @@ function slugify(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replace(/^-|-$/g, '') || 'module'; // never empty (mirrors iu-clusterer.slugAnchor)
 }

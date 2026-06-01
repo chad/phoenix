@@ -51,7 +51,7 @@ export function deriveServices(ius: ImplementationUnit[]): ServiceDescriptor[] {
 
   // Assign ports AFTER sorting so they're deterministic w.r.t. the returned order,
   // independent of IU input order.
-  const sorted = [...serviceMap.values()].sort((a, b) => a.dir.localeCompare(b.dir));
+  const sorted = [...serviceMap.values()].sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
   sorted.forEach((s, i) => { s.port = 3000 + i; });
   return sorted;
 }
