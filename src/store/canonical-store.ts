@@ -24,7 +24,12 @@ export class CanonicalStore {
     if (!existsSync(this.graphPath)) {
       return { nodes: {}, provenance: {} };
     }
-    return JSON.parse(readFileSync(this.graphPath, 'utf8'));
+    // An empty/partial file (process killed mid-write) must not brick the store.
+    try {
+      return JSON.parse(readFileSync(this.graphPath, 'utf8'));
+    } catch {
+      return { nodes: {}, provenance: {} };
+    }
   }
 
   private saveGraph(graph: CanonicalGraph): void {

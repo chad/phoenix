@@ -35,7 +35,11 @@ export class SpecStore {
     if (!existsSync(this.graphPath)) {
       return { documents: {} };
     }
-    return JSON.parse(readFileSync(this.graphPath, 'utf8'));
+    try {
+      return JSON.parse(readFileSync(this.graphPath, 'utf8'));
+    } catch {
+      return { documents: {} }; // empty/partial file must not brick the store
+    }
   }
 
   private saveIndex(index: SpecGraphIndex): void {

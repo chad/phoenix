@@ -28,7 +28,8 @@ export function evaluatePolicy(
     if (matching.length === 0) {
       missing.push(req);
     } else {
-      const latest = matching[matching.length - 1];
+      // Latest by TIMESTAMP, not array position — a stale FAIL must not override a newer PASS.
+      const latest = matching.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
       if (latest.status === EvidenceStatus.PASS) {
         satisfied.push(req);
       } else if (latest.status === EvidenceStatus.FAIL) {

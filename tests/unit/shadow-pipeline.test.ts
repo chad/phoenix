@@ -32,7 +32,7 @@ describe('computeShadowDiff', () => {
 
   it('detects risk escalations (type changes)', () => {
     const old = [makeNode('a', 'shared stmt', [], CanonicalType.REQUIREMENT)];
-    const newN = [makeNode('b', 'shared stmt', [], CanonicalType.CONSTRAINT)];
+    const newN = [makeNode('a', 'shared stmt', [], CanonicalType.CONSTRAINT)]; // same node, type escalated
     const metrics = computeShadowDiff(old, newN);
     expect(metrics.risk_escalations).toBe(1);
   });
@@ -49,7 +49,7 @@ describe('classifyShadowDiff', () => {
 
   it('classifies COMPACTION_EVENT for moderate changes', () => {
     const { classification } = classifyShadowDiff({
-      node_change_pct: 15, edge_change_pct: 10, risk_escalations: 1,
+      node_change_pct: 15, edge_change_pct: 10, risk_escalations: 0,
       orphan_nodes: 0, out_of_scope_growth: 2, semantic_stmt_drift: 20,
     });
     expect(classification).toBe(UpgradeClassification.COMPACTION_EVENT);

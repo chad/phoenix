@@ -37,11 +37,12 @@ export function computeShadowDiff(
     n => n.linked_canon_ids.length === 0 && n.source_clause_ids.length === 0
   ).length;
 
-  // Risk escalations: nodes that changed type (approximate by statement match)
-  const oldByStmt = new Map(oldNodes.map(n => [n.statement, n]));
+  // Risk escalations: nodes that changed type. Match by canon_id (stable identity) — a
+  // statement-keyed map collapses duplicate statements and matches the wrong node.
+  const oldById = new Map(oldNodes.map(n => [n.canon_id, n]));
   let riskEscalations = 0;
   for (const nn of newNodes) {
-    const old = oldByStmt.get(nn.statement);
+    const old = oldById.get(nn.canon_id);
     if (old && old.type !== nn.type) riskEscalations++;
   }
 
@@ -76,7 +77,7 @@ export function classifyShadowDiff(metrics: ShadowDiffMetrics): {
   if (metrics.node_change_pct <= 3 && metrics.risk_escalations === 0) {
     return { classification: UpgradeClassification.SAFE, reason: `Node change ${metrics.node_change_pct}% ≤ 3%, no risk escalations` };
   }
-  if (metrics.node_change_pct <= 25 && metrics.orphan_nodes === 0) {
+  if (metrics.node_change_pct <= 25 && metrics.orphan_nodes === 0 && metrics.risk_escalations === 0) {
     return { classification: UpgradeClassification.COMPACTION_EVENT, reason: `Node change ${metrics.node_change_pct}% ≤ 25%, no orphans` };
   }
   return { classification: UpgradeClassification.REJECT, reason: `Excessive churn: ${metrics.node_change_pct}% node change` };

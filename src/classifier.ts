@@ -308,20 +308,20 @@ function computeAnchorOverlap(
 /**
  * Count canonical nodes affected by a change.
  */
-function countCanonImpact(
+export function countCanonImpact(
   before: Clause | undefined,
   after: Clause | undefined,
   canonBefore: CanonicalNode[],
   canonAfter: CanonicalNode[],
 ): number {
-  let impact = 0;
-
+  // Count DISTINCT affected canon nodes (by canon_id) — summing both sides double-counts
+  // a clause whose concepts are unchanged, tripping the `> 2` contextual-shift threshold.
+  const affected = new Set<string>();
   if (before) {
-    impact += canonBefore.filter(n => n.source_clause_ids.includes(before.clause_id)).length;
+    for (const n of canonBefore) if (n.source_clause_ids.includes(before.clause_id)) affected.add(n.canon_id);
   }
   if (after) {
-    impact += canonAfter.filter(n => n.source_clause_ids.includes(after.clause_id)).length;
+    for (const n of canonAfter) if (n.source_clause_ids.includes(after.clause_id)) affected.add(n.canon_id);
   }
-
-  return impact;
+  return affected.size;
 }

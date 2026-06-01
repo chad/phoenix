@@ -25,7 +25,11 @@ export class EvaluationStore {
 
   private load(): EvalIndex {
     if (!existsSync(this.indexPath)) return { evaluations: [] };
-    return JSON.parse(readFileSync(this.indexPath, 'utf8'));
+    try {
+      return JSON.parse(readFileSync(this.indexPath, 'utf8'));
+    } catch {
+      return { evaluations: [] }; // empty/partial file must not brick the store
+    }
   }
 
   private save(index: EvalIndex): void {
