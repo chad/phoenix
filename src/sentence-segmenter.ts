@@ -56,8 +56,10 @@ export function segmentSentences(rawText: string): Sentence[] {
       continue;
     }
 
-    // Detect list items
-    const listMatch = trimmed.match(/^(?:[-*•]|\d+[.)]\s*)\s*(.*)/);
+    // Detect list items. Require whitespace after the marker and cap the ordinal to
+    // 1-3 digits, so a decimal ('1.5'), negative ('-5'), 4-digit year ('2024.'), or
+    // emphasis ('*word*') at line start is NOT misread as a list item.
+    const listMatch = trimmed.match(/^(?:[-*•]|\d{1,3}[.)])\s+(.*)/);
     if (listMatch) {
       // Flush any pending prose
       if (proseBuffer) {
@@ -126,10 +128,13 @@ function splitProseIntoSentences(text: string): string[] {
   const results: string[] = [];
   // Split on '. ', '! ', '? ' followed by uppercase letter
   const pattern = /([.!?])\s+(?=[A-Z])/g;
+  // Don't split after a known abbreviation/title or a single-letter acronym piece.
+  const ABBREV = /(?:^|[\s(])(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|e\.g|i\.e|U\.S|a\.m|p\.m|[A-Z])$/i;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(text)) !== null) {
+    if (ABBREV.test(text.slice(lastIdx, match.index))) continue; // not a real boundary
     const end = match.index + match[1].length;
     results.push(text.slice(lastIdx, end).trim());
     lastIdx = end + match[0].length - match[1].length;
@@ -149,7 +154,7 @@ function splitProseIntoSentences(text: string): string[] {
  *
  * Only split if both parts contain a modal verb.
  */
-function splitCompoundModals(text: string): string[] {
+export function splitCompoundModals(text: string): string[] {
   // Check for semicolons with modals on both sides
   const semiParts = text.split(/\s*;\s*/);
   if (semiParts.length > 1 && semiParts.every(p => hasModal(p))) {
@@ -157,7 +162,7 @@ function splitCompoundModals(text: string): string[] {
   }
 
   // Check for " and " + modal or " and " separating complete modal clauses
-  const andPattern = /\s+and\s+(?=(?:must|shall|should|will|cannot|must not)\s)/i;
+  const andPattern = /\s+and\s+(?=(?:must not|must|shall|should|will|cannot|may not|may)\s)/i;
   const andMatch = text.match(andPattern);
   if (andMatch && andMatch.index !== undefined) {
     const left = text.slice(0, andMatch.index).trim();
