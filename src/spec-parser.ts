@@ -10,7 +10,7 @@ import type { Clause } from './models/clause.js';
 import { normalizeText } from './normalizer.js';
 import { clauseSemhash, contextSemhashCold, clauseId } from './semhash.js';
 
-interface RawSection {
+export interface RawSection {
   heading: string;
   level: number;
   startLine: number; // 1-indexed
@@ -78,18 +78,26 @@ export function parseSpec(content: string, docId: string): Clause[] {
  * A section = heading line through (but not including) the next heading of same or higher level,
  * or end of file.
  */
-function extractSections(lines: string[]): RawSection[] {
+export function extractSections(lines: string[]): RawSection[] {
   const headingPattern = /^(#{1,6})\s+(.+)/;
   const headingIndices: { index: number; level: number; text: string }[] = [];
 
+  // Track fenced-code state so a `# heading-looking` line INSIDE a ``` fence is not
+  // parsed as a real heading; skip headings whose text is empty after trimming.
+  const fencePattern = /^\s*(```|~~~)/;
+  let inFence = false;
+  let fenceMarker = '';
   for (let i = 0; i < lines.length; i++) {
+    const fm = lines[i].match(fencePattern);
+    if (fm) {
+      if (!inFence) { inFence = true; fenceMarker = fm[1]; }
+      else if (lines[i].trimStart().startsWith(fenceMarker)) { inFence = false; fenceMarker = ''; }
+      continue;
+    }
+    if (inFence) continue;
     const match = lines[i].match(headingPattern);
-    if (match) {
-      headingIndices.push({
-        index: i,
-        level: match[1].length,
-        text: match[2].trim(),
-      });
+    if (match && match[2].trim().length > 0) {
+      headingIndices.push({ index: i, level: match[1].length, text: match[2].trim() });
     }
   }
 
@@ -101,14 +109,14 @@ function extractSections(lines: string[]): RawSection[] {
 
   // Capture pre-heading content as a preamble section
   if (headingIndices.length > 0 && headingIndices[0].index > 0) {
-    const preambleText = lines.slice(0, headingIndices[0].index).join('\n').trim();
-    if (preambleText.length > 0) {
+    const preambleText = lines.slice(0, headingIndices[0].index).join('\n');
+    if (preambleText.trim().length > 0) {
       sections.push({
         heading: '(preamble)',
         level: 0,
         startLine: 1,
         endLine: headingIndices[0].index,
-        rawText: preambleText,
+        rawText: preambleText, // not trimmed — consistent with heading sections + the range
         sectionPath: ['(preamble)'],
       });
     }
@@ -117,9 +125,14 @@ function extractSections(lines: string[]): RawSection[] {
   for (let h = 0; h < headingIndices.length; h++) {
     const { index, level, text } = headingIndices[h];
     const startLine = index + 1; // 1-indexed
-    const endLine = h < headingIndices.length - 1
+    let endLine = h < headingIndices.length - 1
       ? headingIndices[h + 1].index // line before next heading (0-indexed), = next heading 1-indexed - 1
       : lines.length;
+    // For the LAST section, don't count the empty trailing element a final newline
+    // produces — the range must point at a real content line.
+    if (h === headingIndices.length - 1) {
+      while (endLine > startLine && lines[endLine - 1].trim() === '') endLine--;
+    }
 
     // Update section path stack
     while (pathStack.length > 0 && pathStack[pathStack.length - 1].level >= level) {
