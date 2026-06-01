@@ -31,84 +31,46 @@ export function extractDependencies(source: string, filePath: string): Dependenc
   const sideChannels: ExtractedSideChannel[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
     const lineNum = i + 1;
+    // Strip line + single-line block comments so commented-out imports/side-channels are
+    // not extracted. The `(?<!:)` guard protects a URL scheme's `//` (http://…).
+    const line = lines[i].replace(/(?<!:)\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
 
-    // Match: import ... from 'specifier'
-    // Match: import 'specifier'
-    // Match: require('specifier')
-    const importMatch = line.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))/);
-    if (importMatch) {
-      const source = importMatch[1] || importMatch[2] || importMatch[3];
-      imports.push({
-        kind: 'import',
-        source,
-        is_relative: source.startsWith('.') || source.startsWith('/'),
-        source_line: lineNum,
-      });
+    // Static import/export ... from / bare import — only at STATEMENT position (start of
+    // line or after ';') so a string literal containing "import" is not matched, while
+    // multiple statements on one line are all captured.
+    for (const m of line.matchAll(/(?:^|;)\s*(?:import|export)\s+(?:[^'";]*?\bfrom\s+)?['"]([^'"]+)['"]/g)) {
+      addImport(imports, m[1], lineNum);
+    }
+    // Dynamic import('x') and require('x') — function-call form, may appear inline.
+    for (const m of line.matchAll(/(?<![\w$.])(?:import|require)\s*\(\s*['"]([^'"]+)['"]/g)) {
+      addImport(imports, m[1], lineNum);
     }
 
-    // Side channel detection patterns
-    // process.env.XXX
-    const envMatch = line.match(/process\.env\.(\w+)/);
-    if (envMatch) {
-      sideChannels.push({
-        kind: 'config',
-        identifier: envMatch[1],
-        source_line: lineNum,
-      });
+    // ── Side channels (comment-stripped, global so every occurrence is captured) ──
+    for (const m of line.matchAll(/process\.env\.(\w+)/g)) {
+      sideChannels.push({ kind: 'config', identifier: m[1], source_line: lineNum });
     }
-
-    // process.env['XXX']
-    const envBracketMatch = line.match(/process\.env\[['"](\w+)['"]\]/);
-    if (envBracketMatch) {
-      sideChannels.push({
-        kind: 'config',
-        identifier: envBracketMatch[1],
-        source_line: lineNum,
-      });
+    for (const m of line.matchAll(/process\.env\[['"]([^'"]+)['"]\]/g)) {
+      sideChannels.push({ kind: 'config', identifier: m[1], source_line: lineNum });
     }
-
-    // fetch('url') or new URL('...')
-    const fetchMatch = line.match(/(?:fetch|new\s+URL)\s*\(\s*['"]([^'"]+)['"]/);
-    if (fetchMatch) {
-      sideChannels.push({
-        kind: 'external_api',
-        identifier: fetchMatch[1],
-        source_line: lineNum,
-      });
+    for (const m of line.matchAll(/(?<![\w$.])(?:fetch|new\s+URL)\s*\(\s*['"]([^'"]+)['"]/g)) {
+      sideChannels.push({ kind: 'external_api', identifier: m[1], source_line: lineNum });
     }
-
-    // Database patterns: createConnection, createPool, new Pool, PrismaClient, etc.
-    const dbMatch = line.match(/(?:createConnection|createPool|new\s+Pool|new\s+PrismaClient|mongoose\.connect)\s*\(/);
-    if (dbMatch) {
-      sideChannels.push({
-        kind: 'database',
-        identifier: 'database_connection',
-        source_line: lineNum,
-      });
+    for (const _m of line.matchAll(/(?:createConnection|createPool|new\s+Pool|new\s+PrismaClient|mongoose\.connect)\s*\(/g)) {
+      sideChannels.push({ kind: 'database', identifier: 'database_connection', source_line: lineNum });
     }
-
-    // fs.readFile, fs.writeFile, etc.
-    const fsMatch = line.match(/fs\.(readFile|writeFile|readdir|mkdir|unlink|stat|access)/);
-    if (fsMatch) {
-      sideChannels.push({
-        kind: 'file',
-        identifier: `fs.${fsMatch[1]}`,
-        source_line: lineNum,
-      });
+    for (const m of line.matchAll(/(?<![\w$])fs\.(readFile|writeFile|readdir|mkdir|unlink|stat|access)/g)) {
+      sideChannels.push({ kind: 'file', identifier: `fs.${m[1]}`, source_line: lineNum });
     }
-
-    // Redis / cache patterns
-    const cacheMatch = line.match(/(?:new\s+Redis|createClient|redis\.connect)/);
-    if (cacheMatch) {
-      sideChannels.push({
-        kind: 'cache',
-        identifier: 'redis_connection',
-        source_line: lineNum,
-      });
+    for (const _m of line.matchAll(/(?:new\s+Redis|createClient|redis\.connect)/g)) {
+      sideChannels.push({ kind: 'cache', identifier: 'redis_connection', source_line: lineNum });
     }
   }
 
   return { file_path: filePath, imports, side_channels: sideChannels };
+}
+
+function addImport(imports: ExtractedDep[], source: string, line: number): void {
+  imports.push({ kind: 'import', source, is_relative: source.startsWith('.') || source.startsWith('/'), source_line: line });
 }
