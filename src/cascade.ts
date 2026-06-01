@@ -20,23 +20,17 @@ export function computeCascade(
   const events: CascadeEvent[] = [];
   const iuMap = new Map(ius.map(iu => [iu.iu_id, iu]));
 
-  // Build reverse dependency map: iu_id → IUs that depend on it
-  const dependents = new Map<string, ImplementationUnit[]>();
-  for (const iu of ius) {
-    for (const depId of iu.dependencies) {
-      const list = dependents.get(depId) ?? [];
-      list.push(iu);
-      dependents.set(depId, list);
-    }
-  }
-
   for (const eval_ of evaluations) {
     if (eval_.verdict === 'PASS') continue;
 
     const sourceIU = iuMap.get(eval_.iu_id);
     if (!sourceIU) continue;
 
-    const affected = dependents.get(eval_.iu_id) ?? [];
+    // Propagate through the FULL transitive closure (not just direct dependents);
+    // getTransitiveDependents uses a visited set so dependents are de-duplicated.
+    const affected = getTransitiveDependents(eval_.iu_id, ius)
+      .map(id => iuMap.get(id))
+      .filter((iu): iu is ImplementationUnit => iu !== undefined);
     if (affected.length === 0 && eval_.verdict !== 'FAIL') continue;
 
     const actions: CascadeAction[] = [];

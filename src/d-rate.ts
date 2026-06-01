@@ -15,6 +15,10 @@ export class DRateTracker {
   private windowSize: number;
 
   constructor(windowSize: number = DEFAULT_WINDOW_SIZE) {
+    // A non-positive window self-evicts every record, masking the true D-rate as 0%.
+    if (!Number.isInteger(windowSize) || windowSize < 1) {
+      throw new RangeError('windowSize must be a positive integer');
+    }
     this.windowSize = windowSize;
   }
 
