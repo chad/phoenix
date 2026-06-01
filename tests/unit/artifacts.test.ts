@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { splitSharedArtifacts, parseRegions, MIGRATIONS_FILE } from '../../src/artifacts.js';
+import { splitSharedArtifacts, parseRegions } from '../../src/artifacts.js';
 import type { RegenResult } from '../../src/regen.js';
+import { resolveTarget } from '../../src/architectures/index.js';
 import { sha256 } from '../../src/semhash.js';
+
+const TARGET = resolveTarget('web-api/node-typescript')!;
+const MIGRATIONS_FILE = 'src/generated/_migrations.ts';
 
 /** Build a minimal RegenResult for one module file. */
 function makeResult(
@@ -52,7 +56,7 @@ export default router;`;
 describe('splitSharedArtifacts — migrations', () => {
   it('lifts registerMigration out of the module into the shared file', () => {
     const r = makeResult('ISSUE', 'src/generated/issue/issue.ts', ISSUE_MODULE);
-    const split = splitSharedArtifacts([r], null);
+    const split = splitSharedArtifacts([r], TARGET);
 
     // Module no longer self-registers.
     const moduleNow = r.files.get('src/generated/issue/issue.ts')!;
@@ -79,7 +83,7 @@ describe('splitSharedArtifacts — migrations', () => {
 
   it('prunes registerMigration from the db import when no longer used', () => {
     const r = makeResult('ISSUE', 'src/generated/issue/issue.ts', ISSUE_MODULE);
-    splitSharedArtifacts([r], null);
+    splitSharedArtifacts([r], TARGET);
     const moduleNow = r.files.get('src/generated/issue/issue.ts')!;
     expect(moduleNow).toContain("import { db } from '../../db.js'");
     expect(moduleNow).not.toContain('registerMigration');
@@ -87,7 +91,7 @@ describe('splitSharedArtifacts — migrations', () => {
 
   it('round-trips: parsed region hash matches the recorded manifest hash', () => {
     const r = makeResult('ISSUE', 'src/generated/issue/issue.ts', ISSUE_MODULE);
-    const split = splitSharedArtifacts([r], null);
+    const split = splitSharedArtifacts([r], TARGET);
     const shared = split.files.get(MIGRATIONS_FILE)!;
     const parsed = parseRegions(shared);
     expect(parsed).toHaveLength(1);
@@ -98,7 +102,7 @@ describe('splitSharedArtifacts — migrations', () => {
   it('dedupes duplicate table ownership, first IU wins', () => {
     const a = makeResult('ISSUE_A', 'src/generated/a/a.ts', ISSUE_MODULE);
     const b = makeResult('ISSUE_B', 'src/generated/b/b.ts', ISSUE_MODULE);
-    const split = splitSharedArtifacts([a, b], null);
+    const split = splitSharedArtifacts([a, b], TARGET);
 
     // Only one region for the 'issues' table.
     const regions = split.sharedFiles[0].regions.filter(r => r.key === 'issues');
@@ -106,7 +110,7 @@ describe('splitSharedArtifacts — migrations', () => {
     expect(regions[0].iu_id).toBe('ISSUE_A');
     // Conflict reported.
     expect(split.conflicts).toEqual([
-      { table: 'issues', keptIU: 'ISSUE_A', droppedIUs: ['ISSUE_B'] },
+      { role: 'migration', key: 'issues', keptIU: 'ISSUE_A', droppedIUs: ['ISSUE_B'] },
     ]);
   });
 
@@ -122,7 +126,7 @@ describe('splitSharedArtifacts — migrations', () => {
       [String(routeIdx)]: 'CANON_ROUTE', // route line — kept, shifts up
     };
     const r = makeResult('ISSUE', 'src/generated/issue/issue.ts', ISSUE_MODULE, prov);
-    splitSharedArtifacts([r], null);
+    splitSharedArtifacts([r], TARGET);
 
     const out = r.manifest.files['src/generated/issue/issue.ts'].line_provenance!;
     const moduleNow = r.files.get('src/generated/issue/issue.ts')!.split('\n');
@@ -137,7 +141,7 @@ describe('splitSharedArtifacts — migrations', () => {
   it('no-ops cleanly when there are no migrations', () => {
     const plain = `import { Hono } from 'hono';\nconst router = new Hono();\nexport default router;`;
     const r = makeResult('UI', 'src/generated/ui/ui.ts', plain);
-    const split = splitSharedArtifacts([r], null);
+    const split = splitSharedArtifacts([r], TARGET);
     expect(split.sharedFiles).toHaveLength(0);
     expect(split.files.size).toBe(0);
     expect(r.files.get('src/generated/ui/ui.ts')).toBe(plain);
@@ -146,13 +150,13 @@ describe('splitSharedArtifacts — migrations', () => {
   it('preserves regions for IUs not in the batch (partial regen merge)', () => {
     // First, full split to get an existing shared file.
     const issue = makeResult('ISSUE', 'src/generated/issue/issue.ts', ISSUE_MODULE);
-    const first = splitSharedArtifacts([issue], null);
+    const first = splitSharedArtifacts([issue], TARGET);
     const existing = parseRegions(first.files.get(MIGRATIONS_FILE)!);
 
     // Now regen only a different IU; preserve ISSUE's region.
     const sprintModule = ISSUE_MODULE.replace(/issues/g, 'sprints');
     const sprint = makeResult('SPRINT', 'src/generated/sprint/sprint.ts', sprintModule);
-    const second = splitSharedArtifacts([sprint], null, { preserve: existing });
+    const second = splitSharedArtifacts([sprint], TARGET, { preserve: existing });
 
     const tables = second.sharedFiles[0].regions.map(r => r.key).sort();
     expect(tables).toEqual(['issues', 'sprints']);

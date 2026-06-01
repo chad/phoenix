@@ -41,7 +41,7 @@ import { runCompaction, identifyCandidates, shouldTriggerCompaction } from '../.
 import { DRateTracker } from '../../src/d-rate.js';
 import { BootstrapStateMachine } from '../../src/bootstrap.js';
 import { parseCommand, routeCommand, getAllCommands } from '../../src/bot-router.js';
-import { deriveServices, generateScaffold } from '../../src/scaffold.js';
+import { deriveServices, nodeScaffold } from '../../src/scaffold.js';
 
 // Stores
 import { SpecStore } from '../../src/store/spec-store.js';
@@ -563,7 +563,7 @@ describe('E2E: Multi-Spec Project Lifecycle', () => {
     const services = deriveServices(ctx.ius);
     expect(services.length).toBeGreaterThanOrEqual(2);
 
-    const scaffold = generateScaffold(services, 'test-project');
+    const scaffold = nodeScaffold(services, 'test-project');
     expect(scaffold.files.has('package.json')).toBe(true);
     expect(scaffold.files.has('tsconfig.json')).toBe(true);
 

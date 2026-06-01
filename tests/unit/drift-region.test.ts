@@ -2,12 +2,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { splitSharedArtifacts, MIGRATIONS_FILE } from '../../src/artifacts.js';
+import { splitSharedArtifacts } from '../../src/artifacts.js';
 import type { RegenResult } from '../../src/regen.js';
 import { detectDrift } from '../../src/drift.js';
 import { DriftStatus } from '../../src/models/manifest.js';
 import type { GeneratedManifest } from '../../src/models/manifest.js';
+import { resolveTarget } from '../../src/architectures/index.js';
 import { sha256 } from '../../src/semhash.js';
+
+const TARGET = resolveTarget('web-api/node-typescript')!;
+const MIGRATIONS_FILE = 'src/generated/_migrations.ts';
 
 function moduleFor(table: string): string {
   return `import { Hono } from 'hono';
@@ -47,7 +51,7 @@ describe('per-region drift on the shared migrations file', () => {
   function buildManifest(): GeneratedManifest {
     const issue = makeResult('ISSUE', 'src/generated/issue/issue.ts', moduleFor('issues'));
     const sprint = makeResult('SPRINT', 'src/generated/sprint/sprint.ts', moduleFor('sprints'));
-    const split = splitSharedArtifacts([issue, sprint], null);
+    const split = splitSharedArtifacts([issue, sprint], TARGET);
 
     // Write the shared file to disk.
     const full = join(root, MIGRATIONS_FILE);

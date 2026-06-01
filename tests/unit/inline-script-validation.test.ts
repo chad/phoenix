@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateInlineScripts } from '../../src/regen.js';
+import { validateInlineScripts } from '../../src/codegen-util.js';
 
 describe('validateInlineScripts', () => {
   it('catches a browser-fatal syntax error TypeScript cannot see (nested quotes in onclick)', () => {

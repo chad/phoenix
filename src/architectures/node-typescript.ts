@@ -5,7 +5,27 @@
  * Stack: Hono (HTTP) + better-sqlite3 (DB) + Zod (validation)
  */
 
-import type { RuntimeTarget } from '../models/architecture.js';
+import { execSync } from 'node:child_process';
+import { writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import type {
+  RuntimeTarget, CompileError, AggregateRole, AggregateRecognition, ServiceDescriptor,
+} from '../models/architecture.js';
+import type { ImplementationUnit } from '../models/iu.js';
+import { cleanCodeResponse, validateInlineScripts } from '../codegen-util.js';
+import { nodeScaffold } from '../scaffold.js';
+
+const TSC_LINE = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/;
+
+/** Parse `tsc --noEmit` output into structured compile errors. */
+export function parseTscOutput(output: string): CompileError[] {
+  const errors: CompileError[] = [];
+  for (const line of output.split('\n')) {
+    const m = line.match(TSC_LINE);
+    if (m) errors.push({ file: m[1].trim(), line: +m[2], col: +m[3], code: m[4], message: m[5].trim(), raw: line.trim() });
+  }
+  return errors;
+}
 
 // ─── Module template (LLM fills in marked sections) ─────────────────────────
 
@@ -216,12 +236,210 @@ router.delete('/:id', (c) => {
 \`\`\`
 `;
 
+// ─── Codegen hooks (the TS/Hono/Zod/SQLite specifics live here, not in the engine) ──
+
+const MINIMAL_TSCONFIG = JSON.stringify({
+  compilerOptions: {
+    target: 'ES2022', module: 'Node16', moduleResolution: 'Node16',
+    strict: true, esModuleInterop: true, skipLibCheck: true, outDir: 'dist', rootDir: 'src',
+  },
+  include: ['src'],
+}, null, 2);
+
+/** Compile the whole project with tsc; ensure a tsconfig exists during pre-scaffold generation. */
+function tscCompile(projectRoot: string): CompileError[] {
+  const tsconfigPath = join(projectRoot, 'tsconfig.json');
+  if (!existsSync(tsconfigPath)) writeFileSync(tsconfigPath, MINIMAL_TSCONFIG, 'utf8');
+  try {
+    execSync('npx tsc --noEmit 2>&1', { cwd: projectRoot, stdio: 'pipe', timeout: 120_000 });
+    return [];
+  } catch (err: unknown) {
+    const e = err as { stdout?: Buffer; stderr?: Buffer };
+    return parseTscOutput((e.stdout?.toString() ?? '') + (e.stderr?.toString() ?? ''));
+  }
+}
+
+/** Repair raw LLM output into a structurally-valid Hono module: fixed imports, single
+ *  router, default export, _phoenix metadata, and SQL double→single quote fixes. */
+function assembleFromTemplate(llmResponse: string, iu: ImplementationUnit): string {
+  let code = cleanCodeResponse(llmResponse);
+
+  const templateLines = MODULE_TEMPLATE.split('\n');
+  const headerEnd = templateLines.findIndex(l => l.includes('__MIGRATIONS__'));
+  const templateHeader = templateLines.slice(0, Math.max(headerEnd, 0)).join('\n');
+
+  const codeLines = code.split('\n');
+  const bodyLines = codeLines.filter(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('import ') && (
+      trimmed.includes('hono') || trimmed.includes('db.js') ||
+      trimmed.includes('better-sqlite3') || trimmed.includes('zod')
+    )) return false;
+    return true;
+  });
+  let body = bodyLines.join('\n').trim();
+
+  const routerDecls = (body.match(/const router\s*=\s*new Hono\(\)/g) ?? []).length;
+  if (routerDecls > 1) {
+    let found = false;
+    body = body.split('\n').filter(line => {
+      if (line.includes('const router') && line.includes('new Hono()')) {
+        if (found) return false;
+        found = true;
+      }
+      return true;
+    }).join('\n');
+  }
+
+  body = body.replace(/\nexport\s+default\s+router\s*;?\s*/g, '\n');
+  body = body.replace(/\/\*\*[^]*?_phoenix[^]*?\*\/\s*export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
+  body = body.replace(/export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
+  body = body.replace(/\/\*\* @internal Phoenix VCS traceability[^]*?\*\/\s*/g, '');
+
+  if (!body.includes('const router') && !body.includes('new Hono()')) {
+    body = 'const router = new Hono();\n\n' + body;
+  }
+
+  const phoenixMeta = `/** @internal Phoenix VCS traceability — do not remove. */
+export const _phoenix = {
+  iu_id: '${iu.iu_id}',
+  name: '${iu.name}',
+  risk_tier: '${iu.risk_tier}',
+  canon_ids: [${iu.source_canon_ids.length} as const],
+} as const;`;
+
+  body = body.replace(/datetime\("now"\)/g, "datetime('now')");
+  body = body.replace(/date\("now"\)/g, "date('now')");
+  body = body.replace(/WHEN "(\w+)" THEN/g, "WHEN '$1' THEN");
+  body = body.replace(/DEFAULT "([^"]+)"/g, "DEFAULT '$1'");
+  body = body.replace(/< datetime\("now"\)/g, "< datetime('now')");
+  body = body.replace(/< date\("now"\)/g, "< date('now')");
+  body = body.replace(/datetime\s*\(\s*"now"\s*\)/g, "datetime('now')");
+  body = body.replace(/date\s*\(\s*"now"\s*\)/g, "date('now')");
+
+  return `${templateHeader}\n\n${body}\n\nexport default router;\n\n${phoenixMeta}\n`;
+}
+
+/** Minimal valid Hono router stub when generation fails. */
+function archStub(iu: ImplementationUnit): string {
+  return `import { Hono } from 'hono';
+
+const router = new Hono();
+
+router.get('/', (c) => c.json({ stub: true, module: '${iu.name}', message: 'Not yet implemented' }));
+
+export default router;
+
+/** @internal Phoenix VCS traceability — do not remove. */
+export const _phoenix = {
+  iu_id: '${iu.iu_id}',
+  name: '${iu.name}',
+  risk_tier: '${iu.risk_tier}',
+  canon_ids: [${iu.source_canon_ids.length} as const],
+} as const;
+`;
+}
+
+/** Extract a module's Zod schemas + Hono routes so consumer IUs match the contract. */
+function extractTsContract(code: string): string | null {
+  const parts: string[] = [];
+  const schemaRe = /const\s+\w+\s*=\s*z\.object\(\{[\s\S]*?\}\)\s*;/g;
+  let m: RegExpExecArray | null;
+  while ((m = schemaRe.exec(code))) parts.push(m[0]);
+
+  const routes: string[] = [];
+  const seen = new Set<string>();
+  for (const line of code.split('\n')) {
+    const r = line.match(/router\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]/);
+    if (r) {
+      const sig = `router.${r[1]}('${r[2]}')`;
+      if (!seen.has(sig)) { seen.add(sig); routes.push(sig); }
+    }
+  }
+  if (routes.length) parts.push('// routes:\n' + routes.join('\n'));
+
+  let text = parts.join('\n\n');
+  if (!text) return null;
+  if (text.length > 2500) text = text.slice(0, 2500) + '\n// …(truncated)';
+  return text;
+}
+
+// ── Migration aggregate (better-sqlite3 registerMigration) ──
+
+const MIGRATIONS_FILE = 'src/generated/_migrations.ts';
+const MIGRATION_RE = /registerMigration\(\s*(['"])(.*?)\1\s*,\s*`([\s\S]*?)`\s*\)\s*;?/g;
+
+const migrationRole: AggregateRole = {
+  role: 'migration',
+  filePath: MIGRATIONS_FILE,
+  commentPrefix: '//',
+  importSpecifier: './generated/_migrations.js',
+  fileHeader: [
+    '// AUTO-GENERATED shared artifact: database migrations aggregated across IUs.',
+    '// Each region below is OWNED by exactly one Implementation Unit. Editing inside a',
+    '// region is drift attributed to that IU; Phoenix regenerates the whole file.',
+    "import { registerMigration } from '../db.js';",
+    '',
+  ].join('\n'),
+
+  recognize(content: string): AggregateRecognition {
+    const lines = content.split('\n');
+    const removed = new Set<number>();
+    const contributions: AggregateRecognition['contributions'] = [];
+
+    const lineStart: number[] = [];
+    let off = 0;
+    for (const l of lines) { lineStart.push(off); off += l.length + 1; }
+    const lineAt = (charIdx: number): number => {
+      let i = lineStart.length - 1;
+      while (i > 0 && lineStart[i] > charIdx) i--;
+      return i;
+    };
+
+    let m: RegExpExecArray | null;
+    MIGRATION_RE.lastIndex = 0;
+    while ((m = MIGRATION_RE.exec(content))) {
+      const table = m[2];
+      contributions.push({ key: table, body: `registerMigration('${table}', \`${m[3]}\`);` });
+      const startLine = lineAt(m.index);
+      const endLine = lineAt(m.index + m[0].length - 1);
+      for (let i = startLine; i <= endLine; i++) removed.add(i);
+    }
+    for (let i = 0; i < lines.length; i++) {
+      if (/Database migrations/.test(lines[i])) removed.add(i);
+    }
+    // collapse a blank line left immediately after a removed block
+    for (let i = 1; i < lines.length; i++) {
+      if (!removed.has(i) && removed.has(i - 1) && lines[i].trim() === '') removed.add(i);
+    }
+
+    let strippedCode = lines.filter((_, i) => !removed.has(i)).join('\n');
+    strippedCode = pruneRegisterMigrationImport(strippedCode);
+
+    return { strippedCode, removed: [...removed], contributions };
+  },
+};
+
+/** When a module no longer calls registerMigration, drop it from the db import. */
+function pruneRegisterMigrationImport(content: string): string {
+  if (content.includes('registerMigration(')) return content;
+  return content.replace(
+    /import\s*\{([^}]*)\}\s*from\s*(['"][^'"]*db\.js['"]);?/g,
+    (_full, inner: string, from: string) => {
+      const names = inner.split(',').map(s => s.trim()).filter(Boolean).filter(n => n !== 'registerMigration');
+      if (names.length === 0) return '';
+      return `import { ${names.join(', ')} } from ${from};`;
+    },
+  );
+}
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const nodeTypescript: RuntimeTarget = {
   name: 'node-typescript',
   description: 'Node.js + TypeScript — Hono, better-sqlite3, Zod',
   language: 'typescript',
+  fileExtension: 'ts',
 
   packages: {
     'hono': '^4.6.0',
@@ -255,4 +473,17 @@ export const nodeTypescript: RuntimeTarget = {
       test: 'vitest run',
     },
   },
+
+  // ── Codegen hooks ──
+  outputPathFor: (slug: string): string => `src/generated/${slug}/${slug}.ts`,
+  assemble: assembleFromTemplate,
+  stub: archStub,
+  extractContract: extractTsContract,
+  compile: tscCompile,
+  ownsGeneratedFile: (path: string): boolean =>
+    path.startsWith('src/generated/') && !path.endsWith('_migrations.ts'),
+  validateSource: validateInlineScripts,
+  aggregates: [migrationRole],
+  scaffold: (services: ServiceDescriptor[], projectName: string, sharedImports: string[]): Map<string, string> =>
+    nodeScaffold(services, projectName, nodeTypescript, sharedImports).files,
 };

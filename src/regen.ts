@@ -10,9 +10,7 @@
  * and auto-detected from env vars.
  */
 
-import { execSync } from 'node:child_process';
-import vm from 'node:vm';
-import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
 import type { CanonicalNode } from './models/canonical.js';
@@ -22,6 +20,7 @@ import type { LLMProvider } from './llm/provider.js';
 import { buildPrompt, getSystemPrompt, provenanceLabels, extractLineProvenance } from './llm/prompt.js';
 import type { SiblingContract } from './llm/prompt.js';
 import type { ResolvedTarget } from './models/architecture.js';
+import { cleanCodeResponse, buildFixPrompt } from './codegen-util.js';
 import { sha256 } from './semhash.js';
 
 const TOOLCHAIN_VERSION = 'phoenix-regen/0.1.0';
@@ -113,10 +112,10 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
           promptpack_hash: promptpackHash,
           reason: `Generation threw, fell back to stub: ${firstLine(msg)}`,
         });
-        content = ctx.target ? generateArchStub(iu) : generateModule(iu);
+        content = ctx.target ? ctx.target.runtime.stub(iu) : generateModule(iu);
       }
     } else {
-      content = ctx?.target ? generateArchStub(iu) : generateModule(iu);
+      content = ctx?.target ? ctx.target.runtime.stub(iu) : generateModule(iu);
     }
 
     files.set(outputPath, content);
@@ -169,10 +168,10 @@ export async function generateAll(ius: ImplementationUnit[], ctx?: RegenContext)
   const results: RegenResult[] = [];
   for (const iu of orderForGeneration(ius)) {
     const result = await generateIU(iu, ctx);
-    // Extract this IU's contract for downstream consumers.
+    // Extract this IU's contract (via the target) for downstream consumers.
     const primary = result.files.get(iu.output_files[0]) ?? [...result.files.values()][0];
-    if (primary) {
-      const contract = extractContract(primary);
+    if (primary && ctx?.target) {
+      const contract = ctx.target.runtime.extractContract(primary);
       if (contract) contracts.set(iu.iu_id, contract);
     }
     results.push(result);
@@ -190,33 +189,6 @@ function isUiIU(iu: ImplementationUnit): boolean {
   const path = (iu.output_files[0] ?? '').toLowerCase();
   return /\b(web|ui|frontend|interface|page|dashboard|board|design|screen|view)\b/.test(name)
     || /(?:^|\/)(web|ui|frontend|board|dashboard)\//.test(path);
-}
-
-/**
- * Extract a module's public contract — its Zod request/response schemas and its
- * routes — so consumer IUs can be generated against the exact field names, types,
- * enum spellings, and nullability rather than guessing.
- */
-export function extractContract(code: string): string {
-  const parts: string[] = [];
-  const schemaRe = /const\s+\w+\s*=\s*z\.object\(\{[\s\S]*?\}\)\s*;/g;
-  let m: RegExpExecArray | null;
-  while ((m = schemaRe.exec(code))) parts.push(m[0]);
-
-  const routes: string[] = [];
-  const seen = new Set<string>();
-  for (const line of code.split('\n')) {
-    const r = line.match(/router\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]/);
-    if (r) {
-      const sig = `router.${r[1]}('${r[2]}')`;
-      if (!seen.has(sig)) { seen.add(sig); routes.push(sig); }
-    }
-  }
-  if (routes.length) parts.push('// routes:\n' + routes.join('\n'));
-
-  let text = parts.join('\n\n');
-  if (text.length > 2500) text = text.slice(0, 2500) + '\n// …(truncated)';
-  return text;
 }
 
 // ─── LLM Generation ─────────────────────────────────────────────────────────
@@ -268,52 +240,37 @@ async function generateWithLLM(
 
   const systemPrompt = getSystemPrompt(target);
   const prompt = buildPrompt(iu, canonNodes, siblings, target, negativeKnowledge, knownContracts);
-  const template = target?.runtime.moduleTemplate;
+  const rt = target?.runtime ?? null;
+  const filePath = iu.output_files[0];
 
   let code: string;
-
-  if (template) {
-    // Template mode: LLM fills in sections, we splice into template
-    const raw = await llm.generate(prompt, {
-      system: systemPrompt,
-      temperature: 0.1, // lower temp for more deterministic section filling
-      maxTokens: 16384,
-    });
-
-    code = assembleFromTemplate(template, raw, iu);
+  if (rt) {
+    // Target mode: the target repairs raw LLM output into a structurally-valid module.
+    const raw = await llm.generate(prompt, { system: systemPrompt, temperature: 0.1, maxTokens: 16384 });
+    code = rt.assemble(raw, iu);
   } else {
-    // Freeform mode
-    code = cleanCodeResponse(await llm.generate(prompt, {
-      system: systemPrompt,
-      temperature: 0.2,
-      maxTokens: 16384,
-    }));
+    // Freeform mode (no architecture target)
+    code = cleanCodeResponse(await llm.generate(prompt, { system: systemPrompt, temperature: 0.2, maxTokens: 16384 }));
   }
 
-  // Typecheck-and-retry loop. Re-checks after each fix so the final state is known.
-  // The check is BOTH tsc AND inline-script validation — a module can typecheck clean
-  // yet ship browser-fatal JS inside c.html(`…`), so inline validation must gate the
+  // Compile-and-retry loop, driven by the target's compiler. The check is the target's
+  // compile PLUS its optional extra source gate (e.g. inline-<script> validation) — a
+  // module can typecheck clean yet ship browser-fatal JS, so the extra gate runs on the
   // initial pass too, not only post-fix retries.
   let typecheckError: string | undefined;
-  if (projectRoot && iu.output_files[0]) {
-    const check = (c: string): string | null =>
-      typecheckFile(projectRoot, iu.output_files[0], c) || validateInlineScripts(c);
+  if (rt && projectRoot && filePath) {
+    const check = (c: string): string | null => {
+      const full = join(projectRoot, filePath);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, c, 'utf8');
+      const errs = rt.compile(projectRoot).filter(e => e.file === filePath || e.file.endsWith(filePath));
+      return (errs.length ? errs.map(e => e.raw).join('\n') : null) || (rt.validateSource?.(c) ?? null);
+    };
     let errors = check(code);
     let attempt = 0;
     while (errors && attempt < MAX_RETRIES) {
-      // Feed errors back to LLM with the current code
-      const fixPrompt = buildFixPrompt(code, errors);
-      const fixResponse = await llm.generate(fixPrompt, {
-        system: systemPrompt,
-        temperature: 0.1,
-        maxTokens: 16384,
-      });
-
-      if (template) {
-        code = assembleFromTemplate(template, fixResponse, iu);
-      } else {
-        code = cleanCodeResponse(fixResponse);
-      }
+      const fixResponse = await llm.generate(buildFixPrompt(code, errors), { system: systemPrompt, temperature: 0.1, maxTokens: 16384 });
+      code = rt.assemble(fixResponse, iu);
       errors = check(code);
       attempt++;
     }
@@ -334,274 +291,7 @@ function firstLine(text: string): string {
   return line.length > 200 ? line.slice(0, 197) + '…' : line;
 }
 
-/**
- * Repair LLM-generated code using the template as a structural guarantee.
- *
- * The LLM generates a full module. This function:
- * 1. Strips any imports the LLM wrote and replaces with template imports
- * 2. Ensures `export default router` exists
- * 3. Ensures `_phoenix` metadata exists
- * 4. Ensures `const router = new Hono()` exists
- *
- * This is more robust than section parsing — accepts whatever the LLM
- * generates and fixes the structural parts that must be exact.
- */
-function assembleFromTemplate(template: string, llmResponse: string, iu: ImplementationUnit): string {
-  let code = cleanCodeResponse(llmResponse);
-
-  // Extract the template's fixed header (imports)
-  const templateLines = template.split('\n');
-  const headerEnd = templateLines.findIndex(l => l.includes('__MIGRATIONS__'));
-  const templateHeader = templateLines.slice(0, Math.max(headerEnd, 0)).join('\n');
-
-  // Strip LLM's import lines — we'll use the template's
-  const codeLines = code.split('\n');
-  const bodyLines = codeLines.filter(line => {
-    const trimmed = line.trim();
-    // Remove import statements that the template already provides
-    if (trimmed.startsWith('import ') && (
-      trimmed.includes('hono') ||
-      trimmed.includes('db.js') ||
-      trimmed.includes('better-sqlite3') ||
-      trimmed.includes('zod')
-    )) return false;
-    return true;
-  });
-  let body = bodyLines.join('\n').trim();
-
-  // Remove any duplicate "const router = new Hono()" — template has one, LLM might add another
-  const routerDecls = (body.match(/const router\s*=\s*new Hono\(\)/g) ?? []).length;
-  if (routerDecls > 1) {
-    // Keep only the first occurrence
-    let found = false;
-    body = body.split('\n').filter(line => {
-      if (line.includes('const router') && line.includes('new Hono()')) {
-        if (found) return false;
-        found = true;
-      }
-      return true;
-    }).join('\n');
-  }
-
-  // Remove any "export default router" — we'll add it at the end
-  body = body.replace(/\nexport\s+default\s+router\s*;?\s*/g, '\n');
-
-  // Remove any existing _phoenix export
-  body = body.replace(/\/\*\*[^]*?_phoenix[^]*?\*\/\s*export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
-  body = body.replace(/export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
-  // Remove any orphan traceability comment lines the LLM echoed without the export
-  // (otherwise stripping the export above leaves duplicate "@internal" comments).
-  body = body.replace(/\/\*\* @internal Phoenix VCS traceability[^]*?\*\/\s*/g, '');
-
-  // Ensure router declaration exists
-  if (!body.includes('const router') && !body.includes('new Hono()')) {
-    body = 'const router = new Hono();\n\n' + body;
-  }
-
-  // Build the phoenix metadata
-  const phoenixMeta = `/** @internal Phoenix VCS traceability — do not remove. */
-export const _phoenix = {
-  iu_id: '${iu.iu_id}',
-  name: '${iu.name}',
-  risk_tier: '${iu.risk_tier}',
-  canon_ids: [${iu.source_canon_ids.length} as const],
-} as const;`;
-
-  // Fix SQL double-quote issue globally: SQLite treats "x" as column name, needs 'x'
-  // Replace ALL double-quoted SQL keywords that should be single-quoted
-  body = body.replace(/datetime\("now"\)/g, "datetime('now')");
-  body = body.replace(/date\("now"\)/g, "date('now')");
-  body = body.replace(/WHEN "(\w+)" THEN/g, "WHEN '$1' THEN");
-  body = body.replace(/DEFAULT "([^"]+)"/g, "DEFAULT '$1'");
-  body = body.replace(/< datetime\("now"\)/g, "< datetime('now')");
-  body = body.replace(/< date\("now"\)/g, "< date('now')");
-  // Catch any remaining datetime/date with double quotes
-  body = body.replace(/datetime\s*\(\s*"now"\s*\)/g, "datetime('now')");
-  body = body.replace(/date\s*\(\s*"now"\s*\)/g, "date('now')");
-
-  // Assemble: template header + LLM body + exports + metadata
-  return `${templateHeader}\n\n${body}\n\nexport default router;\n\n${phoenixMeta}\n`;
-}
-
-const MINIMAL_TSCONFIG = JSON.stringify({
-  compilerOptions: {
-    target: 'ES2022',
-    module: 'Node16',
-    moduleResolution: 'Node16',
-    strict: true,
-    esModuleInterop: true,
-    skipLibCheck: true,
-    outDir: 'dist',
-    rootDir: 'src',
-  },
-  include: ['src'],
-}, null, 2);
-
-/**
- * Typecheck a single file by writing it to disk and running tsc.
- * Returns error output or null if clean.
- */
-function typecheckFile(projectRoot: string, filePath: string, content: string): string | null {
-  const fullPath = join(projectRoot, filePath);
-  mkdirSync(dirname(fullPath), { recursive: true });
-  writeFileSync(fullPath, content, 'utf8');
-
-  // Ensure tsconfig.json exists for tsc
-  const tsconfigPath = join(projectRoot, 'tsconfig.json');
-  const hadTsconfig = existsSync(tsconfigPath);
-  if (!hadTsconfig) {
-    writeFileSync(tsconfigPath, MINIMAL_TSCONFIG, 'utf8');
-  }
-
-  try {
-    execSync('npx tsc --noEmit 2>&1', {
-      cwd: projectRoot,
-      timeout: 30000,
-      stdio: 'pipe',
-    });
-    return null; // clean
-  } catch (err: unknown) {
-    const execErr = err as { stdout?: Buffer; stderr?: Buffer };
-    const output = (execErr.stdout?.toString() || '') + (execErr.stderr?.toString() || '');
-    // Filter to only errors from this file
-    const fileErrors = output
-      .split('\n')
-      .filter(line => line.includes(filePath))
-      .join('\n')
-      .trim();
-    return fileErrors || output.trim();
-  }
-}
-
-/**
- * Validate inline <script> blocks the module emits inside c.html(`...`).
- *
- * TypeScript treats the whole HTML page as a template-literal string, so tsc never
- * parses the JavaScript inside <script> — a browser-fatal syntax error (e.g. nested
- * quotes in an inline onclick handler) passes typecheck but blanks the page. This
- * parses each inline script the way a browser would, making browser-JS syntax a
- * first-class generation gate alongside typecheck. vm.Script only parses; it never
- * runs the code, so browser globals (document, fetch, …) are irrelevant.
- */
-export function validateInlineScripts(code: string): string | null {
-  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(code))) {
-    const body = m[1];
-    if (!body.trim()) continue;
-    try {
-      // The inline <script> is emitted inside c.html(`…`), so the browser sees the
-      // TEMPLATE-LITERAL-COOKED text, not the raw source. A source `\'` (a valid
-      // escaped quote) collapses to `'` at render time and can break client JS
-      // (e.g. `', \'' +` → `', '' +`, two adjacent strings → SyntaxError). Validate
-      // the cooked form the browser will actually parse.
-      new vm.Script(cookTemplateLiteral(body));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return `Inline <script> has a browser JavaScript syntax error: ${msg}. `
-        + 'The HTML you build inside c.html(`...`) is executed by a real browser and must be valid JS, '
-        + 'not just a valid TypeScript string. A common cause is unescaped nested quotes in an inline '
-        + 'event handler like onclick="moveIssue(\' + id + \', \'\' + status + \'\')". Do NOT build inline '
-        + 'on* handlers by string concatenation — render elements with data-* attributes and attach '
-        + 'behaviour with addEventListener after inserting the HTML.';
-    }
-  }
-  return null;
-}
-
-/**
- * Cook a string the way a backtick template literal would, since our inline scripts
- * are emitted inside c.html(`…`). This is what the browser actually receives:
- * `${…}` interpolations resolve to runtime values (we neutralize them to a literal),
- * and backslash escapes are consumed (`\'`→`'`, `\\`→`\`, `` \` ``→`` ` ``, `\n`→LF…).
- * Validating the cooked form catches client-JS syntax errors that the raw source hides.
- */
-function cookTemplateLiteral(body: string): string {
-  // Neutralize interpolations first — their runtime value is unknown; a literal keeps
-  // the surrounding JS parseable. (Escaped `\${…}` is handled by the cook pass below.)
-  const noInterp = body.replace(/(^|[^\\])\$\{[^}]*\}/g, '$1(0)');
-  const map: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
-  // Consume backslash-escapes left-to-right (so `\\` becomes a single `\`).
-  return noInterp.replace(/\\([\s\S])/g, (_, c: string) => map[c] ?? c);
-}
-
-/**
- * Build a prompt asking the LLM to fix typecheck errors.
- */
-export function buildFixPrompt(code: string, errors: string): string {
-  return `The following TypeScript module has compilation errors. Fix them.
-
-## Current code:
-\`\`\`typescript
-${code}
-\`\`\`
-
-## TypeScript errors:
-${errors}
-
-## Rules:
-- Output ONLY the fixed TypeScript module. No markdown fences, no explanation.
-- Do NOT import external packages. Use only Node.js built-in modules.
-- For WebSocket features, use node:http — do NOT import 'ws'.
-- For DOM/browser code, use string HTML templates — no DOM APIs.
-- The code must compile under strict mode.
-- Keep all existing exports and the _phoenix metadata constant.
-- Keep any //phx:<label> provenance marker comments exactly where they are.
-
-Output the complete fixed TypeScript module now.`;
-}
-
-/**
- * Strip markdown code fences from LLM response.
- */
-export function cleanCodeResponse(raw: string): string {
-  let code = raw.trim();
-
-  // Remove ```typescript ... ``` or ```ts ... ``` or ``` ... ```
-  const fenceMatch = code.match(/^```(?:typescript|ts)?\s*\n([\s\S]*?)\n```\s*$/);
-  if (fenceMatch) {
-    code = fenceMatch[1];
-  }
-
-  // Also handle case where there's text before/after the fence
-  const innerMatch = code.match(/```(?:typescript|ts)?\s*\n([\s\S]*?)\n```/);
-  if (innerMatch && innerMatch[1].includes('export')) {
-    code = innerMatch[1];
-  }
-
-  // Strip any remaining standalone markdown fence lines (e.g. a stray ```typescript
-  // the model left mid-body with no matching close). A line that is only a fence is
-  // never valid TypeScript, so removing it is always safe and keeps line numbers
-  // otherwise intact.
-  code = code.split('\n').filter(l => !/^\s*```[a-zA-Z]*\s*$/.test(l)).join('\n');
-
-  return code;
-}
-
 // ─── Module Generation ───────────────────────────────────────────────────────
-
-/**
- * Generate a minimal Hono router stub for architecture mode.
- * Ensures fallback code still produces a valid default-export router.
- */
-function generateArchStub(iu: ImplementationUnit): string {
-  return `import { Hono } from 'hono';
-
-const router = new Hono();
-
-router.get('/', (c) => c.json({ stub: true, module: '${iu.name}', message: 'Not yet implemented' }));
-
-export default router;
-
-/** @internal Phoenix VCS traceability — do not remove. */
-export const _phoenix = {
-  iu_id: '${iu.iu_id}',
-  name: '${iu.name}',
-  risk_tier: '${iu.risk_tier}',
-  canon_ids: [${iu.source_canon_ids.length} as const],
-} as const;
-`;
-}
 
 /**
  * Generate a natural TypeScript module from an IU contract.

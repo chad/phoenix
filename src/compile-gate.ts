@@ -8,28 +8,21 @@
  * so it must gate the WHOLE assembled project after every IU + scaffold is written, and
  * a failure must be loud and block readiness — never swallowed under a green ✔.
  *
- * The gate runs `tsc` over the project, and if the LLM is available, repairs the
- * offending generated files (feeding tsc's own errors back) for a few rounds. Whatever
- * remains is surfaced as diagnostics and recorded — the truth about the build.
+ * The gate compiles the project via the TARGET's compiler (tsc, go build, pyright…),
+ * and if the LLM is available, repairs the offending generated files (feeding the
+ * compiler's own errors back) for a few rounds. Whatever remains is surfaced and
+ * recorded — the truth about the build. All language specifics live in the target.
  */
 
-import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LLMProvider } from './llm/provider.js';
 import type { ImplementationUnit } from './models/iu.js';
-import { buildFixPrompt, cleanCodeResponse, validateInlineScripts } from './regen.js';
+import { buildFixPrompt, cleanCodeResponse } from './codegen-util.js';
 import { getSystemPrompt } from './llm/prompt.js';
-import type { ResolvedTarget } from './models/architecture.js';
+import type { ResolvedTarget, CompileError } from './models/architecture.js';
 
-export interface CompileError {
-  file: string;        // project-relative path, as tsc reports it
-  line: number;
-  col: number;
-  code: string;        // e.g. 'TS18048'
-  message: string;
-  raw: string;         // the original tsc line
-}
+export type { CompileError };
 
 export interface CompileGateResult {
   ok: boolean;
@@ -38,37 +31,6 @@ export interface CompileGateResult {
   repaired: string[];
   /** Errors still present after the gate gave up. */
   unresolved: CompileError[];
-}
-
-const TSC_LINE = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/;
-
-/** Parse `tsc --noEmit` output into structured errors. */
-export function parseTscOutput(output: string): CompileError[] {
-  const errors: CompileError[] = [];
-  for (const line of output.split('\n')) {
-    const m = line.match(TSC_LINE);
-    if (m) {
-      errors.push({ file: m[1].trim(), line: +m[2], col: +m[3], code: m[4], message: m[5].trim(), raw: line.trim() });
-    }
-  }
-  return errors;
-}
-
-/** Run `tsc --noEmit` over the whole project. Returns [] when the project compiles. */
-export function typecheckProject(projectRoot: string): CompileError[] {
-  try {
-    execSync('npx tsc --noEmit 2>&1', { cwd: projectRoot, stdio: 'pipe', timeout: 120_000 });
-    return [];
-  } catch (err: unknown) {
-    const e = err as { stdout?: Buffer; stderr?: Buffer };
-    const out = (e.stdout?.toString() ?? '') + (e.stderr?.toString() ?? '');
-    return parseTscOutput(out);
-  }
-}
-
-/** Only files Phoenix generated are ours to repair; never touch hand-written scaffold. */
-function isRepairable(file: string): boolean {
-  return file.startsWith('src/generated/') && !file.endsWith('_migrations.ts');
 }
 
 export interface CompileGateOptions {
@@ -92,7 +54,12 @@ export async function runCompileGate(
   projectRoot: string,
   opts: CompileGateOptions = {},
 ): Promise<CompileGateResult> {
-  const typecheck = opts.typecheck ?? typecheckProject;
+  const rt = opts.target?.runtime ?? null;
+  // Compile via the target's compiler (or an injected one in tests). No target +
+  // no injected check → nothing to compile, treat as clean.
+  const typecheck = opts.typecheck ?? (rt ? (root: string) => rt.compile(root) : () => []);
+  const owns = (file: string): boolean =>
+    rt ? rt.ownsGeneratedFile(file) : file.startsWith('src/generated/');
   const maxRounds = opts.maxRounds ?? 3;
   const repaired = new Set<string>();
   const system = getSystemPrompt(opts.target);
@@ -108,7 +75,7 @@ export async function runCompileGate(
     // Group this round's errors by the file that owns them; only repair our files.
     const byFile = new Map<string, CompileError[]>();
     for (const e of errors) {
-      if (!isRepairable(e.file)) continue;
+      if (!owns(e.file)) continue;
       (byFile.get(e.file) ?? byFile.set(e.file, []).get(e.file)!).push(e);
     }
 
@@ -139,24 +106,28 @@ export async function runCompileGate(
     errors = typecheck(projectRoot);
   }
 
-  // Inline-script validation is part of "does the system actually work" — fold any
-  // browser-JS syntax errors in repaired/generated UI files into the unresolved set.
-  const inlineErrors = collectInlineScriptErrors(projectRoot, opts.ius);
+  // The target's extra source gate (e.g. inline-<script> validation) is part of "does
+  // the system actually work" — fold its findings into the unresolved set.
+  const inlineErrors = rt?.validateSource ? collectSourceGateErrors(projectRoot, rt.validateSource, opts.ius) : [];
 
   const unresolved = [...errors, ...inlineErrors];
   return { ok: unresolved.length === 0, rounds: round, repaired: [...repaired], unresolved };
 }
 
-/** Browser-JS syntax errors that tsc cannot see (inside c.html template literals). */
-function collectInlineScriptErrors(projectRoot: string, ius?: ImplementationUnit[]): CompileError[] {
+/** Run the target's optional extra source gate over every generated file. */
+function collectSourceGateErrors(
+  projectRoot: string,
+  validate: (code: string) => string | null,
+  ius?: ImplementationUnit[],
+): CompileError[] {
   const out: CompileError[] = [];
   for (const iu of ius ?? []) {
     for (const file of iu.output_files) {
       const full = join(projectRoot, file);
       if (!existsSync(full)) continue;
-      const err = validateInlineScripts(readFileSync(full, 'utf8'));
+      const err = validate(readFileSync(full, 'utf8'));
       if (err) {
-        out.push({ file, line: 0, col: 0, code: 'INLINE_JS', message: err.split('.')[0], raw: `${file}: ${err.split('.')[0]}` });
+        out.push({ file, line: 0, col: 0, code: 'SOURCE_GATE', message: err.split('.')[0], raw: `${file}: ${err.split('.')[0]}` });
       }
     }
   }

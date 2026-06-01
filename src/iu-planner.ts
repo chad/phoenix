@@ -17,13 +17,14 @@ import { defaultBoundaryPolicy, defaultEnforcement } from './models/iu.js';
 import type { CanonCluster } from './iu-clusterer.js';
 import { clusterCanonNodes, clusterCanonNodesLLM } from './iu-clusterer.js';
 import type { LLMProvider } from './llm/provider.js';
+import type { ResolvedTarget } from './models/architecture.js';
 import { sha256 } from './semhash.js';
 
 /** Deterministic, rule-clustered planning (no LLM). */
-export function planIUs(canonNodes: CanonicalNode[], clauses?: Clause[]): ImplementationUnit[] {
+export function planIUs(canonNodes: CanonicalNode[], clauses?: Clause[], target?: ResolvedTarget | null): ImplementationUnit[] {
   void clauses; // source anchoring stays on the nodes as provenance; not used for grouping
   if (canonNodes.filter(n => n.type !== CanonicalType.CONTEXT).length === 0) return [];
-  return buildIUsFromClusters(clusterCanonNodes(canonNodes));
+  return buildIUsFromClusters(clusterCanonNodes(canonNodes), target);
 }
 
 /** Semantic planning — LLM domain clustering when a provider is given; rule fallback. */
@@ -31,14 +32,15 @@ export async function planIUsAuto(
   canonNodes: CanonicalNode[],
   clauses?: Clause[],
   llm?: LLMProvider | null,
+  target?: ResolvedTarget | null,
 ): Promise<ImplementationUnit[]> {
   void clauses;
   if (canonNodes.filter(n => n.type !== CanonicalType.CONTEXT).length === 0) return [];
   const clusters = llm ? await clusterCanonNodesLLM(canonNodes, llm) : clusterCanonNodes(canonNodes);
-  return buildIUsFromClusters(clusters);
+  return buildIUsFromClusters(clusters, target);
 }
 
-function buildIUsFromClusters(clusters: CanonCluster[]): ImplementationUnit[] {
+function buildIUsFromClusters(clusters: CanonCluster[], target?: ResolvedTarget | null): ImplementationUnit[] {
   const ius: ImplementationUnit[] = [];
   for (const cluster of clusters) {
     const nodes = cluster.nodes;
@@ -46,7 +48,8 @@ function buildIUsFromClusters(clusters: CanonCluster[]): ImplementationUnit[] {
 
     const name = cleanName(cluster.anchor.replace(/-/g, ' '));
     const serviceName = slugify(cluster.anchor);
-    const fileName = serviceName;
+    const outputPath = target?.runtime.outputPathFor(serviceName)
+      ?? `src/generated/${serviceName}/${serviceName}.ts`;
     const riskTier = deriveRiskTier(nodes);
     const canonIds = nodes.map(n => n.canon_id);
 
@@ -78,7 +81,7 @@ function buildIUsFromClusters(clusters: CanonCluster[]): ImplementationUnit[] {
       evidence_policy: {
         required: evidenceForTier(riskTier),
       },
-      output_files: [`src/generated/${serviceName}/${fileName}.ts`],
+      output_files: [outputPath],
     });
   }
 

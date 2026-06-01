@@ -9,22 +9,11 @@
  * - Project package.json and tsconfig.json
  */
 
+import type { RuntimeTarget, ServiceDescriptor } from './models/architecture.js';
 import type { ImplementationUnit } from './models/iu.js';
-import type { ResolvedTarget } from './models/architecture.js';
 import { sha256 } from './semhash.js';
 
-export interface ServiceDescriptor {
-  /** Service name, e.g. "api-gateway" */
-  name: string;
-  /** Directory under src/generated/, e.g. "api-gateway" */
-  dir: string;
-  /** Module file names (without path prefix), e.g. ["authentication.ts", "rate-limiting.ts"] */
-  modules: string[];
-  /** The IUs belonging to this service */
-  ius: ImplementationUnit[];
-  /** Default port for this service */
-  port: number;
-}
+export type { ServiceDescriptor };
 
 export interface ScaffoldResult {
   files: Map<string, string>;  // path → content
@@ -68,18 +57,21 @@ export function deriveServices(ius: ImplementationUnit[]): ServiceDescriptor[] {
 /**
  * Generate all scaffold files.
  */
-export function generateScaffold(
+/**
+ * Generate the runnable shell (server entry, project config, per-service wiring) for a
+ * Node/TypeScript target. This is node-typescript's `scaffold` hook implementation;
+ * other runtime targets bring their own. `rt` null → the legacy no-architecture path.
+ */
+export function nodeScaffold(
   services: ServiceDescriptor[],
   projectName: string = 'phoenix-project',
-  target?: ResolvedTarget | null,
+  rt?: RuntimeTarget | null,
   sharedImports: string[] = [],
 ): ScaffoldResult {
   const files = new Map<string, string>();
 
   // Architecture shared files (db.ts, app.ts, etc.)
-  if (target) {
-    const arch = target.architecture;
-    const rt = target.runtime;
+  if (rt) {
     for (const [path, content] of Object.entries(rt.sharedFiles)) {
       files.set(path, content);
     }
@@ -136,7 +128,7 @@ export function generateScaffold(
       generateServiceIndex(svc),
     );
 
-    if (!target) {
+    if (!rt) {
       // Only generate per-service servers when no architecture is set
       files.set(
         `src/generated/${svc.dir}/server.ts`,
@@ -147,7 +139,7 @@ export function generateScaffold(
     // Service tests
     files.set(
       `src/generated/${svc.dir}/__tests__/${svc.dir}.test.ts`,
-      target ? generateArchTests(svc) : generateServiceTests(svc),
+      rt ? generateArchTests(svc) : generateServiceTests(svc),
     );
   }
 
@@ -155,7 +147,7 @@ export function generateScaffold(
   files.set('src/generated/index.ts', generateRootIndex(services));
 
   // Project config
-  files.set('package.json', generatePackageJson(services, projectName, target));
+  files.set('package.json', generatePackageJson(services, projectName, rt));
   files.set('tsconfig.json', generateTsConfig());
   files.set('vitest.config.ts', generateVitestConfig());
 
@@ -783,7 +775,7 @@ function generateRootIndex(services: ServiceDescriptor[]): string {
 function generatePackageJson(
   services: ServiceDescriptor[],
   projectName: string,
-  target?: ResolvedTarget | null,
+  rt?: RuntimeTarget | null,
 ): string {
   let scripts: Record<string, string> = {
     build: 'tsc',
@@ -792,10 +784,8 @@ function generatePackageJson(
     'test:watch': 'vitest',
   };
 
-  if (target) {
-    const arch = target.architecture;
-    const rt = target.runtime;
-    // Architecture provides its own scripts
+  if (rt) {
+    // Runtime target provides its own scripts
     const archScripts = (rt.packageExtras?.scripts ?? {}) as Record<string, string>;
     scripts = { ...scripts, ...archScripts };
   } else {
@@ -816,9 +806,7 @@ function generatePackageJson(
     scripts,
   };
 
-  if (target) {
-    const arch = target.architecture;
-    const rt = target.runtime;
+  if (rt) {
     pkg.dependencies = rt.packages;
     pkg.devDependencies = rt.devPackages;
   } else {

@@ -32,12 +32,12 @@ import { BootstrapStateMachine } from './bootstrap.js';
 
 // Phase C
 import { planIUs, planIUsAuto } from './iu-planner.js';
-import { generateIU, generateAll, extractContract } from './regen.js';
+import { generateIU, generateAll } from './regen.js';
 import type { RegenContext, RegenResult } from './regen.js';
 import { gateIU } from './regen-gate.js';
 import type { GateVerdict } from './regen-gate.js';
 import { detectDrift } from './drift.js';
-import { splitSharedArtifacts, parseRegions, MIGRATIONS_FILE } from './artifacts.js';
+import { splitSharedArtifacts, parseRegions } from './artifacts.js';
 import type { SplitResult, ParsedRegion } from './artifacts.js';
 import { runCompileGate } from './compile-gate.js';
 import type { CompileGateResult } from './compile-gate.js';
@@ -55,7 +55,7 @@ import { runShadowPipeline } from './shadow-pipeline.js';
 import { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
 
 // Scaffold
-import { deriveServices, generateScaffold } from './scaffold.js';
+import { deriveServices, nodeScaffold } from './scaffold.js';
 
 // Inspect
 import { collectInspectData, renderInspectHTML, serveInspect } from './inspect.js';
@@ -310,35 +310,40 @@ function cmdInit(args?: string[]): void {
  * incremental regen (e.g. just the board) still sees the real contracts of the
  * other modules it calls. generateAll refreshes entries for IUs it regenerates.
  */
-function loadExistingContracts(projectRoot: string, ius: ImplementationUnit[]): Map<string, string> {
+function loadExistingContracts(projectRoot: string, ius: ImplementationUnit[], target: ResolvedTarget | null): Map<string, string> {
   const contracts = new Map<string, string>();
+  if (!target) return contracts;
   for (const iu of ius) {
     const fp = iu.output_files[0];
     if (!fp) continue;
     const full = join(projectRoot, fp);
     if (!existsSync(full)) continue;
     try {
-      const c = extractContract(readFileSync(full, 'utf8'));
+      const c = target.runtime.extractContract(readFileSync(full, 'utf8'));
       if (c) contracts.set(iu.iu_id, c);
     } catch { /* unreadable — skip */ }
   }
   return contracts;
 }
 
-/** Read the existing shared migrations file's regions (for partial-regen merge). */
-function readSharedRegions(projectRoot: string): ParsedRegion[] {
-  const p = join(projectRoot, MIGRATIONS_FILE);
-  if (!existsSync(p)) return [];
-  return parseRegions(readFileSync(p, 'utf8'));
+/** Read the existing shared-aggregate files' regions (for partial-regen merge). */
+function readSharedRegions(projectRoot: string, target: ResolvedTarget | null): ParsedRegion[] {
+  const regions: ParsedRegion[] = [];
+  for (const role of target?.runtime.aggregates ?? []) {
+    const p = join(projectRoot, role.filePath);
+    if (existsSync(p)) regions.push(...parseRegions(readFileSync(p, 'utf8')));
+  }
+  return regions;
 }
 
-/** Report what the artifact split lifted into the shared aggregate. */
+/** Report what the artifact split lifted into each shared aggregate. */
 function reportArtifactSplit(split: SplitResult, indent: string): void {
-  if (!split.sharedFiles.length) return;
-  const regions = split.sharedFiles.reduce((n, s) => n + s.regions.length, 0);
-  console.log(`${indent}${dim('Shared artifact:')} ${cyan(MIGRATIONS_FILE)} ${dim(`(${regions} migration region${regions === 1 ? '' : 's'})`)}`);
+  for (const shared of split.sharedFiles) {
+    const n = shared.regions.length;
+    console.log(`${indent}${dim('Shared artifact:')} ${cyan(shared.path)} ${dim(`(${n} region${n === 1 ? '' : 's'})`)}`);
+  }
   for (const conf of split.conflicts) {
-    console.log(`${indent}${yellow('⚠')} duplicate table ${bold(conf.table)} — kept ${conf.keptIU.slice(0, 8)}…, dropped ${conf.droppedIUs.length}`);
+    console.log(`${indent}${yellow('⚠')} duplicate ${conf.role} ${bold(conf.key)} — kept ${conf.keptIU.slice(0, 8)}…, dropped ${conf.droppedIUs.length}`);
   }
 }
 
@@ -563,9 +568,22 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`    ${green('✔')} System state: ${cyan(machine.getState())}`);
   console.log();
 
+  // Load architecture from config (before planning so output paths match the target).
+  const configPath = join(phoenixDir, 'config.json');
+  let arch: ResolvedTarget | null = null;
+  if (existsSync(configPath)) {
+    try {
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      if (config.architecture) {
+        arch = resolveTarget(config.architecture);
+        if (arch) console.log(`  ${dim('Architecture:')} ${cyan(arch.architecture.name)} / ${cyan(arch.runtime.name)}`);
+      }
+    } catch { /* ignore */ }
+  }
+
   // Step 3: Plan IUs — semantic domain clustering (LLM) when available
   console.log(`  ${dim('Phase C:')} IU planning`);
-  const ius = await planIUsAuto(canonNodes, allClauses, llmEarly);
+  const ius = await planIUsAuto(canonNodes, allClauses, llmEarly, arch);
   saveIUs(phoenixDir, ius);
   console.log(`    ${green('✔')} ${ius.length} Implementation Units planned`);
   for (const iu of ius) {
@@ -583,18 +601,6 @@ async function cmdBootstrap(): Promise<void> {
     console.log(`    ${dim(hint)}`);
   }
 
-  // Load architecture from config
-  const configPath = join(phoenixDir, 'config.json');
-  let arch: ResolvedTarget | null = null;
-  if (existsSync(configPath)) {
-    try {
-      const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      if (config.architecture) {
-        arch = resolveTarget(config.architecture);
-        if (arch) console.log(`  ${dim('Architecture:')} ${cyan(arch.architecture.name)} / ${cyan(arch.runtime.name)}`);
-      }
-    } catch { /* ignore */ }
-  }
 
   // Write shared architecture files BEFORE code generation
   // so the typecheck-retry loop can resolve imports like ../../db.js
@@ -629,7 +635,7 @@ async function cmdBootstrap(): Promise<void> {
     projectRoot,
     target: arch,
     negativeKnowledge: nkByIU,
-    siblingContracts: loadExistingContracts(projectRoot, ius),
+    siblingContracts: loadExistingContracts(projectRoot, ius, arch),
     onGenerationFailure,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
@@ -674,8 +680,10 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`  ${dim('Scaffold:')} Service wiring + project config`);
   const services = deriveServices(ius);
   const projectName = basename(projectRoot);
-  const scaffold = generateScaffold(services, projectName, arch, split.serverImports);
-  for (const [filePath, content] of scaffold.files) {
+  const scaffoldFiles = arch
+    ? arch.runtime.scaffold(services, projectName, split.serverImports)
+    : nodeScaffold(services, projectName, null).files;
+  for (const [filePath, content] of scaffoldFiles) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
     writeFileSync(fullPath, content, 'utf8');
@@ -1253,7 +1261,15 @@ async function cmdPlan(): Promise<void> {
   }
 
   // Semantic domain clustering when a provider is available; rule fallback otherwise.
-  const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir));
+  let planArch: ResolvedTarget | null = null;
+  const planConfigPath = join(phoenixDir, 'config.json');
+  if (existsSync(planConfigPath)) {
+    try {
+      const cfg = JSON.parse(readFileSync(planConfigPath, 'utf8'));
+      if (cfg.architecture) planArch = resolveTarget(cfg.architecture);
+    } catch { /* ignore */ }
+  }
+  const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir), planArch);
   saveIUs(phoenixDir, ius);
 
   console.log(bold('📦 IU Plan'));
@@ -1336,7 +1352,7 @@ async function cmdRegen(args: string[]): Promise<void> {
     projectRoot,
     target: regenArch,
     negativeKnowledge: nkByIU,
-    siblingContracts: loadExistingContracts(projectRoot, ius),
+    siblingContracts: loadExistingContracts(projectRoot, ius, regenArch),
     onGenerationFailure,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
@@ -1352,7 +1368,7 @@ async function cmdRegen(args: string[]): Promise<void> {
   // Shared aggregate (migrations): this may be a PARTIAL regen, so preserve regions
   // owned by IUs not in this batch and merge the freshly-generated ones over them.
   const regeneratedIUs = new Set(results.map(r => r.iu_id));
-  const preserve = readSharedRegions(projectRoot)
+  const preserve = readSharedRegions(projectRoot, regenArch)
     .filter(r => !regeneratedIUs.has(r.iu_id));
   const split = splitSharedArtifacts(results, regenArch, { preserve });
   reportArtifactSplit(split, '  ');
@@ -1388,8 +1404,10 @@ async function cmdRegen(args: string[]): Promise<void> {
   // leaves stale imports to deleted modules and the app won't compile.
   const allIUs = loadIUs(phoenixDir);
   const services = deriveServices(allIUs);
-  const scaffold = generateScaffold(services, basename(projectRoot), regenArch, split.serverImports);
-  for (const [filePath, content] of scaffold.files) {
+  const scaffoldFiles = regenArch
+    ? regenArch.runtime.scaffold(services, basename(projectRoot), split.serverImports)
+    : nodeScaffold(services, basename(projectRoot), null).files;
+  for (const [filePath, content] of scaffoldFiles) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
     writeFileSync(fullPath, content, 'utf8');

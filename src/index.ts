@@ -67,7 +67,7 @@ export type { StorageStats, CompactionCandidate } from './compaction.js';
 export { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
 
 // Scaffold
-export { deriveServices, generateScaffold } from './scaffold.js';
+export { deriveServices, nodeScaffold } from './scaffold.js';
 
 // Inspect
 export { collectInspectData, renderInspectHTML, serveInspect } from './inspect.js';

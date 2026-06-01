@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { extractContract } from '../../src/regen.js';
+import { nodeTypescript } from '../../src/architectures/node-typescript.js';
+const extractContract = nodeTypescript.extractContract;
 import { buildPrompt, extractVocabularies, type SiblingContract } from '../../src/llm/prompt.js';
 import type { CanonicalNode as CNode } from '../../src/models/canonical.js';
 import type { ImplementationUnit } from '../../src/models/iu.js';
@@ -33,7 +34,7 @@ describe('extractContract', () => {
   });
 
   it('returns empty for a module with no schema or routes', () => {
-    expect(extractContract('const x = 1;\nexport const _phoenix = {};')).toBe('');
+    expect(extractContract('const x = 1;\nexport const _phoenix = {};')).toBeNull();
   });
 });
 
