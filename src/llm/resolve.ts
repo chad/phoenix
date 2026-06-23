@@ -17,6 +17,7 @@ import type { LLMProvider, LLMConfig } from './provider.js';
 import { DEFAULT_MODELS } from './provider.js';
 import { AnthropicProvider } from './anthropic.js';
 import { OpenAIProvider } from './openai.js';
+import { ClaudeCliProvider, isClaudeCliAvailable } from './claude-cli.js';
 
 interface PhoenixConfig {
   llm?: LLMConfig;
@@ -60,6 +61,7 @@ export function resolveProvider(phoenixDir?: string): LLMProvider | null {
 function detectProvider(): string | null {
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
   if (process.env.OPENAI_API_KEY) return 'openai';
+  if (isClaudeCliAvailable()) return 'claude-cli';
   return null;
 }
 
@@ -77,6 +79,9 @@ function buildProvider(name: string, model: string): LLMProvider | null {
       const key = process.env.OPENAI_API_KEY;
       if (!key) return null;
       return new OpenAIProvider(key, model);
+    }
+    case 'claude-cli': {
+      return new ClaudeCliProvider(model || 'sonnet');
     }
     default:
       return null;
@@ -115,12 +120,13 @@ export function describeAvailability(): { available: string[]; configured: strin
   const available: string[] = [];
   if (process.env.ANTHROPIC_API_KEY) available.push('anthropic');
   if (process.env.OPENAI_API_KEY) available.push('openai');
+  if (isClaudeCliAvailable()) available.push('claude-cli');
 
   const configured = process.env.PHOENIX_LLM_PROVIDER || null;
 
   let hint: string;
   if (available.length === 0) {
-    hint = 'No LLM API keys found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable code generation. Falling back to stubs.';
+    hint = 'No LLM providers found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, or install Claude Code CLI to enable code generation. Falling back to stubs.';
   } else if (available.length === 1) {
     hint = `Using ${available[0]} (detected from env).`;
   } else {
