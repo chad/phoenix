@@ -42,25 +42,32 @@ knowledge. It is, for the project, what `phoenix status` is for a generated app.
 must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 
 - **Green health: 100%** — every proven capability still holds (0 regressions).
-- **Overall pass rate: 80%** (16/20 cases) — the remaining 20% is the honest backlog.
+- **Overall pass rate: 86%** (18/21 cases) — the remaining 14% is the honest backlog.
 
-### The known-red backlog (4)
+### Closed since the first snapshot (red → green)
 
-1. **`canonicalization.compound-sentence-preserves-subject`** — the segmenter splits
-   a compound constraint and the second fragment loses its subject
-   (`"must not exceed 40 characters"`). This is the origin of the momentum `"line"`
-   mis-binding. *Fix: subject-carrying segmentation.*
-2. **`constraint.non-bound-kinds-are-captured`** — only the `Bound` kind is
-   implemented; enum/pattern/uniqueness/reference constraints are invisible to the
-   structured-constraint layer. *Fix: implement the remaining kinds from the
-   constraint algebra (`docs/PROPOSAL-constraint-algebra.md` §5).*
-3. **`oracle.catches-logic-mutation`** — the oracle is structural term-matching, not
+- ✅ **`canonicalization.compound-sentence-preserves-subject`** — the segmenter now
+  carries the subject noun-phrase across compound-modal splits. Verified on
+  momentum: the canonical node is `"a habit name must not exceed 80 characters"`,
+  not the subjectless/"line" fragment.
+- ✅ **Membership (enum) constraint kind** — added `constraint.membership-kind-is-
+  captured-and-checked`; enums bind by proximity and are statically checked against
+  `z.enum`/literal unions. Verified on momentum: `habit.cadence ∈ {daily, weekly}`
+  binds correctly and the generated code conforms.
+
+### The known-red backlog (3)
+
+1. **`constraint.other-kinds-not-yet-implemented`** — `Bound` and `Membership` are
+   done; `Pattern` (regex/format), `Uniqueness`, `Reference`, `Cardinality`, and the
+   `Expr`/`Invariant` kinds are not yet extracted or checked. *Fix: continue
+   implementing kinds from the algebra (`docs/PROPOSAL-constraint-algebra.md` §5).*
+2. **`oracle.catches-logic-mutation`** — the oracle is structural term-matching, not
    behavioral; code that mentions the fields but violates the invariant passes.
    *Fix: executable/property evals + a per-eval mutation gate.*
-4. **`regeneration.dependents-are-regenerated`** — dependents of a changed IU are
+3. **`regeneration.dependents-are-regenerated`** — dependents of a changed IU are
    flagged for re-validation but not rebuilt, so an upstream contract change can
    break a downstream module until a manual `regen --all`. *Fix: act on the
    revalidate set.*
 
 Each red is a concrete next piece of work with a known fix — the eval doubles as the
-roadmap.
+roadmap. Two were closed this session by the Red→Green loop; three remain.
