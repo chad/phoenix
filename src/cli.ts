@@ -42,6 +42,7 @@ import { splitSharedArtifacts, parseRegions } from './artifacts.js';
 import type { SplitResult, ParsedRegion } from './artifacts.js';
 import { runCompileGate } from './compile-gate.js';
 import type { CompileGateResult } from './compile-gate.js';
+import { provenanceLabels, extractLineProvenance } from './llm/prompt.js';
 import { extractDependencies } from './dep-extractor.js';
 import { validateBoundary } from './boundary-validator.js';
 
@@ -56,6 +57,7 @@ import { recordLowTierEvidence, iuArtifactHash } from './evidence-collector.js';
 import { computeInvalidation, iuKey } from './invalidation.js';
 import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
+import { Journal } from './journal.js';
 import type { CompileError } from './models/architecture.js';
 
 // Phase E
@@ -280,6 +282,34 @@ function persistIUDependencies(
   return ius;
 }
 
+/**
+ * Journal every regenerated IU: file outputs (with hashes), the canon nodes and
+ * model/promptpack that produced them. This is the authoritative provenance edge
+ * `phoenix why` walks — spec change → canon → IU → these exact files.
+ */
+function journalRegen(phoenixDir: string, results: RegenResult[], ius: ImplementationUnit[]): void {
+  if (results.length === 0) return;
+  const journal = new Journal(phoenixDir);
+  const iuById = new Map(ius.map(iu => [iu.iu_id, iu]));
+  for (const result of results) {
+    const iu = iuById.get(result.iu_id);
+    const meta = result.manifest.regen_metadata;
+    journal.append({
+      type: 'regen',
+      inputs: iu?.source_canon_ids ?? [],
+      outputs: [...result.files.keys()],
+      meta: {
+        iu_id: result.iu_id,
+        iu_name: result.manifest.iu_name,
+        model_id: meta.model_id,
+        promptpack_hash: meta.promptpack_hash,
+        toolchain_version: meta.toolchain_version,
+        file_hashes: Object.fromEntries(Object.entries(result.manifest.files).map(([p, e]) => [p, e.content_hash])),
+      },
+    });
+  }
+}
+
 /** Current artifact hash per IU — the identity of the generation on disk now. */
 function currentArtifactHashes(
   ius: ImplementationUnit[],
@@ -473,6 +503,7 @@ async function runCompileGateAndReport(
     target: ResolvedTarget | null;
     manifestManager: ManifestManager;
     onGenerationFailure?: RegenContext['onGenerationFailure'];
+    canonNodes?: CanonicalNode[];
     indent?: string;
   },
 ): Promise<CompileGateResult> {
@@ -488,7 +519,18 @@ async function runCompileGateAndReport(
     },
     onRepair: (file, iu) => {
       const full = join(projectRoot, file);
-      if (existsSync(full)) opts.manifestManager.updateGeneratedFile(file, readFileSync(full, 'utf8'));
+      if (existsSync(full)) {
+        const content = readFileSync(full, 'utf8');
+        // Re-extract line→canon provenance from the repaired content's surviving
+        // `//phx:` markers instead of dropping it (keeps `phoenix why` line-accurate).
+        let lineProv: Record<string, string> | undefined;
+        if (iu) {
+          const canonForIU = (opts.canonNodes ?? []).filter(n => iu.source_canon_ids.includes(n.canon_id));
+          const labels = provenanceLabels(iu, canonForIU);
+          lineProv = extractLineProvenance(content, labels).lineProvenance;
+        }
+        opts.manifestManager.updateGeneratedFile(file, content, lineProv);
+      }
       console.log(`${indent}  ${cyan('↻')} repaired ${file}${iu ? dim(` (${iu.name})`) : ''}`);
     },
   });
@@ -670,6 +712,12 @@ async function cmdBootstrap(): Promise<void> {
   canonStore.saveNodes(canonNodes);
   // Seed the canonical-stability baseline (first run; nothing to compare yet).
   new CanonStabilityStore(phoenixDir).update(canonNodes);
+  new Journal(phoenixDir).append({
+    type: 'canonicalize',
+    inputs: allClauses.map(c => c.clause_id),
+    outputs: canonNodes.map(n => n.canon_id),
+    meta: { node_count: canonNodes.length, model_id: llmEarly ? `${llmEarly.name}/${llmEarly.model}` : 'rule' },
+  });
   console.log(`    ${green('✔')} ${canonNodes.length} canonical nodes extracted`);
 
   // Compute warm hashes
@@ -704,6 +752,12 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`  ${dim('Phase C:')} IU planning`);
   const ius = await planIUsAuto(canonNodes, allClauses, llmEarly, arch);
   saveIUs(phoenixDir, ius);
+  new Journal(phoenixDir).append({
+    type: 'plan',
+    inputs: canonNodes.map(n => n.canon_id),
+    outputs: ius.map(iu => iu.iu_id),
+    meta: { iu_count: ius.length, ius: ius.map(iu => ({ id: iu.iu_id, name: iu.name, canon: iu.source_canon_ids })) },
+  });
   console.log(`    ${green('✔')} ${ius.length} Implementation Units planned`);
   for (const iu of ius) {
     console.log(`      ${dim('·')} ${iu.name} ${dim(`(${iu.risk_tier})`)} → ${iu.output_files.join(', ')}`);
@@ -780,6 +834,7 @@ async function cmdBootstrap(): Promise<void> {
     writeFileSync(fullPath, content, 'utf8');
   }
   manifestManager.recordSharedFiles(split.sharedFiles);
+  journalRegen(phoenixDir, regenResults, ius);
 
   // Derive IU→IU dependencies from the generated imports and persist them onto
   // the IU graph. This is the substrate for cascade, IU-level boundary
@@ -810,7 +865,7 @@ async function cmdBootstrap(): Promise<void> {
   // Compile gate: the assembled system must typecheck. Repair what we can, surface the
   // rest honestly (recorded as negative knowledge; never a silent ✔).
   await runCompileGateAndReport(projectRoot, phoenixDir, ius, {
-    llm, target: arch, manifestManager, onGenerationFailure,
+    llm, target: arch, manifestManager, onGenerationFailure, canonNodes,
   });
 
   // A full bootstrap regenerates everything, so any prior staleness is resolved.
@@ -1375,7 +1430,28 @@ function cmdIngest(args: string[]): void {
     if (result.stale.length > 0 || result.revalidate.length > 0 || result.canon_stale) {
       new InvalidationStore(phoenixDir).record(result);
       invalidationSummary = { stale: result.stale.length, revalidate: result.revalidate.length, canonStale: result.canon_stale };
+      new Journal(phoenixDir).append({
+        type: 'invalidate',
+        inputs: result.causes.map(c => c.clause_id),
+        outputs: result.stale.map(s => s.iu_id),
+        meta: {
+          stale: result.stale.map(s => s.iu_name),
+          revalidate: result.revalidate.map(s => s.iu_name),
+          canon_stale: result.canon_stale,
+          causes: result.causes.map(c => ({ clause: c.clause_id, doc: c.doc_id, class: c.change_class })),
+        },
+      });
     }
+  }
+
+  // Journal the ingest itself (spec → clauses), for the provenance chain.
+  if (classifiedByDoc.length > 0 || totalChanges > 0) {
+    new Journal(phoenixDir).append({
+      type: 'ingest',
+      inputs: files.map(f => relative(projectRoot, f)),
+      outputs: [],
+      meta: { total_clauses: totalClauses, changes: totalChanges },
+    });
   }
 
   console.log();
@@ -1569,6 +1645,13 @@ async function cmdPlan(): Promise<void> {
   const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir), planArch);
   saveIUs(phoenixDir, ius);
 
+  new Journal(phoenixDir).append({
+    type: 'plan',
+    inputs: canonNodes.map(n => n.canon_id),
+    outputs: ius.map(iu => iu.iu_id),
+    meta: { iu_count: ius.length, ius: ius.map(iu => ({ id: iu.iu_id, name: iu.name, canon: iu.source_canon_ids })) },
+  });
+
   console.log(bold('📦 IU Plan'));
   console.log();
   console.log(`  ${green(`${ius.length} Implementation Units planned`)}`);
@@ -1736,6 +1819,8 @@ async function cmdRegen(args: string[]): Promise<void> {
     console.log(`  ${dim(`Labels: cleared ${clearedWaivers} waiver(s), resolved ${resolvedPromotions} promotion(s) on regenerated files`)}`);
   }
 
+  journalRegen(phoenixDir, results, ius);
+
   // Clear the invalidation marks for the IUs we just regenerated — the stale
   // work is done. Remaining stale IUs (if this was a targeted regen) persist.
   invStore.clearKeys(targetIUs.map(iuKey));
@@ -1765,7 +1850,7 @@ async function cmdRegen(args: string[]): Promise<void> {
   // Compile gate over the whole assembled project (regen touched a subset, but the
   // system as a whole must still typecheck).
   await runCompileGateAndReport(projectRoot, phoenixDir, allIUs, {
-    llm, target: regenArch, manifestManager, onGenerationFailure,
+    llm, target: regenArch, manifestManager, onGenerationFailure, canonNodes,
   });
 }
 
@@ -1944,6 +2029,13 @@ function cmdLabel(args: string[]): void {
     });
   }
 
+  new Journal(phoenixDir).append({
+    type: 'label',
+    inputs: [key],
+    outputs: [],
+    meta: { kind, reason, signed_by, expires, labeled_hash: labeledHash },
+  });
+
   console.log(green(`✔ Labeled ${key} as ${kind}`));
   console.log(`  ${dim('reason:')} ${reason}`);
   if (signed_by) console.log(`  ${dim('signed by:')} ${signed_by}`);
@@ -1985,6 +2077,13 @@ async function cmdCanonicalize(): Promise<void> {
   // Canonical stability (PRD §20): how much did re-canonicalization churn the
   // graph, measured on the stable anchor layer? A cosmetic edit should score high.
   const stability = new CanonStabilityStore(phoenixDir).update(canonNodes);
+
+  new Journal(phoenixDir).append({
+    type: 'canonicalize',
+    inputs: allClauses.map(c => c.clause_id),
+    outputs: canonNodes.map(n => n.canon_id),
+    meta: { node_count: canonNodes.length, stability_retention: stability.retention, model_id: llm ? `${llm.name}/${llm.model}` : 'rule' },
+  });
 
   console.log(`  ${green('✔')} ${canonNodes.length} canonical nodes extracted from ${allClauses.length} clauses`);
   if (!stability.first_run) {
@@ -2340,6 +2439,123 @@ function readinessToIcon(readiness: ReadinessLevel): string {
   }
 }
 
+/**
+ * `phoenix why <file>` — the query the whole "provenance is version control"
+ * thesis exists for. Walks the journal + graphs backward from a generated file
+ * to the spec lines, decisions, and generation record that produced it:
+ *   file → regen event (model, promptpack) → IU → canonical nodes → source clauses → spec lines.
+ */
+function cmdWhy(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const target = args.find(a => !a.startsWith('--'));
+  if (!target) {
+    console.error(red('✖ Usage: phoenix why <file>'));
+    process.exit(1);
+  }
+  const key = relative(projectRoot, resolve(target)) || target;
+
+  const journal = new Journal(phoenixDir);
+  const events = journal.readAll();
+  const ius = loadIUs(phoenixDir);
+  const canonStore = new CanonicalStore(phoenixDir);
+  const canonById = new Map(canonStore.getAllNodes().map(n => [n.canon_id, n]));
+  const specStore = new SpecStore(phoenixDir);
+
+  console.log(bold(`🔎 Why does ${key} exist?`));
+  console.log();
+
+  // The most recent regen event that produced this file.
+  const regen = [...events].reverse().find(e => e.type === 'regen' && e.outputs.includes(key));
+  if (!regen) {
+    console.log(yellow(`  No regeneration record found for ${key}.`));
+    console.log(dim('  (Run `phoenix bootstrap` or `phoenix regen` to build the provenance chain.)'));
+    return;
+  }
+
+  const iuId = regen.meta.iu_id as string;
+  const iu = ius.find(u => u.iu_id === iuId);
+  console.log(`  ${dim('Generated by:')} ${cyan(regen.meta.iu_name as string)} ${dim(`(IU ${String(iuId).slice(0, 8)})`)}`);
+  console.log(`  ${dim('Model:')} ${regen.meta.model_id} ${dim('·')} ${dim('promptpack')} ${String(regen.meta.promptpack_hash).slice(0, 12)} ${dim('·')} ${regen.timestamp}`);
+  console.log();
+
+  // The canonical requirements that drove it, and their source spec lines.
+  const canonIds = iu?.source_canon_ids ?? regen.inputs;
+  console.log(`  ${bold('Requirements that drove this code:')}`);
+  const seenClauses = new Set<string>();
+  for (const cid of canonIds) {
+    const node = canonById.get(cid);
+    if (!node) continue;
+    const typeColor = node.type === 'CONSTRAINT' ? red : node.type === 'INVARIANT' ? magenta : node.type === 'REQUIREMENT' ? green : blue;
+    console.log(`    ${typeColor(node.type)} ${node.statement.slice(0, 70)}${node.statement.length > 70 ? '…' : ''}`);
+    for (const clauseId of node.source_clause_ids) {
+      if (seenClauses.has(clauseId)) continue;
+      seenClauses.add(clauseId);
+      const clause = specStore.getClause(clauseId);
+      if (clause) {
+        const loc = `${clause.source_doc_id}:L${clause.source_line_range[0]}`;
+        console.log(`      ${dim('←')} ${dim(loc)} ${dim(`"${clause.raw_text.slice(0, 50).replace(/\n/g, ' ')}"`)}`);
+      }
+    }
+  }
+  console.log();
+
+  // Any invalidations or labels that touched this file/IU.
+  const related = events.filter(e =>
+    (e.type === 'invalidate' && (e.outputs.includes(iuId) || (e.meta.stale as string[] | undefined)?.includes(regen.meta.iu_name as string))) ||
+    (e.type === 'label' && e.inputs.includes(key)),
+  );
+  if (related.length > 0) {
+    console.log(`  ${bold('History:')}`);
+    for (const e of related) {
+      if (e.type === 'invalidate') console.log(`    ${yellow('▸')} ${dim(e.timestamp)} invalidated (spec change)`);
+      if (e.type === 'label') console.log(`    ${blue('🏷')} ${dim(e.timestamp)} labeled ${e.meta.kind}: ${e.meta.reason}`);
+    }
+    console.log();
+  }
+
+  console.log(dim(`  Provenance chain verified against ${events.length} journal events.`));
+}
+
+/** `phoenix journal [--verify]` — show or verify the provenance chain. */
+function cmdJournal(args: string[]): void {
+  const { phoenixDir } = requirePhoenixRoot();
+  const journal = new Journal(phoenixDir);
+  const events = journal.readAll();
+
+  console.log(bold('📜 Provenance Journal'));
+  console.log();
+
+  if (events.length === 0) {
+    console.log(dim('  No events yet. Run `phoenix bootstrap`.'));
+    return;
+  }
+
+  const verify = journal.verify();
+  if (verify.ok) {
+    console.log(`  ${green('✔')} chain intact ${dim(`(${events.length} events, tamper-evident)`)}`);
+  } else {
+    console.log(`  ${red('✖')} chain broken at seq ${verify.brokenSeq}: ${verify.reason}`);
+  }
+  console.log();
+
+  if (args.includes('--verify')) return;
+
+  const limit = 25;
+  const shown = events.slice(-limit);
+  if (events.length > limit) console.log(dim(`  (showing last ${limit} of ${events.length})`));
+  for (const e of shown) {
+    const typeColor = e.type === 'regen' ? green : e.type === 'invalidate' ? yellow : e.type === 'label' ? blue : cyan;
+    const summary = e.type === 'regen' ? `${e.meta.iu_name} → ${e.outputs.length} file(s)`
+      : e.type === 'canonicalize' ? `${e.meta.node_count} nodes`
+      : e.type === 'plan' ? `${e.meta.iu_count} IUs`
+      : e.type === 'invalidate' ? `${(e.meta.stale as string[])?.length ?? 0} stale`
+      : e.type === 'label' ? `${e.meta.kind}`
+      : e.type === 'ingest' ? `${e.meta.total_clauses} clauses`
+      : '';
+    console.log(`  ${dim(`#${e.seq}`)} ${typeColor(e.type.padEnd(12))} ${dim(e.timestamp.slice(11, 19))} ${summary}`);
+  }
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -2384,6 +2600,8 @@ ${bold('Verification:')}
 ${bold('Inspection:')}
   ${cyan('inspect')} [--port=N]    Interactive pipeline visualisation (opens browser)
   ${cyan('graph')}                 Show provenance graph summary
+  ${cyan('why')} <file>            Trace a generated file back to the spec lines that produced it
+  ${cyan('journal')} [--verify]    Show/verify the append-only provenance chain
   ${cyan('bot')} "<command>"       Route a bot command (e.g., "SpecBot: help")
 
 ${bold('Meta:')}
@@ -2455,6 +2673,12 @@ async function main(): Promise<void> {
       break;
     case 'graph':
       cmdGraph();
+      break;
+    case 'why':
+      cmdWhy(commandArgs);
+      break;
+    case 'journal':
+      cmdJournal(commandArgs);
       break;
     case 'bot':
       cmdBot(commandArgs);
