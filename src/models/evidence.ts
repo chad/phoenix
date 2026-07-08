@@ -41,6 +41,8 @@ export interface PolicyEvaluation {
   satisfied: string[];
   missing: string[];
   failed: string[];
+  /** Required kinds whose only evidence was stale (bound to a superseded artifact). */
+  stale?: string[];
   verdict: 'PASS' | 'FAIL' | 'INCOMPLETE';
 }
 
