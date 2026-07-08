@@ -55,6 +55,7 @@ import { deriveIUDependencies, applyDerivedDependencies, buildFileToIUMap, resol
 import { recordLowTierEvidence, iuArtifactHash } from './evidence-collector.js';
 import { computeInvalidation, iuKey } from './invalidation.js';
 import { InvalidationStore } from './store/invalidation-store.js';
+import { CanonStabilityStore } from './canon-stability.js';
 import type { CompileError } from './models/architecture.js';
 
 // Phase E
@@ -667,6 +668,8 @@ async function cmdBootstrap(): Promise<void> {
   // Extract canonical nodes (LLM-enhanced when available)
   const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly);
   canonStore.saveNodes(canonNodes);
+  // Seed the canonical-stability baseline (first run; nothing to compare yet).
+  new CanonStabilityStore(phoenixDir).update(canonNodes);
   console.log(`    ${green('✔')} ${canonNodes.length} canonical nodes extracted`);
 
   // Compute warm hashes
@@ -902,6 +905,26 @@ function printTrustDashboard(
     const orphanPct = ((orphanCount / canonNodes.length) * 100).toFixed(0);
     const hierPct = nonContextNodes.length > 0 ? ((withParent / nonContextNodes.length) * 100).toFixed(0) : '0';
     console.log(`  ${dim('Resolution:')} ${totalEdges} edges ${dim(`(${resDRate}% relates_to)`)}${dim(',')} max degree ${maxDegree}${dim(',')} ${hierPct}% hierarchy`);
+  }
+
+  // Canonical stability (PRD §20) — how much the last re-canonicalization churned
+  // the graph, measured on the stable anchor layer. Low stability is a trust risk:
+  // it means downstream IU identity and invalidation are shifting under you.
+  const stabilitySnapshot = new CanonStabilityStore(phoenixDir).loadSnapshot();
+  if (stabilitySnapshot?.last_result && !stabilitySnapshot.last_result.first_run) {
+    const r = stabilitySnapshot.last_result;
+    const pct = (r.retention * 100).toFixed(0);
+    const color = r.retention >= 0.9 ? green : r.retention >= 0.7 ? yellow : red;
+    console.log(`  ${dim('Canonical Stability:')} ${color(`${pct}%`)} ${dim(`(${r.kept} kept, ${r.added} new, ${r.dropped} dropped)`)}`);
+    if (r.retention < 0.7) {
+      diagnostics.push({
+        severity: 'warning',
+        category: 'canon',
+        subject: 'Global',
+        message: `Canonical stability ${pct}% — re-canonicalization churned the graph`,
+        recommended_actions: ['Large churn under an unchanged spec points at extractor instability — investigate before trusting selective invalidation'],
+      });
+    }
   }
 
   // Extraction coverage (recompute from current specs)
@@ -1959,7 +1982,16 @@ async function cmdCanonicalize(): Promise<void> {
   const canonNodes = await extractCanonicalNodesLLM(allClauses, llm);
   canonStore.saveNodes(canonNodes);
 
+  // Canonical stability (PRD §20): how much did re-canonicalization churn the
+  // graph, measured on the stable anchor layer? A cosmetic edit should score high.
+  const stability = new CanonStabilityStore(phoenixDir).update(canonNodes);
+
   console.log(`  ${green('✔')} ${canonNodes.length} canonical nodes extracted from ${allClauses.length} clauses`);
+  if (!stability.first_run) {
+    const pct = (stability.retention * 100).toFixed(0);
+    const color = stability.retention >= 0.9 ? green : stability.retention >= 0.7 ? yellow : red;
+    console.log(`  ${dim('Canonical stability:')} ${color(`${pct}%`)} ${dim(`(${stability.kept} kept, ${stability.added} new, ${stability.dropped} dropped)`)}`);
+  }
 
   const byType = new Map<string, number>();
   for (const node of canonNodes) {
