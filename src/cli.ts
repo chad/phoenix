@@ -63,6 +63,9 @@ import { mineEntityAttributes, extractBoundConstraints } from './constraints/ext
 import { checkBound } from './constraints/check.js';
 import { verdictOf, verdictSeverity } from './models/validation.js';
 import type { ValidationResult } from './models/validation.js';
+import { runSuite } from './eval/harness.js';
+import { CAPABILITY_SUITE } from './eval/suite.js';
+import { renderScorecard, scorecardArtifact } from './eval/report.js';
 import type { CompileError } from './models/architecture.js';
 
 // Phase E
@@ -2976,6 +2979,35 @@ function cmdJournal(args: string[]): void {
   }
 }
 
+/**
+ * `phoenix selftest [--json] [--strict]` — run Phoenix's own capability eval and
+ * print the Red/Green scorecard. This is the project's trust surface for itself: green
+ * capabilities are locked against regression; red ones are the honest, documented
+ * backlog. Exit non-zero on any regression (a proven capability that broke), and —
+ * under --strict — also on any promotion (a red that now passes and should be
+ * flipped to green). Unlike a normal command this does not require a Phoenix project.
+ */
+async function cmdEval(args: string[]): Promise<void> {
+  const asJson = args.includes('--json');
+  const strict = args.includes('--strict');
+  const sc = await runSuite(CAPABILITY_SUITE, () => new Date().toISOString());
+
+  if (asJson) {
+    console.log(JSON.stringify(scorecardArtifact(sc), null, 2));
+  } else {
+    console.log(renderScorecard(sc, { color: process.stdout.isTTY ?? false }));
+  }
+
+  if (sc.regressions.length > 0) {
+    console.error(red(`✖ ${sc.regressions.length} regression(s) — a proven capability broke.`));
+    process.exit(1);
+  }
+  if (strict && sc.promotions.length > 0) {
+    console.error(yellow(`⚠ ${sc.promotions.length} promotion(s) — flip these reds to green (--strict).`));
+    process.exit(2);
+  }
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -3029,6 +3061,8 @@ ${bold('Inspection:')}
   ${cyan('bot')} "<command>"       Route a bot command (e.g., "SpecBot: help")
 
 ${bold('Meta:')}
+  ${cyan('selftest')} [--json]     Phoenix's own capability eval — the Red/Green scorecard
+                         ${dim('--strict also fails on promotions (reds that now pass)')}
   ${cyan('version')}               Show version
   ${cyan('help')}                  Show this help
 
@@ -3095,6 +3129,10 @@ async function main(): Promise<void> {
     case 'evals':
     case 'eval-gen':
       cmdEvals(commandArgs);
+      break;
+    case 'selftest':
+    case 'capabilities':
+      await cmdEval(commandArgs);
       break;
     case 'attest':
       cmdAttest(commandArgs);
