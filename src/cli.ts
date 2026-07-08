@@ -66,6 +66,7 @@ import { runShadowPipeline } from './shadow-pipeline.js';
 
 // Phase F
 import { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
+import { ConfirmStore } from './store/confirm-store.js';
 
 // Scaffold
 import { deriveServices, nodeScaffold } from './scaffold.js';
@@ -803,7 +804,7 @@ async function cmdBootstrap(): Promise<void> {
 
   // Extract canonical nodes (LLM-enhanced when available)
   const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly);
-  canonStore.saveNodes(canonNodes);
+  canonStore.replaceNodes(canonNodes);
   // Seed the canonical-stability baseline (first run; nothing to compare yet).
   new CanonStabilityStore(phoenixDir).update(canonNodes);
   new Journal(phoenixDir).append({
@@ -2141,6 +2142,133 @@ function cmdLabel(args: string[]): void {
   }
 }
 
+/**
+ * `phoenix attest <iu> --kind=<kind> [--note="..."]` — record human/manual
+ * evidence that Phoenix can't auto-collect: threat_note, human_signoff,
+ * static_analysis, formal_verification, simulation. This is how a high/critical
+ * IU reaches a PASS verdict (PRD §10). Bound to the IU's current artifact hash so
+ * it goes stale if the code is regenerated.
+ */
+function cmdAttest(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const positional = args.filter(a => !a.startsWith('--'));
+  const iuArg = positional[0];
+  const kind = args.find(a => a.startsWith('--kind='))?.split('=')[1];
+  const note = args.find(a => a.startsWith('--note='))?.slice('--note='.length);
+
+  const manualKinds = ['threat_note', 'human_signoff', 'static_analysis', 'formal_verification', 'simulation'];
+  if (!iuArg || !kind || !manualKinds.includes(kind)) {
+    console.error(red(`✖ Usage: phoenix attest <iu> --kind=<${manualKinds.join('|')}> [--note="..."]`));
+    process.exit(1);
+  }
+
+  const ius = loadIUs(phoenixDir);
+  const iu = ius.find(u => u.iu_id.startsWith(iuArg) || u.name === iuArg);
+  if (!iu) {
+    console.error(red(`✖ No IU matching: ${iuArg}`));
+    process.exit(1);
+  }
+
+  const manifest = new ManifestManager(phoenixDir).load();
+  const artifactHash = iuArtifactHash(iu, manifest, projectRoot);
+  const timestamp = new Date().toISOString();
+  const signer = kind === 'human_signoff' ? defaultSigner(projectRoot) : undefined;
+
+  new EvidenceStore(phoenixDir).addRecord({
+    evidence_id: createHash('sha256').update(`${kind}\x00${iu.iu_id}\x00${timestamp}`).digest('hex').slice(0, 16),
+    kind: kind as import('./models/evidence.js').EvidenceKind,
+    status: 'PASS' as import('./models/evidence.js').EvidenceStatus,
+    iu_id: iu.iu_id,
+    canon_ids: iu.source_canon_ids,
+    artifact_hash: artifactHash,
+    message: note ?? `${kind} attested${signer ? ` by ${signer}` : ''}`,
+    timestamp,
+  });
+
+  new Journal(phoenixDir).append({
+    type: 'evidence',
+    inputs: [iu.iu_id],
+    outputs: [],
+    meta: { kind, iu_name: iu.name, note, signer, artifact_hash: artifactHash },
+  });
+
+  console.log(green(`✔ Recorded ${kind} for ${iu.name}`));
+  if (signer) console.log(`  ${dim('signed by:')} ${signer}`);
+  if (note) console.log(`  ${dim('note:')} ${note}`);
+  console.log(`  ${dim('Bound to artifact')} ${artifactHash.slice(0, 12)} ${dim('— regenerating')} ${iu.name} ${dim('will invalidate it.')}`);
+}
+
+/**
+ * `phoenix upgrade [--apply]` — shadow-canonicalization (PRD §5.1). Re-runs the
+ * canonicalization pipeline WITHOUT committing, diffs the result against the
+ * current graph on the stable-anchor layer, and classifies the upgrade
+ * SAFE / COMPACTION_EVENT / REJECT. Only applies with --apply, and never applies
+ * a REJECT. Emits a PipelineUpgrade meta-event to the journal.
+ */
+async function cmdUpgrade(args: string[]): Promise<void> {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const apply = args.includes('--apply');
+
+  const specStore = new SpecStore(phoenixDir);
+  const canonStore = new CanonicalStore(phoenixDir);
+  const oldNodes = canonStore.getAllNodes();
+  if (oldNodes.length === 0) {
+    console.log(yellow('⚠ No canonical graph yet. Run `phoenix bootstrap` first.'));
+    return;
+  }
+
+  const allClauses: Clause[] = [];
+  for (const specFile of findSpecFiles(projectRoot)) {
+    allClauses.push(...specStore.getClauses(relative(projectRoot, specFile)));
+  }
+
+  const llm = resolveProvider(phoenixDir);
+  console.log(bold('🔀 Shadow Canonicalization Upgrade'));
+  console.log(dim('  Runs the new pipeline in parallel and classifies the diff before committing.'));
+  console.log();
+
+  // Run the new pipeline (fresh extraction) without saving.
+  const newNodes = await extractCanonicalNodesLLM(allClauses, llm);
+
+  const oldCfg = {
+    pipeline_id: 'current', model_id: 'stored', promptpack_version: 'stored',
+    extraction_rules_version: 'stored', diff_policy_version: 'stored',
+  };
+  const newCfg = {
+    pipeline_id: 'candidate', model_id: llm ? `${llm.name}/${llm.model}` : 'rule',
+    promptpack_version: 'candidate', extraction_rules_version: 'v2', diff_policy_version: 'candidate',
+  };
+  const result = runShadowPipeline(oldCfg, newCfg, oldNodes, newNodes);
+  const m = result.metrics;
+
+  const classColor = result.classification === 'SAFE' ? green
+    : result.classification === 'COMPACTION_EVENT' ? yellow : red;
+  console.log(`  ${dim('Old nodes:')} ${oldNodes.length}  ${dim('New nodes:')} ${newNodes.length}`);
+  console.log(`  ${dim('Node change:')} ${m.node_change_pct}%  ${dim('Edge change:')} ${m.edge_change_pct}%`);
+  console.log(`  ${dim('Risk escalations:')} ${m.risk_escalations}  ${dim('Orphans:')} ${m.orphan_nodes}  ${dim('Semantic drift:')} ${m.semantic_stmt_drift}%`);
+  console.log(`  ${dim('Classification:')} ${classColor(bold(result.classification))} ${dim('—')} ${result.reason}`);
+  console.log();
+
+  new Journal(phoenixDir).append({
+    type: 'canonicalize',
+    inputs: oldNodes.map(n => n.canon_id),
+    outputs: newNodes.map(n => n.canon_id),
+    meta: { PipelineUpgrade: true, classification: result.classification, reason: result.reason, metrics: m, applied: apply && result.classification !== 'REJECT' },
+  });
+
+  if (result.classification === 'REJECT') {
+    console.log(red('  ✖ Upgrade REJECTED — not applied. Resolve orphans / churn before upgrading.'));
+    return;
+  }
+  if (!apply) {
+    console.log(dim(`  Preview only. Re-run with ${cyan('--apply')} to commit this ${result.classification}.`));
+    return;
+  }
+  canonStore.replaceNodes(newNodes);
+  new CanonStabilityStore(phoenixDir).update(newNodes);
+  console.log(green(`  ✔ Applied ${result.classification}. Canonical graph updated. Re-plan + regen affected IUs.`));
+}
+
 async function cmdCanonicalize(): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const specStore = new SpecStore(phoenixDir);
@@ -2166,7 +2294,7 @@ async function cmdCanonicalize(): Promise<void> {
   console.log();
 
   const canonNodes = await extractCanonicalNodesLLM(allClauses, llm);
-  canonStore.saveNodes(canonNodes);
+  canonStore.replaceNodes(canonNodes);
 
   // Canonical stability (PRD §20): how much did re-canonicalization churn the
   // graph, measured on the stable anchor layer? A cosmetic edit should score high.
@@ -2319,9 +2447,8 @@ function cmdCascade(): void {
   }
 }
 
-function cmdBot(args: string[]): void {
+async function cmdBot(args: string[]): Promise<void> {
   if (args.length === 0) {
-    // Show all bot commands
     const commands = getAllCommands();
     console.log(bold('🤖 Phoenix Bots'));
     console.log();
@@ -2330,26 +2457,81 @@ function cmdBot(args: string[]): void {
     }
     console.log();
     console.log(dim('  Usage: phoenix bot "BotName: action arg=value"'));
+    console.log(dim('         phoenix bot "phx confirm <id>"  (or "ok")  — run a pending mutating command'));
     return;
   }
 
-  const raw = args.join(' ');
-  const parsed = parseCommand(raw);
+  const { phoenixDir } = requirePhoenixRoot();
+  const confirmStore = new ConfirmStore(phoenixDir);
+  const raw = args.join(' ').trim();
 
+  // Confirmation replies: `ok` runs the most recent pending; `phx confirm <id>` a specific one.
+  const confirmMatch = raw.match(/^(?:phx\s+confirm\s+(\S+)|ok)$/i);
+  if (confirmMatch) {
+    const pending = confirmMatch[1] ? confirmStore.take(confirmMatch[1]) : (() => {
+      const latest = confirmStore.latest();
+      return latest ? confirmStore.take(latest.confirm_id) : null;
+    })();
+    if (!pending) {
+      console.error(red('✖ No matching pending command to confirm.'));
+      process.exit(1);
+    }
+    console.log(bold(`🤖 ${pending.command.bot}`));
+    console.log(`  ${green('✔')} confirmed: ${pending.intent}`);
+    console.log();
+    await dispatchBotCommand(pending.command);
+    return;
+  }
+
+  const parsed = parseCommand(raw);
   if ('error' in parsed) {
     console.error(red(`✖ ${parsed.error}`));
     process.exit(1);
   }
 
   const response = routeCommand(parsed);
-
   console.log(bold(`🤖 ${response.bot}`));
   console.log();
-  console.log(`  ${response.message}`);
 
   if (response.mutating && response.confirm_id) {
-    console.log();
-    console.log(dim(`  Confirmation ID: ${response.confirm_id}`));
+    // Persist the pending command so it can be confirmed in a later invocation.
+    confirmStore.add({
+      confirm_id: response.confirm_id,
+      command: parsed,
+      intent: response.intent ?? `${parsed.bot} ${parsed.action}`,
+      created_at: new Date().toISOString(),
+    });
+    console.log(`  ${response.message}`);
+    return;
+  }
+
+  // Read-only: actually execute (help/commands/version print their own message).
+  if (['help', 'commands', 'version'].includes(parsed.action)) {
+    console.log(`  ${response.message}`);
+    return;
+  }
+  await dispatchBotCommand(parsed);
+}
+
+/**
+ * Execute a parsed bot command by dispatching to the real CLI command — bots
+ * "behave as normal users" (PRD §14): they run the same operations, not stand-ins.
+ */
+async function dispatchBotCommand(cmd: import('./models/bot.js').BotCommand): Promise<void> {
+  const doc = cmd.args['_'] || cmd.args['doc'];
+  const iu = cmd.args['iu'] || cmd.args['_'];
+  switch (`${cmd.bot}:${cmd.action}`) {
+    case 'SpecBot:ingest': cmdIngest(doc ? [doc] : []); break;
+    case 'SpecBot:diff': cmdDiff(doc ? [doc] : []); break;
+    case 'SpecBot:clauses': cmdClauses(doc ? [doc] : []); break;
+    case 'ImplBot:plan': await cmdPlan(); break;
+    case 'ImplBot:regen': await cmdRegen(iu ? [`--iu=${iu}`] : []); break;
+    case 'ImplBot:drift': cmdDrift(); break;
+    case 'PolicyBot:status': cmdStatus(); break;
+    case 'PolicyBot:evidence': cmdEvaluate(iu ? [`--iu=${iu}`] : []); break;
+    case 'PolicyBot:cascade': cmdCascade(); break;
+    case 'PolicyBot:evaluate': cmdEvaluate(iu ? [`--iu=${iu}`] : []); break;
+    default: console.log(dim(`  (no executor for ${cmd.bot}:${cmd.action})`));
   }
 }
 
@@ -2724,6 +2906,7 @@ ${bold('Spec Management:')}
 ${bold('Canonical Graph:')}
   ${cyan('canonicalize')}          Extract canonical nodes from ingested clauses
   ${cyan('canon')}                 Show the canonical graph
+  ${cyan('upgrade')} [--apply]      Shadow-canonicalize: classify a pipeline upgrade before committing
 
 ${bold('Implementation:')}
   ${cyan('plan')}                  Plan Implementation Units from canonical graph
@@ -2739,6 +2922,8 @@ ${bold('Verification:')}
                          ${dim('--kind=<kind> --reason="..." [--expires=Nd] [--signed-by=NAME]')}
                          ${dim('--list to show labels, --remove to clear one')}
   ${cyan('evals')} [--iu=<id>]    Generate durable evaluations (the oracle) + record evidence
+  ${cyan('attest')} <iu>          Record manual evidence (threat_note|human_signoff|static_analysis|…)
+                         ${dim('--kind=<kind> [--note="..."]')}
   ${cyan('evaluate')} [--iu=<id>] Evaluate evidence against policy
   ${cyan('cascade')}               Show cascade failure effects
   ${cyan('audit')} [--iu=<id>]    Replacement audit — readiness per IU
@@ -2788,6 +2973,9 @@ async function main(): Promise<void> {
     case 'canon-extract':
       await cmdCanonicalize();
       break;
+    case 'upgrade':
+      await cmdUpgrade(commandArgs);
+      break;
     case 'canon':
       cmdCanon();
       break;
@@ -2815,6 +3003,9 @@ async function main(): Promise<void> {
     case 'eval-gen':
       cmdEvals(commandArgs);
       break;
+    case 'attest':
+      cmdAttest(commandArgs);
+      break;
     case 'audit':
       cmdAudit(commandArgs);
       break;
@@ -2831,7 +3022,7 @@ async function main(): Promise<void> {
       cmdJournal(commandArgs);
       break;
     case 'bot':
-      cmdBot(commandArgs);
+      await cmdBot(commandArgs);
       break;
     case 'version':
     case '--version':

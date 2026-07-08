@@ -11,6 +11,8 @@ export enum EvidenceKind {
   STATIC_ANALYSIS = 'static_analysis',
   THREAT_NOTE = 'threat_note',
   HUMAN_SIGNOFF = 'human_signoff',
+  FORMAL_VERIFICATION = 'formal_verification',
+  SIMULATION = 'simulation',
 }
 
 export enum EvidenceStatus {

@@ -1,5 +1,15 @@
 # Phoenix VCS — Project Audit Report
 
+> **⚠️ SUPERSEDED (2026-07-08).** This audit describes an early snapshot (Phases
+> A–C2, ~4k lines, 142 tests). The codebase has since grown ~3× and the trust
+> loops have been closed. Notably resolved since this audit: **H1** (provenance
+> graph) is now the hash-chained `journal.jsonl` with `phoenix why`; **M3/M4**
+> (manifest/orphan reconciliation, store GC) are addressed by `replaceNodes` +
+> content-store `remove`; the classifier→D-rate loop, evidence collection, drift
+> labeling, IU dependencies, selective invalidation, two-layer identity, durable
+> evaluations, and the fault-injection status eval are all implemented. Kept for
+> historical context; do not treat its "not yet fixed" items as current.
+
 **Date:** 2026-02-17  
 **Scope:** Phases A, B, C1, C2  
 **Lines of code:** ~2,450 source, ~1,800 test (4,258 total)  

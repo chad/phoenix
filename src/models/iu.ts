@@ -42,8 +42,14 @@ export interface EnforcementConfig {
 }
 
 export interface EvidencePolicy {
-  /** What evidence is required for this risk tier */
+  /** What evidence is required for this risk tier (ALL must be satisfied). */
   required: string[];
+  /**
+   * Alternative groups: each group is satisfied if AT LEAST ONE of its kinds is.
+   * Expresses PRD §10's "human signoff OR formal/simulation evidence" for the
+   * critical tier without forcing every alternative.
+   */
+  one_of?: string[][];
 }
 
 export interface ImplementationUnit {

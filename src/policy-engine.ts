@@ -67,6 +67,22 @@ export function evaluatePolicy(
     }
   }
 
+  // one_of groups (PRD §10 critical tier): each group needs ≥1 satisfied kind.
+  const oneOfGroups = iu.evidence_policy.one_of ?? [];
+  for (const group of oneOfGroups) {
+    const anySatisfied = group.some(kind => {
+      const matching = iuEvidence.filter(e => e.kind === kind);
+      if (matching.length === 0) return false;
+      const latest = matching.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+      return latest.status === EvidenceStatus.PASS;
+    });
+    if (anySatisfied) {
+      satisfied.push(`one_of(${group.join('|')})`);
+    } else {
+      missing.push(`one_of(${group.join(' or ')})`);
+    }
+  }
+
   let verdict: 'PASS' | 'FAIL' | 'INCOMPLETE';
   if (failed.length > 0) {
     verdict = 'FAIL';

@@ -90,9 +90,7 @@ export function buildIUsFromClusters(clusters: CanonCluster[], target?: Resolved
       dependencies: [],
       boundary_policy: defaultBoundaryPolicy(),
       enforcement: defaultEnforcement(),
-      evidence_policy: {
-        required: evidenceForTier(riskTier),
-      },
+      evidence_policy: evidencePolicyForTier(riskTier),
       output_files: [outputPath],
     });
   }
@@ -176,14 +174,34 @@ function deriveRiskTier(nodes: CanonicalNode[]): 'low' | 'medium' | 'high' | 'cr
   return 'low';
 }
 
-function evidenceForTier(tier: string): string[] {
+/**
+ * Risk-tiered evidence policy per PRD §10:
+ *   low      → typecheck, lint, boundary validation
+ *   medium   → + unit tests
+ *   high     → + property tests, threat note, static analysis
+ *   critical → + human signoff OR formal/simulation evidence (a one_of group)
+ */
+export function evidencePolicyForTier(tier: string): { required: string[]; one_of?: string[][] } {
   switch (tier) {
-    case 'low': return ['typecheck', 'lint', 'boundary_validation'];
-    case 'medium': return ['typecheck', 'lint', 'boundary_validation', 'unit_tests'];
-    case 'high': return ['typecheck', 'lint', 'boundary_validation', 'unit_tests', 'property_tests', 'static_analysis'];
-    case 'critical': return ['typecheck', 'lint', 'boundary_validation', 'unit_tests', 'property_tests', 'static_analysis', 'human_signoff'];
-    default: return ['typecheck'];
+    case 'low':
+      return { required: ['typecheck', 'lint', 'boundary_validation'] };
+    case 'medium':
+      return { required: ['typecheck', 'lint', 'boundary_validation', 'unit_tests'] };
+    case 'high':
+      return { required: ['typecheck', 'lint', 'boundary_validation', 'unit_tests', 'property_tests', 'threat_note', 'static_analysis'] };
+    case 'critical':
+      return {
+        required: ['typecheck', 'lint', 'boundary_validation', 'unit_tests', 'property_tests', 'threat_note', 'static_analysis'],
+        one_of: [['human_signoff', 'formal_verification', 'simulation']],
+      };
+    default:
+      return { required: ['typecheck'] };
   }
+}
+
+/** Back-compat: the flat required list (used where one_of isn't modeled). */
+export function evidenceForTier(tier: string): string[] {
+  return evidencePolicyForTier(tier).required;
 }
 
 function slugify(name: string): string {

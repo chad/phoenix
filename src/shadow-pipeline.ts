@@ -14,12 +14,17 @@ export function computeShadowDiff(
   oldNodes: CanonicalNode[],
   newNodes: CanonicalNode[],
 ): ShadowDiffMetrics {
-  const oldIds = new Set(oldNodes.map(n => n.canon_id));
-  const newIds = new Set(newNodes.map(n => n.canon_id));
+  // Match on the STABLE identity (canon_anchor: type + tags), not canon_id
+  // (content-addressed). Otherwise a pipeline upgrade that merely rewords
+  // statements churns every id and is wrongly REJECTed — the exact failure that
+  // made this classifier unusable. Fall back to canon_id when no anchor exists.
+  const identity = (n: CanonicalNode): string => n.canon_anchor ?? n.canon_id;
+  const oldIds = new Set(oldNodes.map(identity));
+  const newIds = new Set(newNodes.map(identity));
 
-  const addedNodes = newNodes.filter(n => !oldIds.has(n.canon_id));
-  const removedNodes = oldNodes.filter(n => !newIds.has(n.canon_id));
-  const keptNodes = newNodes.filter(n => oldIds.has(n.canon_id));
+  const addedNodes = newNodes.filter(n => !oldIds.has(identity(n)));
+  const removedNodes = oldNodes.filter(n => !newIds.has(identity(n)));
+  const keptNodes = newNodes.filter(n => oldIds.has(identity(n)));
 
   const totalNodes = Math.max(oldNodes.length, 1);
   const nodeChangePct = ((addedNodes.length + removedNodes.length) / totalNodes) * 100;
@@ -37,12 +42,12 @@ export function computeShadowDiff(
     n => n.linked_canon_ids.length === 0 && n.source_clause_ids.length === 0
   ).length;
 
-  // Risk escalations: nodes that changed type. Match by canon_id (stable identity) — a
-  // statement-keyed map collapses duplicate statements and matches the wrong node.
-  const oldById = new Map(oldNodes.map(n => [n.canon_id, n]));
+  // Risk escalations: nodes that changed type across the upgrade, matched on the
+  // stable anchor so a reworded-but-same-concept node is compared to its prior self.
+  const oldByAnchor = new Map(oldNodes.map(n => [identity(n), n]));
   let riskEscalations = 0;
   for (const nn of newNodes) {
-    const old = oldById.get(nn.canon_id);
+    const old = oldByAnchor.get(identity(nn));
     if (old && old.type !== nn.type) riskEscalations++;
   }
 
