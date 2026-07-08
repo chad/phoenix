@@ -158,7 +158,7 @@ export function splitCompoundModals(text: string): string[] {
   // Check for semicolons with modals on both sides
   const semiParts = text.split(/\s*;\s*/);
   if (semiParts.length > 1 && semiParts.every(p => hasModal(p))) {
-    return semiParts.filter(p => p.length >= CONFIG.MIN_SPLIT_PART_LENGTH);
+    return carrySubjects(semiParts.filter(p => p.length >= CONFIG.MIN_SPLIT_PART_LENGTH));
   }
 
   // Check for " and " + modal or " and " separating complete modal clauses
@@ -168,11 +168,39 @@ export function splitCompoundModals(text: string): string[] {
     const left = text.slice(0, andMatch.index).trim();
     const right = text.slice(andMatch.index + andMatch[0].length).trim();
     if (left.length >= CONFIG.MIN_SPLIT_PART_LENGTH && right.length >= CONFIG.MIN_SPLIT_PART_LENGTH && hasModal(left)) {
-      return [left, right];
+      return carrySubjects([left, right]);
     }
   }
 
   return [text];
+}
+
+const MODAL_START = /^(?:must not|must|shall|should|will|cannot|may not|may)\b/i;
+const FIRST_MODAL = /\b(?:must not|must|shall|should|will|cannot|may not|may)\b/i;
+
+/** The subject noun phrase of a clause: everything before its first modal. */
+function subjectOf(clause: string): string {
+  const m = clause.match(FIRST_MODAL);
+  if (!m || m.index === undefined || m.index === 0) return '';
+  return clause.slice(0, m.index).trim();
+}
+
+/**
+ * Carry the subject forward across split conjuncts. A conjunct that begins with a
+ * bare modal ("must not exceed 40 characters") lost its subject in the split; give
+ * it the most recent preceding subject so it reads "a tag label must not exceed 40
+ * characters". Without this, the fragment canonicalizes to a subjectless constraint
+ * that binds to nothing — the origin of the §1 mis-binding.
+ */
+function carrySubjects(parts: string[]): string[] {
+  let subject = '';
+  return parts.map(part => {
+    const p = part.trim();
+    if (MODAL_START.test(p) && subject) return `${subject} ${p}`;
+    const s = subjectOf(p);
+    if (s) subject = s;
+    return p;
+  });
 }
 
 function hasModal(text: string): boolean {

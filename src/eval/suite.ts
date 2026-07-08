@@ -93,8 +93,7 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'canonicalization.compound-sentence-preserves-subject', capability: 'canonicalization', tier: 'unit', expect: 'red',
-    redReason: 'The sentence segmenter splits a compound constraint ("a tag label must not be empty AND must not exceed 40 characters") and the second fragment loses its subject ("must not exceed 40 characters"). This is the origin of the momentum "line" mis-binding. Fix: subject-carrying segmentation, or attach the subject from the clause before splitting.',
+    id: 'canonicalization.compound-sentence-preserves-subject', capability: 'canonicalization', tier: 'unit', expect: 'green',
     description: 'A compound-sentence constraint keeps its subject on every fragment.',
     run: () => {
       const nodes = extractCanonicalNodes(parseSpec('# T\n\n## T\n\n- A tag label must not be empty and must not exceed 40 characters\n', 'd.md'))
