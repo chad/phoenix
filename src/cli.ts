@@ -58,6 +58,7 @@ import { computeInvalidation, iuKey } from './invalidation.js';
 import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
+import { deriveEvaluations, checkEvaluation } from './evals.js';
 import type { CompileError } from './models/architecture.js';
 
 // Phase E
@@ -327,6 +328,96 @@ function currentArtifactHashes(
 }
 
 /**
+ * Generate durable evaluations for each IU, check them against the generated
+ * module, persist them (with pass/fail status), and record the resulting
+ * unit_tests / property_tests evidence bound to the IU's artifact hash. This is
+ * the oracle: it gives regeneration something to be conservative against, and it
+ * turns the permanent "missing unit_tests" INCOMPLETE into a real, satisfiable
+ * (or honestly-failing) signal.
+ */
+function generateCheckAndRecordEvals(
+  phoenixDir: string,
+  projectRoot: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  manifestManager: ManifestManager,
+): { generated: number; passed: number; failed: number } {
+  const evalStore = new EvaluationStore(phoenixDir);
+  const evidenceStore = new EvidenceStore(phoenixDir);
+  const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+  const manifest = manifestManager.load();
+  const timestamp = new Date().toISOString();
+  const evidence: import('./models/evidence.js').EvidenceRecord[] = [];
+  let generated = 0, passed = 0, failed = 0;
+
+  for (const iu of ius) {
+    const primaryFile = iu.output_files[0];
+    if (!primaryFile) continue;
+    const full = join(projectRoot, primaryFile);
+    if (!existsSync(full)) continue;
+    const source = readFileSync(full, 'utf8');
+
+    const derived = deriveEvaluations(iu, canonNodes);
+    if (derived.length === 0) continue;
+
+    // Check each eval against the generated module; stamp status; persist.
+    const results = derived.map(e => checkEvaluation(e, source, canonById));
+    const statusById = new Map(results.map(r => [r.eval_id, r.status]));
+    for (const e of derived) {
+      e.last_status = statusById.get(e.eval_id) ?? 'untested';
+      e.last_verified_at = timestamp;
+    }
+    evalStore.addMany(derived);
+    generated += derived.length;
+    passed += results.filter(r => r.status === 'pass').length;
+    failed += results.filter(r => r.status === 'fail').length;
+
+    const artifactHash = iuArtifactHash(iu, manifest, projectRoot);
+    const required = new Set(iu.evidence_policy.required);
+
+    // unit_tests ← boundary_contract + domain_rule + failure_mode evals.
+    if (required.has('unit_tests')) {
+      const behavioral = derived.filter(e => e.binding !== 'invariant');
+      const anyFail = behavioral.some(e => e.last_status === 'fail');
+      if (behavioral.length > 0) {
+        evidence.push(makeEvalEvidence('unit_tests', iu, artifactHash, !anyFail, behavioral.length, timestamp));
+      }
+    }
+    // property_tests ← invariant evals (the properties that must always hold).
+    if (required.has('property_tests')) {
+      const invariants = derived.filter(e => e.binding === 'invariant');
+      const anyFail = invariants.some(e => e.last_status === 'fail');
+      if (invariants.length > 0) {
+        evidence.push(makeEvalEvidence('property_tests', iu, artifactHash, !anyFail, invariants.length, timestamp));
+      }
+    }
+  }
+
+  if (evidence.length > 0) evidenceStore.addRecords(evidence);
+  return { generated, passed, failed };
+}
+
+function makeEvalEvidence(
+  kind: 'unit_tests' | 'property_tests',
+  iu: ImplementationUnit,
+  artifactHash: string,
+  pass: boolean,
+  count: number,
+  timestamp: string,
+): import('./models/evidence.js').EvidenceRecord {
+  return {
+    evidence_id: createHash('sha256').update(`${kind}\x00${iu.iu_id}\x00${timestamp}`).digest('hex').slice(0, 16),
+    kind: kind as import('./models/evidence.js').EvidenceKind,
+    status: (pass ? 'PASS' : 'FAIL') as import('./models/evidence.js').EvidenceStatus,
+    iu_id: iu.iu_id,
+    canon_ids: iu.source_canon_ids,
+    artifact_hash: artifactHash,
+    message: `${count} durable ${kind === 'unit_tests' ? 'behavioral' : 'invariant'} eval(s) ${pass ? 'passed' : 'failed'} structural check`,
+    timestamp,
+  };
+}
+
+/**
  * Record low-tier evidence (typecheck, lint, boundary) from the checks that just
  * ran, binding each record to the IU's current artifact hash. Called after the
  * compile gate so the manifest reflects any repairs.
@@ -337,6 +428,7 @@ function collectEvidenceAfterGate(
   ius: ImplementationUnit[],
   manifestManager: ManifestManager,
   compileErrors: CompileError[],
+  canonNodes: CanonicalNode[],
 ): void {
   const boundaryDiagnostics = computeBoundaryDiagnostics(projectRoot, ius);
   recordLowTierEvidence(phoenixDir, {
@@ -346,6 +438,8 @@ function collectEvidenceAfterGate(
     compileErrors,
     boundaryDiagnostics,
   });
+  // Generate + check durable evaluations, recording unit/property test evidence.
+  generateCheckAndRecordEvals(phoenixDir, projectRoot, ius, canonNodes, manifestManager);
 }
 
 function findSpecFiles(projectRoot: string): string[] {
@@ -569,7 +663,7 @@ async function runCompileGateAndReport(
   // checks that just ran, bound to each IU's current artifact hash. This is what
   // lets `phoenix status` show satisfied low-tier policy instead of permanent
   // "missing evidence" noise.
-  collectEvidenceAfterGate(phoenixDir, projectRoot, ius, opts.manifestManager, result.unresolved);
+  collectEvidenceAfterGate(phoenixDir, projectRoot, ius, opts.manifestManager, result.unresolved, opts.canonNodes ?? []);
 
   console.log();
   return result;
@@ -2146,6 +2240,57 @@ function cmdEvaluate(args: string[]): void {
   }
 }
 
+/**
+ * `phoenix evals [--iu=<id>]` — generate durable behavioral evaluations from the
+ * canonical graph, check them against the generated code, and record the
+ * unit_tests / property_tests evidence. This is how a medium/high-tier IU stops
+ * being permanently INCOMPLETE: it acquires an oracle.
+ */
+function cmdEvals(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const manifestManager = new ManifestManager(phoenixDir);
+
+  const iuFilter = args.find(a => a.startsWith('--iu='))?.split('=')[1];
+  const targetIUs = iuFilter
+    ? ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter)
+    : ius;
+
+  if (targetIUs.length === 0) {
+    console.log(yellow('⚠ No IUs. Run `phoenix plan` first.'));
+    return;
+  }
+
+  console.log(bold('🎯 Durable Evaluations'));
+  console.log(dim('  The oracle: what regenerated code must satisfy, independent of implementation.'));
+  console.log();
+
+  const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+  for (const iu of targetIUs) {
+    const derived = deriveEvaluations(iu, canonNodes);
+    const primary = iu.output_files[0];
+    const full = primary ? join(projectRoot, primary) : '';
+    const source = full && existsSync(full) ? readFileSync(full, 'utf8') : null;
+
+    console.log(`  ${bold(iu.name)} ${dim(`(${iu.risk_tier})`)} — ${derived.length} eval(s)`);
+    for (const e of derived) {
+      let mark = dim('○ untested');
+      if (source) {
+        const r = checkEvaluation(e, source, canonById);
+        mark = r.status === 'pass' ? green(`✔ ${r.reason}`) : red(`✖ ${r.reason}`);
+      }
+      const bindingColor = e.binding === 'invariant' ? magenta : e.binding === 'failure_mode' ? red : e.binding === 'boundary_contract' ? cyan : green;
+      console.log(`    ${bindingColor(e.binding.padEnd(18))} ${e.assertion.slice(0, 50)} ${mark}`);
+    }
+    console.log();
+  }
+
+  const result = generateCheckAndRecordEvals(phoenixDir, projectRoot, targetIUs, canonNodes, manifestManager);
+  console.log(`  ${dim(`Generated ${result.generated} evals — ${result.passed} pass, ${result.failed} fail. Recorded as evidence.`)}`);
+  console.log(`  ${dim('Run')} ${cyan('phoenix status')} ${dim('to see updated policy verdicts.')}`);
+}
+
 function cmdCascade(): void {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
@@ -2593,6 +2738,7 @@ ${bold('Verification:')}
   ${cyan('label')} <file>          Label a manual edit (waiver | temporary_patch | promote_to_requirement)
                          ${dim('--kind=<kind> --reason="..." [--expires=Nd] [--signed-by=NAME]')}
                          ${dim('--list to show labels, --remove to clear one')}
+  ${cyan('evals')} [--iu=<id>]    Generate durable evaluations (the oracle) + record evidence
   ${cyan('evaluate')} [--iu=<id>] Evaluate evidence against policy
   ${cyan('cascade')}               Show cascade failure effects
   ${cyan('audit')} [--iu=<id>]    Replacement audit — readiness per IU
@@ -2664,6 +2810,10 @@ async function main(): Promise<void> {
       break;
     case 'cascade':
       cmdCascade();
+      break;
+    case 'evals':
+    case 'eval-gen':
+      cmdEvals(commandArgs);
       break;
     case 'audit':
       cmdAudit(commandArgs);
