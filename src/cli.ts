@@ -59,6 +59,10 @@ import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
 import { deriveEvaluations, checkEvaluation } from './evals.js';
+import { mineEntityAttributes, extractBoundConstraints } from './constraints/extract.js';
+import { checkBound } from './constraints/check.js';
+import { verdictOf, verdictSeverity } from './models/validation.js';
+import type { ValidationResult } from './models/validation.js';
 import type { CompileError } from './models/architecture.js';
 
 // Phase E
@@ -310,6 +314,91 @@ function journalRegen(phoenixDir: string, results: RegenResult[], ius: Implement
       },
     });
   }
+}
+
+/**
+ * Structured-constraint validation (SHACL-spine, first shape family = `Bound`).
+ * Extracts bound constraints from the canonical graph, resolves their bindings
+ * against the mined entity.attribute universe, and statically checks each against
+ * the generated code. Returns Diagnostics via the total-function verdict, so a
+ * spec constraint that the code does not enforce is a hard ERROR — not a false
+ * green (the §1 failure). Unresolvable bindings are ERRORs before codegen.
+ */
+function computeConstraintDiagnostics(
+  projectRoot: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  allClauses: Clause[],
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  if (canonNodes.length === 0) return diagnostics;
+
+  const entityAttrs = mineEntityAttributes(ius, canonNodes, allClauses);
+  const clauseById = new Map(allClauses.map(c => [c.clause_id, c]));
+  const { constraints, defects } = extractBoundConstraints(canonNodes, entityAttrs, (cid) => {
+    const c = clauseById.get(cid);
+    return c ? { doc: c.source_doc_id, line: c.source_line_range[0], text: c.raw_text } : {};
+  });
+
+  // Binding defects: a constraint whose subject resolves to nothing (the §1 mechanism).
+  for (const d of defects) {
+    diagnostics.push({
+      severity: 'error',
+      category: 'constraint',
+      subject: d.subject,
+      message: `Unbound constraint: ${d.reason} — "${d.source.statement.slice(0, 60)}"`,
+      source_file: d.source.doc,
+      source_line: d.source.line,
+      recommended_actions: [
+        'The requirement graph names a subject the graph does not contain — fix the spec wording or the canonicalizer binding',
+      ],
+    });
+  }
+
+  // Resolved constraints: statically check enforcement in the generated code.
+  const iuByEntity = new Map<string, ImplementationUnit>();
+  for (const iu of ius) iuByEntity.set(iu.name.toLowerCase().replace(/s$/, ''), iu);
+
+  for (const c of constraints) {
+    const iu = iuByEntity.get(c.binding.entity) ?? ius.find(u => u.name.toLowerCase().includes(c.binding.entity));
+    let source: string | null = null;
+    if (iu) {
+      const file = iu.output_files[0];
+      const full = file ? join(projectRoot, file) : '';
+      if (full && existsSync(full)) source = readFileSync(full, 'utf8');
+    }
+    const check = checkBound(c, source);
+    const result: ValidationResult = {
+      focus: { label: `${c.binding.entity}.${c.binding.attribute}`, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: iu?.iu_id },
+      path: c.binding.attribute,
+      value: check.found,
+      source_component: 'bound',
+      result: check.result,
+      method: 'static',
+      message: `${c.binding.entity}.${c.binding.attribute} ${c.assertion.op} ${c.assertion.value}${c.assertion.unit ? ' ' + c.assertion.unit : ''}: ${check.detail}`,
+      recommended_actions: [],
+      provenance: { source_doc: c.source.doc, line: c.source.line },
+    };
+    const verdict = verdictOf(result.method, result.result);
+    const sev = verdictSeverity(verdict);
+    if (!sev) continue; // conforms → OK → no diagnostic
+    result.recommended_actions = check.result === 'absent'
+      ? [`Enforce ${c.binding.entity}.${c.binding.attribute} .${c.assertion.op === '<=' ? 'max' : 'min'}(${c.assertion.value}) in the generated schema, then regenerate`]
+      : check.result === 'violates'
+        ? [`Generated code enforces the wrong bound (${check.found}); regenerate to match the spec (${c.assertion.value})`]
+        : [`Generate ${c.binding.entity} to reason about this constraint`];
+    diagnostics.push({
+      severity: sev,
+      category: 'constraint',
+      subject: result.focus.label,
+      iu_id: iu?.iu_id,
+      message: result.message,
+      source_file: result.provenance?.source_doc,
+      source_line: result.provenance?.line,
+      recommended_actions: result.recommended_actions,
+    });
+  }
+  return diagnostics;
 }
 
 /** Current artifact hash per IU — the identity of the generation on disk now. */
@@ -1260,6 +1349,10 @@ function printTrustDashboard(
 
   // Boundary validation — includes IU-level coupling (allowed_ius/forbidden_ius).
   diagnostics.push(...computeBoundaryDiagnostics(projectRoot, ius));
+
+  // Structured-constraint validation (SHACL spine, `Bound` shape family): a spec
+  // constraint the generated code does not enforce is an ERROR, not a false green.
+  diagnostics.push(...computeConstraintDiagnostics(projectRoot, ius, canonNodes, allClauses));
 
   // Policy evaluation — bind to current artifact hashes so stale evidence (for a
   // superseded generation) does not satisfy the policy.
