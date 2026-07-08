@@ -53,6 +53,8 @@ import { WaiverStore, defaultSigner, parseExpiry } from './waivers.js';
 import type { StoredWaiver } from './waivers.js';
 import { deriveIUDependencies, applyDerivedDependencies, buildFileToIUMap, resolveRelativeImport } from './iu-deps.js';
 import { recordLowTierEvidence, iuArtifactHash } from './evidence-collector.js';
+import { computeInvalidation, iuKey } from './invalidation.js';
+import { InvalidationStore } from './store/invalidation-store.js';
 import type { CompileError } from './models/architecture.js';
 
 // Phase E
@@ -808,6 +810,9 @@ async function cmdBootstrap(): Promise<void> {
     llm, target: arch, manifestManager, onGenerationFailure,
   });
 
+  // A full bootstrap regenerates everything, so any prior staleness is resolved.
+  new InvalidationStore(phoenixDir).clearAll();
+
   // Save state
   saveBootstrapState(phoenixDir, machine);
 
@@ -1009,6 +1014,34 @@ function printTrustDashboard(
     console.log(`  ${dim('Drift:')} ${dim('no manifest')}`);
   }
 
+  // Selective invalidation — which IUs a spec change made stale, and why. This
+  // is the defining capability made visible: not "the app is stale" but "this
+  // requirement changed → this IU is stale; that IU depends on it → re-validate".
+  const invalidation = new InvalidationStore(phoenixDir).load();
+  if (invalidation && (invalidation.stale.length > 0 || invalidation.revalidate.length > 0)) {
+    console.log(`  ${dim('Invalidation:')} ${yellow(`${invalidation.stale.length} stale`)}${invalidation.revalidate.length > 0 ? dim(`, ${invalidation.revalidate.length} to re-validate`) : ''}`);
+    for (const s of invalidation.stale) {
+      diagnostics.push({
+        severity: 'warning',
+        category: 'canon',
+        subject: s.iu_name,
+        iu_id: s.iu_id,
+        message: `Stale — requirements changed: ${s.cause_chain}`,
+        recommended_actions: [`Run \`phoenix regen\` to regenerate only the ${invalidation.stale.length} affected IU(s)`],
+      });
+    }
+    for (const r of invalidation.revalidate) {
+      diagnostics.push({
+        severity: 'info',
+        category: 'canon',
+        subject: r.iu_name,
+        iu_id: r.iu_id,
+        message: `Re-validate — ${r.cause_chain}`,
+        recommended_actions: ['Re-run typecheck + boundary + tests after the upstream IU regenerates'],
+      });
+    }
+  }
+
   // Open promotions — manual edits the user declared to be real requirements.
   // Surfaced (not blocking) so harvested scar-tissue knowledge is never lost:
   // "the implementation remembers". Cleared when the file regenerates.
@@ -1187,11 +1220,19 @@ function cmdIngest(args: string[]): void {
   console.log(bold('📥 Spec Ingestion'));
   console.log();
 
-  // Canonical graph (current = "before" state) for classification signals.
+  // Canonical graph + IUs (current = "before" state) for classification and
+  // invalidation. These reference the pre-change clause ids, which is exactly
+  // what we walk to find the affected subtree.
   const canonStoreForClass = new CanonicalStore(phoenixDir);
   const canonNodesBefore = canonStoreForClass.getAllNodes();
+  const iusBefore = loadIUs(phoenixDir);
   const changeStore = new ChangeStore(phoenixDir);
   const classifiedByDoc: Array<{ docId: string; classifications: import('./models/classification.js').ChangeClassification[] }> = [];
+  // All (diff, classification) pairs across docs, for the invalidation walk.
+  const allChanges: Array<{ diff: import('./models/clause.js').ClauseDiff; classification: import('./models/classification.js').ChangeClassification }> = [];
+  // clause_id → doc / start line, for readable cause chains.
+  const clauseDocs = new Map<string, string>();
+  const clauseLines = new Map<string, number>();
 
   let totalClauses = 0;
   let totalChanges = 0;
@@ -1213,6 +1254,14 @@ function cmdIngest(args: string[]): void {
     if (changed.length > 0) {
       const classifications = classifyChanges(changed, canonNodesBefore, canonNodesBefore);
       classifiedByDoc.push({ docId, classifications });
+      for (let i = 0; i < changed.length; i++) {
+        allChanges.push({ diff: changed[i], classification: classifications[i] });
+        const before = changed[i].clause_before;
+        if (before) {
+          clauseDocs.set(before.clause_id, docId);
+          clauseLines.set(before.clause_id, before.source_line_range[0]);
+        }
+      }
     }
 
     // Now ingest (overwrites stored clauses)
@@ -1289,6 +1338,23 @@ function cmdIngest(args: string[]): void {
     saveBootstrapState(phoenixDir, machine);
   }
 
+  // Selective invalidation — the defining capability. Walk the changed clauses
+  // through canon → IU → dependents and persist exactly which IUs are stale.
+  let invalidationSummary: { stale: number; revalidate: number; canonStale: boolean } | null = null;
+  if (allChanges.length > 0 && iusBefore.length > 0) {
+    const result = computeInvalidation({
+      changes: allChanges,
+      canonNodes: canonNodesBefore,
+      ius: iusBefore,
+      clauseDocs,
+      clauseLines,
+    });
+    if (result.stale.length > 0 || result.revalidate.length > 0 || result.canon_stale) {
+      new InvalidationStore(phoenixDir).record(result);
+      invalidationSummary = { stale: result.stale.length, revalidate: result.revalidate.length, canonStale: result.canon_stale };
+    }
+  }
+
   console.log();
   console.log(`  ${dim(`Total: ${totalClauses} clauses ingested`)}`);
   if (totalChanges > 0) {
@@ -1302,6 +1368,13 @@ function cmdIngest(args: string[]): void {
     }
     if (machine.getState() !== before) {
       console.log(`  ${green('✔')} ${dim(`System state: ${before} → ${machine.getState()}`)}`);
+    }
+    if (invalidationSummary) {
+      const parts: string[] = [];
+      if (invalidationSummary.stale > 0) parts.push(`${invalidationSummary.stale} IU(s) stale`);
+      if (invalidationSummary.revalidate > 0) parts.push(`${invalidationSummary.revalidate} to re-validate`);
+      if (invalidationSummary.canonStale) parts.push('canon changed');
+      console.log(`  ${yellow('▸')} ${dim(`Invalidated: ${parts.join(', ')} — only these regenerate`)}`);
     }
     console.log();
     console.log(`  ${dim('Next: run')} ${cyan('phoenix canonicalize')} ${dim('then')} ${cyan('phoenix regen')} ${dim('to update generated code')}`);
@@ -1512,12 +1585,32 @@ async function cmdRegen(args: string[]): Promise<void> {
   // Parse --iu=<id> flag and --stubs flag
   const iuFilter = args.find(a => a.startsWith('--iu='))?.split('=')[1];
   const forceStubs = args.includes('--stubs');
-  const targetIUs = iuFilter
-    ? ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter)
-    : ius;
+  const forceAll = args.includes('--all');
+
+  // Selective invalidation drives regen by default: regenerate ONLY the IUs a
+  // spec change made stale (PRD §0). `--all` forces a full regen; `--iu=` targets
+  // one explicitly; an empty/absent invalidation set also means full regen.
+  const invStore = new InvalidationStore(phoenixDir);
+  const staleKeys = invStore.staleKeys();
+  let selectionReason: string;
+  let targetIUs: ImplementationUnit[];
+  if (iuFilter) {
+    targetIUs = ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter);
+    selectionReason = `--iu=${iuFilter}`;
+  } else if (!forceAll && staleKeys.size > 0) {
+    targetIUs = ius.filter(iu => staleKeys.has(iuKey(iu)));
+    selectionReason = `selective (${targetIUs.length} stale of ${ius.length})`;
+  } else {
+    targetIUs = ius;
+    selectionReason = forceAll ? 'all (--all)' : 'all';
+  }
 
   if (targetIUs.length === 0) {
-    console.log(red(`✖ No IU matching: ${iuFilter}`));
+    if (iuFilter) {
+      console.log(red(`✖ No IU matching: ${iuFilter}`));
+    } else {
+      console.log(green('✔ Nothing stale — all IUs are up to date.'));
+    }
     return;
   }
 
@@ -1531,6 +1624,10 @@ async function cmdRegen(args: string[]): Promise<void> {
   } else {
     const { hint } = describeAvailability();
     console.log(`  ${dim('Mode: stubs')}${forceStubs ? '' : ` ${dim('—')} ${dim(hint)}`}`);
+  }
+  console.log(`  ${dim(`Scope: ${selectionReason}`)}`);
+  if (selectionReason.startsWith('selective')) {
+    for (const iu of targetIUs) console.log(`    ${yellow('▸')} ${dim(iu.name)}`);
   }
   console.log();
 
@@ -1615,6 +1712,10 @@ async function cmdRegen(args: string[]): Promise<void> {
   if (clearedWaivers > 0 || resolvedPromotions > 0) {
     console.log(`  ${dim(`Labels: cleared ${clearedWaivers} waiver(s), resolved ${resolvedPromotions} promotion(s) on regenerated files`)}`);
   }
+
+  // Clear the invalidation marks for the IUs we just regenerated — the stale
+  // work is done. Remaining stale IUs (if this was a targeted regen) persist.
+  invStore.clearKeys(targetIUs.map(iuKey));
 
   // Derive and persist IU→IU dependencies from the freshly generated imports.
   persistIUDependencies(phoenixDir, projectRoot, loadIUs(phoenixDir));
@@ -2233,8 +2334,9 @@ ${bold('Canonical Graph:')}
 
 ${bold('Implementation:')}
   ${cyan('plan')}                  Plan Implementation Units from canonical graph
-  ${cyan('regen')} [--iu=<id>]    Regenerate code (all or specific IU)
+  ${cyan('regen')} [--iu=<id>]    Regenerate code — selective by default (only stale IUs)
                          ${dim('Uses LLM if ANTHROPIC_API_KEY or OPENAI_API_KEY is set')}
+                         ${dim('--all    Regenerate every IU (ignore the invalidation set)')}
                          ${dim('--stubs  Force stub generation (skip LLM)')}
 
 ${bold('Verification:')}

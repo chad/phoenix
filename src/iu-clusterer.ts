@@ -44,6 +44,15 @@ const STOP_ANCHORS = new Set([
   'interface', 'programmatic', 'request', 'response', 'field', 'time', 'date',
   'name', 'id', 'identifier', 'list', 'set', 'item', 'thing', 'type', 'order',
   'create', 'read', 'update', 'delete', 'edit', 'character', 'exceed', 'change',
+  // operation verbs — a cluster is a domain NOUN (entity/capability), never an
+  // action. Anchoring on a verb like "allow"/"manage" merges unrelated entities
+  // and makes IU identity unstable across re-planning (breaking selective regen).
+  // Only UNAMBIGUOUS verbs — words that double as domain nouns (issue, order,
+  // view, store, return, process, mark) are deliberately left out.
+  'allow', 'manage', 'register', 'generate', 'deactivate', 'activate',
+  'assign', 'provide', 'support', 'enable', 'accept', 'receive', 'handle',
+  'validate', 'reopen', 'let', 'must', 'reset', 'submit', 'cancel', 'approve',
+  'reject', 'compute', 'calculate',
   // common attributes / values
   'status', 'priority', 'point', 'estimate', 'capacity', 'title', 'goal', 'label',
   'assignee', 'description', 'count', 'color', 'complete', 'overdue', 'unique', 'integer',
