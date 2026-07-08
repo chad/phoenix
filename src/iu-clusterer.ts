@@ -42,8 +42,21 @@ const REPORT_MARKERS = new Set([
 const STOP_ANCHORS = new Set([
   'system', 'user', 'app', 'application', 'service', 'api', 'data', 'value', 'one',
   'interface', 'programmatic', 'request', 'response', 'field', 'time', 'date',
-  'name', 'id', 'identifier', 'list', 'set', 'item', 'thing', 'type', 'order',
+  'name', 'id', 'identifier', 'list', 'set', 'thing', 'type',
+  // NB: 'order' and 'item' are domain ENTITIES far more often than sequence words
+  // (e-commerce order, line item), so they are NOT stop-anchors.
   'create', 'read', 'update', 'delete', 'edit', 'character', 'exceed', 'change',
+  // adjectives / value words that describe an entity but must not name a cluster
+  'negative', 'positive', 'least', 'most', 'empty', 'valid', 'invalid', 'active',
+  // operation verbs — a cluster is a domain NOUN (entity/capability), never an
+  // action. Anchoring on a verb like "allow"/"manage" merges unrelated entities
+  // and makes IU identity unstable across re-planning (breaking selective regen).
+  // Only UNAMBIGUOUS verbs — words that double as domain nouns (issue, order,
+  // view, store, return, process, mark) are deliberately left out.
+  'allow', 'manage', 'register', 'generate', 'deactivate', 'activate',
+  'assign', 'provide', 'support', 'enable', 'accept', 'receive', 'handle',
+  'validate', 'reopen', 'let', 'must', 'reset', 'submit', 'cancel', 'approve',
+  'reject', 'compute', 'calculate',
   // common attributes / values
   'status', 'priority', 'point', 'estimate', 'capacity', 'title', 'goal', 'label',
   'assignee', 'description', 'count', 'color', 'complete', 'overdue', 'unique', 'integer',

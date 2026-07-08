@@ -5,7 +5,7 @@
  * Operates on the filesystem under .phoenix/store/objects/
  */
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 export class ContentStore {
@@ -45,5 +45,18 @@ export class ContentStore {
   has(id: string): boolean {
     const filePath = join(this.objectsDir, id.slice(0, 2), id);
     return existsSync(filePath);
+  }
+
+  /**
+   * Delete an object by id. No-op if absent. Used to reclaim objects that are
+   * definitively orphaned (e.g. a canonical node dropped by re-canonicalization),
+   * so the content store doesn't accumulate dead blobs forever.
+   */
+  remove(id: string): boolean {
+    if (!id || id.length < 2) return false;
+    const filePath = join(this.objectsDir, id.slice(0, 2), id);
+    if (!existsSync(filePath)) return false;
+    rmSync(filePath);
+    return true;
   }
 }

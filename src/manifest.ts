@@ -82,17 +82,23 @@ export class ManifestManager {
 
   /**
    * Refresh a generated file's manifest hash after the compile gate repaired it, so
-   * drift detection stays honest. An LLM rewrite invalidates the exact line→canon
-   * provenance, so we drop it (the inspector falls back to inference).
+   * drift detection stays honest. A repair may move lines, so the caller re-extracts
+   * line→canon provenance from the repaired content (its `//phx:` markers usually
+   * survive) and passes it here; if none is given we drop the stale mapping rather
+   * than keep a wrong one (file→IU→canon provenance still lives in the journal).
    */
-  updateGeneratedFile(path: string, content: string): void {
+  updateGeneratedFile(path: string, content: string, lineProvenance?: Record<string, string>): void {
     const manifest = this.load();
     for (const iuManifest of Object.values(manifest.iu_manifests)) {
       const entry = iuManifest.files[path];
       if (entry) {
         entry.content_hash = sha256(content);
         entry.size = content.length;
-        delete entry.line_provenance;
+        if (lineProvenance && Object.keys(lineProvenance).length > 0) {
+          entry.line_provenance = lineProvenance;
+        } else {
+          delete entry.line_provenance;
+        }
         manifest.generated_at = new Date().toISOString();
         this.save(manifest);
         return;

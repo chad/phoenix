@@ -27,6 +27,11 @@ interface PhoenixConfig {
  * Resolve the LLM provider. Returns null if no provider is available.
  */
 export function resolveProvider(phoenixDir?: string): LLMProvider | null {
+  // 0. Hard stub-mode override — force deterministic, offline stub generation
+  //    regardless of available keys/CLI. Used for reproducible tests and for
+  //    "explain the pipeline without spending tokens".
+  if (process.env.PHOENIX_NO_LLM === '1') return null;
+
   const config = phoenixDir ? loadConfig(phoenixDir) : {};
 
   // 1. Explicit env var override
@@ -117,6 +122,9 @@ function saveConfig(phoenixDir: string, config: PhoenixConfig): void {
  * Describe which providers are available (for CLI help).
  */
 export function describeAvailability(): { available: string[]; configured: string | null; hint: string } {
+  if (process.env.PHOENIX_NO_LLM === '1') {
+    return { available: [], configured: null, hint: 'PHOENIX_NO_LLM=1 — forcing deterministic stub generation.' };
+  }
   const available: string[] = [];
   if (process.env.ANTHROPIC_API_KEY) available.push('anthropic');
   if (process.env.OPENAI_API_KEY) available.push('openai');

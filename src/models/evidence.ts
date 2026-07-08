@@ -11,6 +11,8 @@ export enum EvidenceKind {
   STATIC_ANALYSIS = 'static_analysis',
   THREAT_NOTE = 'threat_note',
   HUMAN_SIGNOFF = 'human_signoff',
+  FORMAL_VERIFICATION = 'formal_verification',
+  SIMULATION = 'simulation',
 }
 
 export enum EvidenceStatus {
@@ -41,6 +43,8 @@ export interface PolicyEvaluation {
   satisfied: string[];
   missing: string[];
   failed: string[];
+  /** Required kinds whose only evidence was stale (bound to a superseded artifact). */
+  stale?: string[];
   verdict: 'PASS' | 'FAIL' | 'INCOMPLETE';
 }
 

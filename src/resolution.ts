@@ -345,10 +345,16 @@ function inferHierarchy(nodes: CanonicalNode[], clauseMap: Map<string, Clause>):
 // ─── Step 6: Anchor computation ──────────────────────────────────────────────
 
 function computeAnchors(nodes: CanonicalNode[]): void {
+  // Two-layer identity. canon_anchor is the STABLE identity: the semantic
+  // skeleton (type + domain tags), which survives rewording because a reworded
+  // statement keeps its type and domain nouns. It deliberately EXCLUDES the
+  // statement text and source_clause_ids — those are content-addressed and
+  // churn on every edit, which is the job of canon_id (the content version).
+  // Keeping the anchor stable is what makes canonical-stability measurable and
+  // lets the classifier recognize "same concept, reworded" (→ B, not D).
   for (const node of nodes) {
     const sortedTags = [...node.tags].sort().join(',');
-    const sortedSources = [...node.source_clause_ids].sort().join(',');
-    node.canon_anchor = sha256([node.type, sortedTags, sortedSources].join('\x00'));
+    node.canon_anchor = sha256([node.type, sortedTags].join('\x00'));
   }
 }
 

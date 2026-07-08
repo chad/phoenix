@@ -17,7 +17,7 @@ import type { CanonicalNode } from './models/canonical.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { IUManifest, RegenMetadata, FileManifestEntry } from './models/manifest.js';
 import type { LLMProvider } from './llm/provider.js';
-import { buildPrompt, getSystemPrompt, provenanceLabels, extractLineProvenance } from './llm/prompt.js';
+import { buildPrompt, getSystemPrompt, provenanceLabels, extractLineProvenance, promptpackHash } from './llm/prompt.js';
 import type { SiblingContract } from './llm/prompt.js';
 import type { ResolvedTarget } from './models/architecture.js';
 import { cleanCodeResponse, buildFixPrompt } from './codegen-util.js';
@@ -74,8 +74,13 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
   const files = new Map<string, string>();
   const provByPath = new Map<string, Record<string, string>>();
   const modelId = ctx?.llm ? `${ctx.llm.name}/${ctx.llm.model}` : 'stub-generator/1.0';
-  const promptpackHash = sha256(JSON.stringify(iu.contract));
   const iuNegativeKnowledge = ctx?.negativeKnowledge?.get(iu.iu_id) ?? [];
+  // TRUE promptpack hash: the actual system + user prompt that shapes this
+  // generation, plus model + toolchain — so the record can reproduce the run
+  // (PRD §8). Computed from the same builders generateWithLLM uses.
+  const ppSystem = getSystemPrompt(ctx?.target);
+  const ppUser = buildPrompt(iu, ctx?.canonNodes ?? [], undefined, ctx?.target, iuNegativeKnowledge);
+  const ppHash = promptpackHash({ systemPrompt: ppSystem, userPrompt: ppUser, modelId, toolchainVersion: TOOLCHAIN_VERSION });
 
   for (const outputPath of iu.output_files) {
     let content: string;
@@ -97,7 +102,7 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
           ctx.onProgress?.(iu, 'done');
           ctx.onGenerationFailure?.(iu, {
             model_id: modelId,
-            promptpack_hash: promptpackHash,
+            promptpack_hash: ppHash,
             reason: `Generated code did not typecheck after retries: ${firstLine(gen.typecheckError)}`,
           });
         } else {
@@ -109,7 +114,7 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
         // Fall back to stub on LLM failure — and record what failed. (Gate 2.)
         ctx.onGenerationFailure?.(iu, {
           model_id: modelId,
-          promptpack_hash: promptpackHash,
+          promptpack_hash: ppHash,
           reason: `Generation threw, fell back to stub: ${firstLine(msg)}`,
         });
         content = ctx.target ? ctx.target.runtime.stub(iu) : generateModule(iu);
@@ -137,7 +142,7 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
 
   const metadata: RegenMetadata = {
     model_id: modelId,
-    promptpack_hash: promptpackHash,
+    promptpack_hash: ppHash,
     toolchain_version: TOOLCHAIN_VERSION,
     generated_at: now,
   };

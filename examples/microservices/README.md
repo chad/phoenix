@@ -1,202 +1,79 @@
-# Phoenix VCS — Example Project
+# Phoenix VCS — Microservices Example
 
-A sample microservices platform with three specs: API Gateway, User Service, and Notification Service.
+A **spec-only** starter: three specs (API Gateway, User Service, Notification
+Service) that Phoenix compiles into a working microservices platform. This
+directory ships the specs; you generate the code yourself with the commands
+below — nothing here is pre-generated.
 
-## Quick Start
+## Layout
+
+```
+microservices/
+  spec/
+    api-gateway.md
+    user-service.md
+    notification-service.md
+```
+
+## Generate it
 
 ```bash
-# From the phoenix repo root, build and link the CLI (one-time)
+# From the phoenix repo root, build the CLI (one-time)
 cd /path/to/phoenix
-npm run build
-npm link
+npm install && npm run build
 
-# Enter the example project
-cd example
+# Enter this example
+cd examples/microservices
 
-# 1. Initialize Phoenix
-phoenix init
-
-# 2. Bootstrap (ingest → canonicalize → plan → generate → scaffold)
-phoenix bootstrap
-
-# 3. Install generated project dependencies
-npm install
-
-# 4. Typecheck the generated code
-npm run typecheck
-
-# 5. Run all generated tests (52 tests)
-npm test
-
-# 6. Start a service
-npm run start:api-gateway        # http://localhost:3000
-npm run start:user-service       # http://localhost:3002
-npm run start:notification-service  # http://localhost:3001
+# Initialize and compile the specs → code
+node ../../dist/cli.js init --arch=sqlite-web-api
+node ../../dist/cli.js bootstrap
 ```
 
-## Hit the Live Endpoints
+Bootstrap runs the full pipeline: ingest → canonicalize → plan → generate →
+scaffold → compile gate. With an LLM provider configured (ANTHROPIC_API_KEY /
+OPENAI_API_KEY, or the Claude CLI) it generates real implementations; with none,
+it produces typed, mountable stubs. Set `PHOENIX_NO_LLM=1` to force deterministic
+stub generation.
+
+## What you get
+
+The exact counts depend on the pipeline and provider, but for these three specs
+you should see roughly:
+
+- **26** spec clauses across the three documents
+- **~110** canonical nodes (requirements, constraints, invariants, definitions)
+- **~15** Implementation Units, each with a risk tier, contract, and boundary policy
+- Generated modules under `src/generated/`, wired together by the scaffold
+
+Run `phoenix status` to see the trust dashboard, `phoenix journal` to see the
+provenance chain, and `phoenix why <file>` to trace any generated file back to
+the spec lines that produced it.
+
+## Explore
 
 ```bash
-# Start the API Gateway
-npm run start:api-gateway &
-
-# Health check
-curl localhost:3000/health | jq .
-
-# Request metrics
-curl localhost:3000/metrics | jq .
-
-# List registered modules with risk tiers
-curl localhost:3000/modules | jq .
-
-# 404 for unknown routes
-curl localhost:3000/nonexistent | jq .
+node ../../dist/cli.js status          # trust dashboard — the primary UX
+node ../../dist/cli.js clauses         # the ingested clauses
+node ../../dist/cli.js canon           # the canonical graph
+node ../../dist/cli.js plan            # the Implementation Units
+node ../../dist/cli.js evals           # generate durable evaluations (the oracle)
+node ../../dist/cli.js journal         # the append-only provenance chain
+node ../../dist/cli.js why src/generated/<iu>/<iu>.ts   # trace code → spec
 ```
 
-## Explore with Phoenix
+## Make a spec change (selective invalidation)
 
 ```bash
-# Trust dashboard — the primary UX
-phoenix status
+# Add a requirement to one service
+echo "- The gateway must rate-limit requests to 100 per minute" >> spec/api-gateway.md
 
-# See what Phoenix extracted from specs
-phoenix clauses                     # 26 clauses across 3 docs
-phoenix canon                       # 87 canonical nodes (requirements, constraints, invariants)
-
-# Inspect the IU plan
-phoenix plan                        # 20 Implementation Units across 3 services
-
-# Check generated files for unauthorized edits
-phoenix drift
-
-# Evaluate evidence against risk-tier policy
-phoenix evaluate
-
-# Provenance graph summary
-phoenix graph
+node ../../dist/cli.js ingest          # classifies the change, marks only the affected IU stale
+node ../../dist/cli.js status          # shows the invalidation set + cause chain
+node ../../dist/cli.js canonicalize
+node ../../dist/cli.js plan
+node ../../dist/cli.js regen            # selective by default — regenerates ONLY the stale subtree
 ```
 
-## Make a Spec Change
-
-```bash
-# Add a requirement
-echo "- The gateway must support WebSocket upgrade requests" >> spec/api-gateway.md
-
-# See the diff
-phoenix diff spec/api-gateway.md
-
-# Re-ingest → re-canonicalize → re-plan → regenerate
-phoenix ingest
-phoenix canonicalize
-phoenix plan
-phoenix regen
-
-# Rebuild and test
-npm run build
-npm test
-
-# Check status
-phoenix status
-```
-
-## Simulate Drift
-
-```bash
-# Edit a generated file without going through Phoenix
-echo "// unauthorized edit" >> src/generated/api-gateway/authentication.ts
-
-# Drift detection catches it
-phoenix drift                      # DRIFTED
-phoenix status                     # Shows ERROR diagnostic
-
-# Fix it by regenerating
-phoenix regen
-phoenix status                     # Clean again
-```
-
-## Project Structure After Bootstrap
-
-```
-example/
-├── package.json                        # Generated — npm scripts for each service
-├── tsconfig.json                       # Generated — strict TypeScript config
-├── vitest.config.ts                    # Generated — test runner config
-├── spec/                               # Human-written specs
-│   ├── api-gateway.md
-│   ├── user-service.md
-│   └── notification-service.md
-├── src/generated/
-│   ├── index.ts                        # Service registry
-│   ├── api-gateway/
-│   │   ├── index.ts                    # Barrel exports
-│   │   ├── server.ts                   # HTTP server (:3000)
-│   │   ├── authentication.ts           # Module: validate(token)
-│   │   ├── rate-limiting.ts            # Module: rateLimit(input)
-│   │   ├── request-routing.ts          # Module: route(request)
-│   │   ├── circuit-breaking.ts         # Module: handle(request)
-│   │   ├── logging-observability.ts
-│   │   ├── request-transformation.ts
-│   │   ├── security-constraints.ts
-│   │   └── __tests__/
-│   │       └── api-gateway.test.ts     # 18 tests (modules + server)
-│   ├── user-service/
-│   │   ├── index.ts
-│   │   ├── server.ts                   # HTTP server (:3002)
-│   │   ├── account-management.ts       # Module: create(input)
-│   │   ├── search.ts                   # Module: search(user): User[]
-│   │   ├── events.ts                   # Module: publish(event)
-│   │   ├── profile-management.ts
-│   │   ├── authentication-integration.ts
-│   │   ├── data-constraints.ts
-│   │   └── __tests__/
-│   │       └── user-service.test.ts    # 16 tests
-│   └── notification-service/
-│       ├── index.ts
-│       ├── server.ts                   # HTTP server (:3001)
-│       ├── email-delivery.ts
-│       ├── push-notifications.ts
-│       ├── delivery-guarantees.ts
-│       ├── template-system.ts
-│       ├── channel-support.ts
-│       ├── in-app-messages.ts
-│       ├── rate-limiting.ts
-│       └── __tests__/
-│           └── notification-service.test.ts  # 18 tests
-└── .phoenix/                           # Phoenix state (not checked in)
-    ├── state.json
-    ├── graphs/
-    │   ├── spec.json
-    │   ├── canonical.json
-    │   ├── ius.json
-    │   └── warm-hashes.json
-    ├── manifests/
-    │   └── generated_manifest.json
-    └── store/objects/
-```
-
-## What Each Test Verifies
-
-**Module tests** (per module):
-- Exports Phoenix traceability metadata (`_phoenix.name`, `_phoenix.risk_tier`)
-- Has at least one exported function
-
-**Server tests** (per service):
-- `GET /health` returns 200 with service name, uptime, module list
-- `GET /metrics` returns request counts
-- `GET /modules` lists all modules with risk tiers and exports
-- `GET /unknown` returns 404
-
-## The Trace
-
-Every line of generated code traces back to a spec:
-
-```
-spec/api-gateway.md:9  "The gateway must validate JWT tokens..."
-  → Clause 976a9f4b
-    → CanonicalNode a890e171 (REQUIREMENT)
-      → IU "Authentication" (high risk)
-        → src/generated/api-gateway/authentication.ts
-          → validate(jwtToken: JwtToken): boolean
-```
-
-Change that spec line → only `authentication.ts` is invalidated. Not the whole project.
+Changing one spec line invalidates only the dependent subtree, not the whole
+repository. That is the point.

@@ -9,6 +9,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { join, resolve, relative, basename, dirname } from 'node:path';
 
 // Stores
@@ -41,18 +42,31 @@ import { splitSharedArtifacts, parseRegions } from './artifacts.js';
 import type { SplitResult, ParsedRegion } from './artifacts.js';
 import { runCompileGate } from './compile-gate.js';
 import type { CompileGateResult } from './compile-gate.js';
+import { provenanceLabels, extractLineProvenance } from './llm/prompt.js';
 import { extractDependencies } from './dep-extractor.js';
 import { validateBoundary } from './boundary-validator.js';
 
 // Phase D
-import { evaluatePolicy, evaluateAllPolicies } from './policy-engine.js';
+import { evaluateAllPolicies } from './policy-engine.js';
 import { computeCascade } from './cascade.js';
+import { ChangeStore } from './store/change-store.js';
+import { WaiverStore, defaultSigner, parseExpiry } from './waivers.js';
+import type { StoredWaiver } from './waivers.js';
+import { deriveIUDependencies, applyDerivedDependencies, buildFileToIUMap, resolveRelativeImport } from './iu-deps.js';
+import { recordLowTierEvidence, iuArtifactHash } from './evidence-collector.js';
+import { computeInvalidation, iuKey } from './invalidation.js';
+import { InvalidationStore } from './store/invalidation-store.js';
+import { CanonStabilityStore } from './canon-stability.js';
+import { Journal } from './journal.js';
+import { deriveEvaluations, checkEvaluation } from './evals.js';
+import type { CompileError } from './models/architecture.js';
 
 // Phase E
 import { runShadowPipeline } from './shadow-pipeline.js';
 
 // Phase F
 import { parseCommand, routeCommand, getAllCommands } from './bot-router.js';
+import { ConfirmStore } from './store/confirm-store.js';
 
 // Scaffold
 import { deriveServices, nodeScaffold } from './scaffold.js';
@@ -180,31 +194,253 @@ function saveIUs(phoenixDir: string, ius: ImplementationUnit[]): void {
   writeFileSync(join(dir, 'ius.json'), JSON.stringify(ius, null, 2), 'utf8');
 }
 
+/**
+ * Build the D-rate tracker from the persisted change window (ChangeStore).
+ * This is the live trust metric: the window survives across processes, so the
+ * D-rate reflects real classification history — not a per-run reset.
+ */
 function loadDRateTracker(phoenixDir: string): DRateTracker {
-  const path = join(phoenixDir, 'drate.json');
-  if (existsSync(path)) {
-    const data = JSON.parse(readFileSync(path, 'utf8'));
-    const tracker = new DRateTracker(data.window_size || 100);
-    // Re-record stored window
-    if (data.window) {
-      for (const cls of data.window) {
-        tracker.recordOne(cls);
-      }
-    }
-    return tracker;
-  }
-  return new DRateTracker();
+  const changeStore = new ChangeStore(phoenixDir);
+  const window = changeStore.getWindow();
+  const tracker = new DRateTracker(changeStore.getWindowSize());
+  for (const cls of window) tracker.recordOne(cls);
+  return tracker;
 }
 
-function saveDRateTracker(phoenixDir: string, tracker: DRateTracker): void {
-  const status = tracker.getStatus();
-  writeFileSync(join(phoenixDir, 'drate.json'), JSON.stringify({
-    window_size: status.window_size,
-    rate: status.rate,
-    level: status.level,
-    d_count: status.d_count,
-    total_count: status.total_count,
-  }, null, 2), 'utf8');
+/**
+ * Compute boundary diagnostics for every generated IU file, including IU-level
+ * coupling (allowed_ius / forbidden_ius) which requires mapping each relative
+ * import to its owning IU — the piece that was previously unenforceable.
+ */
+function computeBoundaryDiagnostics(projectRoot: string, ius: ImplementationUnit[]): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const fileToIU = buildFileToIUMap(ius);
+  const knownFiles = new Set(fileToIU.keys());
+  const iuById = new Map(ius.map(iu => [iu.iu_id, iu]));
+
+  for (const iu of ius) {
+    for (const outputFile of iu.output_files) {
+      const fullPath = join(projectRoot, outputFile);
+      if (!existsSync(fullPath)) continue;
+      const source = readFileSync(fullPath, 'utf8');
+      const depGraph = extractDependencies(source, outputFile);
+      // Package + side-channel + forbidden-path checks.
+      diagnostics.push(...validateBoundary(depGraph, iu));
+
+      // IU-level coupling: resolve each relative import to its owning IU and
+      // enforce allowed_ius / forbidden_ius. This is mechanical enforcement of
+      // the boundary policy the PRD §7 example depends on.
+      const policy = iu.boundary_policy.code;
+      if (policy.allowed_ius.length === 0 && policy.forbidden_ius.length === 0) continue;
+      for (const imp of depGraph.imports) {
+        if (!imp.is_relative) continue;
+        const resolved = resolveRelativeImport(outputFile.replace(/\\/g, '/'), imp.source, knownFiles);
+        if (!resolved) continue;
+        const targetIU = fileToIU.get(resolved);
+        if (!targetIU || targetIU === iu.iu_id) continue;
+        const targetName = iuById.get(targetIU)?.name ?? targetIU.slice(0, 8);
+        if (policy.forbidden_ius.includes(targetIU) || policy.forbidden_ius.includes(targetName)) {
+          diagnostics.push({
+            severity: iu.enforcement.dependency_violation.severity,
+            category: 'dependency_violation',
+            subject: iu.name,
+            message: `Imports ${targetName} (forbidden by boundary policy)`,
+            iu_id: iu.iu_id,
+            source_file: outputFile,
+            source_line: imp.source_line,
+            recommended_actions: [`Remove the import of ${targetName}, or update ${iu.name}'s boundary policy`],
+          });
+        } else if (policy.allowed_ius.length > 0 && !policy.allowed_ius.includes(targetIU) && !policy.allowed_ius.includes(targetName)) {
+          diagnostics.push({
+            severity: iu.enforcement.dependency_violation.severity,
+            category: 'dependency_violation',
+            subject: iu.name,
+            message: `Imports ${targetName}, which is not in ${iu.name}'s allowed_ius`,
+            iu_id: iu.iu_id,
+            source_file: outputFile,
+            source_line: imp.source_line,
+            recommended_actions: [`Add ${targetName} to allowed_ius, or remove the import`],
+          });
+        }
+      }
+    }
+  }
+  return diagnostics;
+}
+
+/**
+ * Derive the IU dependency graph from generated code and persist it onto the IU
+ * list (graphs/ius.json). This populates the edges cascade, IU-level boundary
+ * enforcement, and selective invalidation all traverse. Returns the updated IUs.
+ */
+function persistIUDependencies(
+  phoenixDir: string,
+  projectRoot: string,
+  ius: ImplementationUnit[],
+): ImplementationUnit[] {
+  const derived = deriveIUDependencies(projectRoot, ius);
+  const changed = applyDerivedDependencies(ius, derived);
+  if (changed.length > 0) saveIUs(phoenixDir, ius);
+  return ius;
+}
+
+/**
+ * Journal every regenerated IU: file outputs (with hashes), the canon nodes and
+ * model/promptpack that produced them. This is the authoritative provenance edge
+ * `phoenix why` walks — spec change → canon → IU → these exact files.
+ */
+function journalRegen(phoenixDir: string, results: RegenResult[], ius: ImplementationUnit[]): void {
+  if (results.length === 0) return;
+  const journal = new Journal(phoenixDir);
+  const iuById = new Map(ius.map(iu => [iu.iu_id, iu]));
+  for (const result of results) {
+    const iu = iuById.get(result.iu_id);
+    const meta = result.manifest.regen_metadata;
+    journal.append({
+      type: 'regen',
+      inputs: iu?.source_canon_ids ?? [],
+      outputs: [...result.files.keys()],
+      meta: {
+        iu_id: result.iu_id,
+        iu_name: result.manifest.iu_name,
+        model_id: meta.model_id,
+        promptpack_hash: meta.promptpack_hash,
+        toolchain_version: meta.toolchain_version,
+        file_hashes: Object.fromEntries(Object.entries(result.manifest.files).map(([p, e]) => [p, e.content_hash])),
+      },
+    });
+  }
+}
+
+/** Current artifact hash per IU — the identity of the generation on disk now. */
+function currentArtifactHashes(
+  ius: ImplementationUnit[],
+  manifestManager: ManifestManager,
+  projectRoot: string,
+): Map<string, string> {
+  const manifest = manifestManager.load();
+  const map = new Map<string, string>();
+  for (const iu of ius) {
+    if (iu.output_files.some(f => existsSync(join(projectRoot, f)))) {
+      map.set(iu.iu_id, iuArtifactHash(iu, manifest, projectRoot));
+    }
+  }
+  return map;
+}
+
+/**
+ * Generate durable evaluations for each IU, check them against the generated
+ * module, persist them (with pass/fail status), and record the resulting
+ * unit_tests / property_tests evidence bound to the IU's artifact hash. This is
+ * the oracle: it gives regeneration something to be conservative against, and it
+ * turns the permanent "missing unit_tests" INCOMPLETE into a real, satisfiable
+ * (or honestly-failing) signal.
+ */
+function generateCheckAndRecordEvals(
+  phoenixDir: string,
+  projectRoot: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  manifestManager: ManifestManager,
+): { generated: number; passed: number; failed: number } {
+  const evalStore = new EvaluationStore(phoenixDir);
+  const evidenceStore = new EvidenceStore(phoenixDir);
+  const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+  const manifest = manifestManager.load();
+  const timestamp = new Date().toISOString();
+  const evidence: import('./models/evidence.js').EvidenceRecord[] = [];
+  let generated = 0, passed = 0, failed = 0;
+
+  for (const iu of ius) {
+    const primaryFile = iu.output_files[0];
+    if (!primaryFile) continue;
+    const full = join(projectRoot, primaryFile);
+    if (!existsSync(full)) continue;
+    const source = readFileSync(full, 'utf8');
+
+    const derived = deriveEvaluations(iu, canonNodes);
+    if (derived.length === 0) continue;
+
+    // Check each eval against the generated module; stamp status; persist.
+    const results = derived.map(e => checkEvaluation(e, source, canonById));
+    const statusById = new Map(results.map(r => [r.eval_id, r.status]));
+    for (const e of derived) {
+      e.last_status = statusById.get(e.eval_id) ?? 'untested';
+      e.last_verified_at = timestamp;
+    }
+    evalStore.addMany(derived);
+    generated += derived.length;
+    passed += results.filter(r => r.status === 'pass').length;
+    failed += results.filter(r => r.status === 'fail').length;
+
+    const artifactHash = iuArtifactHash(iu, manifest, projectRoot);
+    const required = new Set(iu.evidence_policy.required);
+
+    // unit_tests ← boundary_contract + domain_rule + failure_mode evals.
+    if (required.has('unit_tests')) {
+      const behavioral = derived.filter(e => e.binding !== 'invariant');
+      const anyFail = behavioral.some(e => e.last_status === 'fail');
+      if (behavioral.length > 0) {
+        evidence.push(makeEvalEvidence('unit_tests', iu, artifactHash, !anyFail, behavioral.length, timestamp));
+      }
+    }
+    // property_tests ← invariant evals (the properties that must always hold).
+    if (required.has('property_tests')) {
+      const invariants = derived.filter(e => e.binding === 'invariant');
+      const anyFail = invariants.some(e => e.last_status === 'fail');
+      if (invariants.length > 0) {
+        evidence.push(makeEvalEvidence('property_tests', iu, artifactHash, !anyFail, invariants.length, timestamp));
+      }
+    }
+  }
+
+  if (evidence.length > 0) evidenceStore.addRecords(evidence);
+  return { generated, passed, failed };
+}
+
+function makeEvalEvidence(
+  kind: 'unit_tests' | 'property_tests',
+  iu: ImplementationUnit,
+  artifactHash: string,
+  pass: boolean,
+  count: number,
+  timestamp: string,
+): import('./models/evidence.js').EvidenceRecord {
+  return {
+    evidence_id: createHash('sha256').update(`${kind}\x00${iu.iu_id}\x00${timestamp}`).digest('hex').slice(0, 16),
+    kind: kind as import('./models/evidence.js').EvidenceKind,
+    status: (pass ? 'PASS' : 'FAIL') as import('./models/evidence.js').EvidenceStatus,
+    iu_id: iu.iu_id,
+    canon_ids: iu.source_canon_ids,
+    artifact_hash: artifactHash,
+    message: `${count} durable ${kind === 'unit_tests' ? 'behavioral' : 'invariant'} eval(s) ${pass ? 'passed' : 'failed'} structural check`,
+    timestamp,
+  };
+}
+
+/**
+ * Record low-tier evidence (typecheck, lint, boundary) from the checks that just
+ * ran, binding each record to the IU's current artifact hash. Called after the
+ * compile gate so the manifest reflects any repairs.
+ */
+function collectEvidenceAfterGate(
+  phoenixDir: string,
+  projectRoot: string,
+  ius: ImplementationUnit[],
+  manifestManager: ManifestManager,
+  compileErrors: CompileError[],
+  canonNodes: CanonicalNode[],
+): void {
+  const boundaryDiagnostics = computeBoundaryDiagnostics(projectRoot, ius);
+  recordLowTierEvidence(phoenixDir, {
+    ius,
+    manifest: manifestManager.load(),
+    projectRoot,
+    compileErrors,
+    boundaryDiagnostics,
+  });
+  // Generate + check durable evaluations, recording unit/property test evidence.
+  generateCheckAndRecordEvals(phoenixDir, projectRoot, ius, canonNodes, manifestManager);
 }
 
 function findSpecFiles(projectRoot: string): string[] {
@@ -362,6 +598,7 @@ async function runCompileGateAndReport(
     target: ResolvedTarget | null;
     manifestManager: ManifestManager;
     onGenerationFailure?: RegenContext['onGenerationFailure'];
+    canonNodes?: CanonicalNode[];
     indent?: string;
   },
 ): Promise<CompileGateResult> {
@@ -377,7 +614,18 @@ async function runCompileGateAndReport(
     },
     onRepair: (file, iu) => {
       const full = join(projectRoot, file);
-      if (existsSync(full)) opts.manifestManager.updateGeneratedFile(file, readFileSync(full, 'utf8'));
+      if (existsSync(full)) {
+        const content = readFileSync(full, 'utf8');
+        // Re-extract line→canon provenance from the repaired content's surviving
+        // `//phx:` markers instead of dropping it (keeps `phoenix why` line-accurate).
+        let lineProv: Record<string, string> | undefined;
+        if (iu) {
+          const canonForIU = (opts.canonNodes ?? []).filter(n => iu.source_canon_ids.includes(n.canon_id));
+          const labels = provenanceLabels(iu, canonForIU);
+          lineProv = extractLineProvenance(content, labels).lineProvenance;
+        }
+        opts.manifestManager.updateGeneratedFile(file, content, lineProv);
+      }
       console.log(`${indent}  ${cyan('↻')} repaired ${file}${iu ? dim(` (${iu.name})`) : ''}`);
     },
   });
@@ -411,6 +659,12 @@ async function runCompileGateAndReport(
     unresolved: result.unresolved,
     checked_at: new Date().toISOString(),
   }, null, 2), 'utf8');
+
+  // Close the evidence loop: record typecheck/lint/boundary evidence from the
+  // checks that just ran, bound to each IU's current artifact hash. This is what
+  // lets `phoenix status` show satisfied low-tier policy instead of permanent
+  // "missing evidence" noise.
+  collectEvidenceAfterGate(phoenixDir, projectRoot, ius, opts.manifestManager, result.unresolved, opts.canonNodes ?? []);
 
   console.log();
   return result;
@@ -550,7 +804,15 @@ async function cmdBootstrap(): Promise<void> {
 
   // Extract canonical nodes (LLM-enhanced when available)
   const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly);
-  canonStore.saveNodes(canonNodes);
+  canonStore.replaceNodes(canonNodes);
+  // Seed the canonical-stability baseline (first run; nothing to compare yet).
+  new CanonStabilityStore(phoenixDir).update(canonNodes);
+  new Journal(phoenixDir).append({
+    type: 'canonicalize',
+    inputs: allClauses.map(c => c.clause_id),
+    outputs: canonNodes.map(n => n.canon_id),
+    meta: { node_count: canonNodes.length, model_id: llmEarly ? `${llmEarly.name}/${llmEarly.model}` : 'rule' },
+  });
   console.log(`    ${green('✔')} ${canonNodes.length} canonical nodes extracted`);
 
   // Compute warm hashes
@@ -585,6 +847,12 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`  ${dim('Phase C:')} IU planning`);
   const ius = await planIUsAuto(canonNodes, allClauses, llmEarly, arch);
   saveIUs(phoenixDir, ius);
+  new Journal(phoenixDir).append({
+    type: 'plan',
+    inputs: canonNodes.map(n => n.canon_id),
+    outputs: ius.map(iu => iu.iu_id),
+    meta: { iu_count: ius.length, ius: ius.map(iu => ({ id: iu.iu_id, name: iu.name, canon: iu.source_canon_ids })) },
+  });
   console.log(`    ${green('✔')} ${ius.length} Implementation Units planned`);
   for (const iu of ius) {
     console.log(`      ${dim('·')} ${iu.name} ${dim(`(${iu.risk_tier})`)} → ${iu.output_files.join(', ')}`);
@@ -661,6 +929,13 @@ async function cmdBootstrap(): Promise<void> {
     writeFileSync(fullPath, content, 'utf8');
   }
   manifestManager.recordSharedFiles(split.sharedFiles);
+  journalRegen(phoenixDir, regenResults, ius);
+
+  // Derive IU→IU dependencies from the generated imports and persist them onto
+  // the IU graph. This is the substrate for cascade, IU-level boundary
+  // enforcement, and selective invalidation.
+  persistIUDependencies(phoenixDir, projectRoot, ius);
+
   console.log();
   reportRegenGate(gateVerdicts, '  ');
 
@@ -685,8 +960,11 @@ async function cmdBootstrap(): Promise<void> {
   // Compile gate: the assembled system must typecheck. Repair what we can, surface the
   // rest honestly (recorded as negative knowledge; never a silent ✔).
   await runCompileGateAndReport(projectRoot, phoenixDir, ius, {
-    llm, target: arch, manifestManager, onGenerationFailure,
+    llm, target: arch, manifestManager, onGenerationFailure, canonNodes,
   });
+
+  // A full bootstrap regenerates everything, so any prior staleness is resolved.
+  new InvalidationStore(phoenixDir).clearAll();
 
   // Save state
   saveBootstrapState(phoenixDir, machine);
@@ -779,6 +1057,26 @@ function printTrustDashboard(
     console.log(`  ${dim('Resolution:')} ${totalEdges} edges ${dim(`(${resDRate}% relates_to)`)}${dim(',')} max degree ${maxDegree}${dim(',')} ${hierPct}% hierarchy`);
   }
 
+  // Canonical stability (PRD §20) — how much the last re-canonicalization churned
+  // the graph, measured on the stable anchor layer. Low stability is a trust risk:
+  // it means downstream IU identity and invalidation are shifting under you.
+  const stabilitySnapshot = new CanonStabilityStore(phoenixDir).loadSnapshot();
+  if (stabilitySnapshot?.last_result && !stabilitySnapshot.last_result.first_run) {
+    const r = stabilitySnapshot.last_result;
+    const pct = (r.retention * 100).toFixed(0);
+    const color = r.retention >= 0.9 ? green : r.retention >= 0.7 ? yellow : red;
+    console.log(`  ${dim('Canonical Stability:')} ${color(`${pct}%`)} ${dim(`(${r.kept} kept, ${r.added} new, ${r.dropped} dropped)`)}`);
+    if (r.retention < 0.7) {
+      diagnostics.push({
+        severity: 'warning',
+        category: 'canon',
+        subject: 'Global',
+        message: `Canonical stability ${pct}% — re-canonicalization churned the graph`,
+        recommended_actions: ['Large churn under an unchanged spec points at extractor instability — investigate before trusting selective invalidation'],
+      });
+    }
+  }
+
   // Extraction coverage (recompute from current specs)
   if (allClauses.length > 0) {
     const { coverage } = extractCandidates(allClauses);
@@ -828,13 +1126,16 @@ function printTrustDashboard(
     console.log(`  ${dim('D-Rate:')} ${dim('no data')}`);
   }
 
-  // Drift detection
+  // Drift detection — waivers suppress labeled divergences (they still show as
+  // WARN so a signed/temporary edit is never invisible, just not an ERROR).
   const manifestManager = new ManifestManager(phoenixDir);
   const manifest = manifestManager.load();
+  const waiverStore = new WaiverStore(phoenixDir);
   if (manifest.generated_at) {
-    const driftReport = detectDrift(manifest, projectRoot);
+    const driftReport = detectDrift(manifest, projectRoot, waiverStore.asMap());
+    const waivedCount = driftReport.entries.filter(e => e.status === DriftStatus.WAIVED).length;
     const driftLabel = driftReport.drifted_count === 0 && driftReport.missing_count === 0
-      ? green('clean')
+      ? (waivedCount > 0 ? yellow(`clean (${waivedCount} waived)`) : green('clean'))
       : red(`${driftReport.drifted_count} drifted, ${driftReport.missing_count} missing`);
     console.log(`  ${dim('Drift:')} ${driftLabel} ${dim(`(${driftReport.clean_count} clean)`)}`);
 
@@ -846,7 +1147,7 @@ function printTrustDashboard(
           subject: entry.file_path,
           iu_id: entry.iu_id,
           message: `Working tree differs from generated manifest`,
-          recommended_actions: ['Label edit (promote_to_requirement, waiver, or temporary_patch)', 'Or run `phoenix regen` to regenerate'],
+          recommended_actions: ['Label edit: `phoenix label <file> --kind=promote_to_requirement|waiver|temporary_patch`', 'Or run `phoenix regen` to regenerate'],
         });
       }
       if (entry.status === DriftStatus.MISSING) {
@@ -859,9 +1160,77 @@ function printTrustDashboard(
           recommended_actions: ['Run `phoenix regen` to regenerate'],
         });
       }
+      if (entry.status === DriftStatus.WAIVED && entry.waiver) {
+        diagnostics.push({
+          severity: 'warning',
+          category: 'drift',
+          subject: entry.file_path,
+          iu_id: entry.iu_id,
+          message: `Edit accepted under ${entry.waiver.kind}: ${entry.waiver.reason}`,
+          recommended_actions: entry.waiver.expires
+            ? [`Expires ${entry.waiver.expires} — reconcile before then`]
+            : ['Reconcile into spec when convenient (`phoenix regen` clears it)'],
+        });
+      }
+      if (entry.status === DriftStatus.UNTRACKED) {
+        diagnostics.push({
+          severity: 'warning',
+          category: 'drift',
+          subject: entry.file_path,
+          iu_id: entry.iu_id,
+          message: `Region on disk is not tracked in the manifest`,
+          recommended_actions: ['Run `phoenix regen` to reconcile the manifest'],
+        });
+      }
     }
   } else {
     console.log(`  ${dim('Drift:')} ${dim('no manifest')}`);
+  }
+
+  // Selective invalidation — which IUs a spec change made stale, and why. This
+  // is the defining capability made visible: not "the app is stale" but "this
+  // requirement changed → this IU is stale; that IU depends on it → re-validate".
+  const invalidation = new InvalidationStore(phoenixDir).load();
+  if (invalidation && (invalidation.stale.length > 0 || invalidation.revalidate.length > 0)) {
+    console.log(`  ${dim('Invalidation:')} ${yellow(`${invalidation.stale.length} stale`)}${invalidation.revalidate.length > 0 ? dim(`, ${invalidation.revalidate.length} to re-validate`) : ''}`);
+    for (const s of invalidation.stale) {
+      diagnostics.push({
+        severity: 'warning',
+        category: 'canon',
+        subject: s.iu_name,
+        iu_id: s.iu_id,
+        message: `Stale — requirements changed: ${s.cause_chain}`,
+        recommended_actions: [`Run \`phoenix regen\` to regenerate only the ${invalidation.stale.length} affected IU(s)`],
+      });
+    }
+    for (const r of invalidation.revalidate) {
+      diagnostics.push({
+        severity: 'info',
+        category: 'canon',
+        subject: r.iu_name,
+        iu_id: r.iu_id,
+        message: `Re-validate — ${r.cause_chain}`,
+        recommended_actions: ['Re-run typecheck + boundary + tests after the upstream IU regenerates'],
+      });
+    }
+  }
+
+  // Open promotions — manual edits the user declared to be real requirements.
+  // Surfaced (not blocking) so harvested scar-tissue knowledge is never lost:
+  // "the implementation remembers". Cleared when the file regenerates.
+  const openPromotions = waiverStore.openPromotions();
+  if (openPromotions.length > 0) {
+    console.log(`  ${dim('Promotions:')} ${yellow(`${openPromotions.length} pending`)}`);
+    for (const p of openPromotions) {
+      diagnostics.push({
+        severity: 'info',
+        category: 'canon',
+        subject: p.file_path,
+        iu_id: p.iu_id,
+        message: `Pending promotion to requirement: ${p.reason}`,
+        recommended_actions: ['Add the requirement to the spec, then `phoenix ingest` + `phoenix regen`'],
+      });
+    }
   }
 
   // Build status — the assembled system's most basic eval: does it compile?
@@ -889,22 +1258,15 @@ function printTrustDashboard(
     } catch { /* ignore malformed build status */ }
   }
 
-  // Boundary validation
-  for (const iu of ius) {
-    for (const outputFile of iu.output_files) {
-      const fullPath = join(projectRoot, outputFile);
-      if (!existsSync(fullPath)) continue;
-      const source = readFileSync(fullPath, 'utf8');
-      const depGraph = extractDependencies(source, outputFile);
-      const boundaryDiags = validateBoundary(depGraph, iu);
-      diagnostics.push(...boundaryDiags);
-    }
-  }
+  // Boundary validation — includes IU-level coupling (allowed_ius/forbidden_ius).
+  diagnostics.push(...computeBoundaryDiagnostics(projectRoot, ius));
 
-  // Policy evaluation
+  // Policy evaluation — bind to current artifact hashes so stale evidence (for a
+  // superseded generation) does not satisfy the policy.
   const evidenceStore = new EvidenceStore(phoenixDir);
   const allEvidence = evidenceStore.getAll();
-  const policyEvals = evaluateAllPolicies(ius, allEvidence);
+  const artifactHashes = currentArtifactHashes(ius, manifestManager, projectRoot);
+  const policyEvals = evaluateAllPolicies(ius, allEvidence, { currentArtifactHash: artifactHashes });
 
   let passCount = 0;
   let failCount = 0;
@@ -927,13 +1289,24 @@ function printTrustDashboard(
         recommended_actions: ['Re-run failing evidence checks', `Risk tier: ${eval_.risk_tier}`],
       });
     } else if (eval_.verdict === 'INCOMPLETE') {
+      const staleKinds = eval_.stale ?? [];
+      const freshMissing = eval_.missing.filter(m => !staleKinds.includes(m));
+      const parts: string[] = [];
+      if (freshMissing.length > 0) parts.push(`missing ${freshMissing.join(', ')}`);
+      if (staleKinds.length > 0) parts.push(`stale (superseded artifact): ${staleKinds.join(', ')}`);
+      const actions: string[] = [];
+      if (staleKinds.length > 0) actions.push('Re-run `phoenix regen` — the compile gate re-collects low-tier evidence');
+      if (freshMissing.some(m => ['unit_tests', 'property_tests'].includes(m))) actions.push('Generate durable evals: `phoenix evals`');
+      if (freshMissing.includes('threat_note')) actions.push('Add a threat note for this high-risk IU');
+      if (freshMissing.includes('human_signoff')) actions.push('Obtain human sign-off for this critical IU');
+      if (actions.length === 0) actions.push(`Collect required evidence for ${eval_.risk_tier} tier`);
       diagnostics.push({
         severity: 'warning',
         category: 'evidence',
         subject: eval_.iu_name,
         iu_id: eval_.iu_id,
-        message: `Missing evidence: ${eval_.missing.join(', ')}`,
-        recommended_actions: [`Collect required evidence for ${eval_.risk_tier} tier`],
+        message: `Evidence incomplete — ${parts.join('; ')}`,
+        recommended_actions: actions,
       });
     }
   }
@@ -1020,6 +1393,20 @@ function cmdIngest(args: string[]): void {
   console.log(bold('📥 Spec Ingestion'));
   console.log();
 
+  // Canonical graph + IUs (current = "before" state) for classification and
+  // invalidation. These reference the pre-change clause ids, which is exactly
+  // what we walk to find the affected subtree.
+  const canonStoreForClass = new CanonicalStore(phoenixDir);
+  const canonNodesBefore = canonStoreForClass.getAllNodes();
+  const iusBefore = loadIUs(phoenixDir);
+  const changeStore = new ChangeStore(phoenixDir);
+  const classifiedByDoc: Array<{ docId: string; classifications: import('./models/classification.js').ChangeClassification[] }> = [];
+  // All (diff, classification) pairs across docs, for the invalidation walk.
+  const allChanges: Array<{ diff: import('./models/clause.js').ClauseDiff; classification: import('./models/classification.js').ChangeClassification }> = [];
+  // clause_id → doc / start line, for readable cause chains.
+  const clauseDocs = new Map<string, string>();
+  const clauseLines = new Map<string, number>();
+
   let totalClauses = 0;
   let totalChanges = 0;
 
@@ -1032,6 +1419,23 @@ function cmdIngest(args: string[]): void {
     const removed = diffs.filter(d => d.diff_type === DiffType.REMOVED).length;
     const modified = diffs.filter(d => d.diff_type === DiffType.MODIFIED).length;
     const hasChanges = added > 0 || removed > 0 || modified > 0;
+
+    // Classify every non-identity change and record it — this drives the D-rate.
+    // Only ADDED/REMOVED/MODIFIED/MOVED are recorded; UNCHANGED clauses are not
+    // "changes" and must not dilute the window.
+    const changed = diffs.filter(d => d.diff_type !== DiffType.UNCHANGED);
+    if (changed.length > 0) {
+      const classifications = classifyChanges(changed, canonNodesBefore, canonNodesBefore);
+      classifiedByDoc.push({ docId, classifications });
+      for (let i = 0; i < changed.length; i++) {
+        allChanges.push({ diff: changed[i], classification: classifications[i] });
+        const before = changed[i].clause_before;
+        if (before) {
+          clauseDocs.set(before.clause_id, docId);
+          clauseLines.set(before.clause_id, before.source_line_range[0]);
+        }
+      }
+    }
 
     // Now ingest (overwrites stored clauses)
     const result = specStore.ingestDocument(file, projectRoot);
@@ -1086,10 +1490,86 @@ function cmdIngest(args: string[]): void {
     }
   }
 
+  // Record classifications and report the class breakdown — the D-rate is live now.
+  let dCount = 0;
+  const classCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+  for (const { docId, classifications } of classifiedByDoc) {
+    changeStore.record(classifications, docId);
+    for (const c of classifications) {
+      classCounts[c.change_class] = (classCounts[c.change_class] ?? 0) + 1;
+      if (c.change_class === 'D') dCount++;
+    }
+  }
+
+  // Advance the bootstrap state machine: enough classified history + acceptable
+  // D-rate transitions WARMING → STEADY_STATE (previously unreachable).
+  const machine = loadBootstrapState(phoenixDir);
+  const tracker = loadDRateTracker(phoenixDir);
+  const before = machine.getState();
+  machine.evaluateTransition(tracker.getStatus());
+  if (machine.getState() !== before) {
+    saveBootstrapState(phoenixDir, machine);
+  }
+
+  // Selective invalidation — the defining capability. Walk the changed clauses
+  // through canon → IU → dependents and persist exactly which IUs are stale.
+  let invalidationSummary: { stale: number; revalidate: number; canonStale: boolean } | null = null;
+  if (allChanges.length > 0 && iusBefore.length > 0) {
+    const result = computeInvalidation({
+      changes: allChanges,
+      canonNodes: canonNodesBefore,
+      ius: iusBefore,
+      clauseDocs,
+      clauseLines,
+    });
+    if (result.stale.length > 0 || result.revalidate.length > 0 || result.canon_stale) {
+      new InvalidationStore(phoenixDir).record(result);
+      invalidationSummary = { stale: result.stale.length, revalidate: result.revalidate.length, canonStale: result.canon_stale };
+      new Journal(phoenixDir).append({
+        type: 'invalidate',
+        inputs: result.causes.map(c => c.clause_id),
+        outputs: result.stale.map(s => s.iu_id),
+        meta: {
+          stale: result.stale.map(s => s.iu_name),
+          revalidate: result.revalidate.map(s => s.iu_name),
+          canon_stale: result.canon_stale,
+          causes: result.causes.map(c => ({ clause: c.clause_id, doc: c.doc_id, class: c.change_class })),
+        },
+      });
+    }
+  }
+
+  // Journal the ingest itself (spec → clauses), for the provenance chain.
+  if (classifiedByDoc.length > 0 || totalChanges > 0) {
+    new Journal(phoenixDir).append({
+      type: 'ingest',
+      inputs: files.map(f => relative(projectRoot, f)),
+      outputs: [],
+      meta: { total_clauses: totalClauses, changes: totalChanges },
+    });
+  }
+
   console.log();
   console.log(`  ${dim(`Total: ${totalClauses} clauses ingested`)}`);
   if (totalChanges > 0) {
-    console.log(`  ${dim(`Changes: ${totalChanges} clauses affected`)}`);
+    const classParts = (['A', 'B', 'C', 'D'] as const)
+      .filter(k => classCounts[k] > 0)
+      .map(k => `${classCounts[k]}${k}`);
+    console.log(`  ${dim(`Changes: ${totalChanges} clauses affected`)}${classParts.length ? dim(` — classes ${classParts.join(' ')}`) : ''}`);
+    if (dCount > 0) {
+      const status = tracker.getStatus();
+      console.log(`  ${dim(`D-rate: ${(status.rate * 100).toFixed(1)}% (${status.level})`)}`);
+    }
+    if (machine.getState() !== before) {
+      console.log(`  ${green('✔')} ${dim(`System state: ${before} → ${machine.getState()}`)}`);
+    }
+    if (invalidationSummary) {
+      const parts: string[] = [];
+      if (invalidationSummary.stale > 0) parts.push(`${invalidationSummary.stale} IU(s) stale`);
+      if (invalidationSummary.revalidate > 0) parts.push(`${invalidationSummary.revalidate} to re-validate`);
+      if (invalidationSummary.canonStale) parts.push('canon changed');
+      console.log(`  ${yellow('▸')} ${dim(`Invalidated: ${parts.join(', ')} — only these regenerate`)}`);
+    }
     console.log();
     console.log(`  ${dim('Next: run')} ${cyan('phoenix canonicalize')} ${dim('then')} ${cyan('phoenix regen')} ${dim('to update generated code')}`);
   }
@@ -1260,6 +1740,13 @@ async function cmdPlan(): Promise<void> {
   const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir), planArch);
   saveIUs(phoenixDir, ius);
 
+  new Journal(phoenixDir).append({
+    type: 'plan',
+    inputs: canonNodes.map(n => n.canon_id),
+    outputs: ius.map(iu => iu.iu_id),
+    meta: { iu_count: ius.length, ius: ius.map(iu => ({ id: iu.iu_id, name: iu.name, canon: iu.source_canon_ids })) },
+  });
+
   console.log(bold('📦 IU Plan'));
   console.log();
   console.log(`  ${green(`${ius.length} Implementation Units planned`)}`);
@@ -1299,12 +1786,32 @@ async function cmdRegen(args: string[]): Promise<void> {
   // Parse --iu=<id> flag and --stubs flag
   const iuFilter = args.find(a => a.startsWith('--iu='))?.split('=')[1];
   const forceStubs = args.includes('--stubs');
-  const targetIUs = iuFilter
-    ? ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter)
-    : ius;
+  const forceAll = args.includes('--all');
+
+  // Selective invalidation drives regen by default: regenerate ONLY the IUs a
+  // spec change made stale (PRD §0). `--all` forces a full regen; `--iu=` targets
+  // one explicitly; an empty/absent invalidation set also means full regen.
+  const invStore = new InvalidationStore(phoenixDir);
+  const staleKeys = invStore.staleKeys();
+  let selectionReason: string;
+  let targetIUs: ImplementationUnit[];
+  if (iuFilter) {
+    targetIUs = ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter);
+    selectionReason = `--iu=${iuFilter}`;
+  } else if (!forceAll && staleKeys.size > 0) {
+    targetIUs = ius.filter(iu => staleKeys.has(iuKey(iu)));
+    selectionReason = `selective (${targetIUs.length} stale of ${ius.length})`;
+  } else {
+    targetIUs = ius;
+    selectionReason = forceAll ? 'all (--all)' : 'all';
+  }
 
   if (targetIUs.length === 0) {
-    console.log(red(`✖ No IU matching: ${iuFilter}`));
+    if (iuFilter) {
+      console.log(red(`✖ No IU matching: ${iuFilter}`));
+    } else {
+      console.log(green('✔ Nothing stale — all IUs are up to date.'));
+    }
     return;
   }
 
@@ -1318,6 +1825,10 @@ async function cmdRegen(args: string[]): Promise<void> {
   } else {
     const { hint } = describeAvailability();
     console.log(`  ${dim('Mode: stubs')}${forceStubs ? '' : ` ${dim('—')} ${dim(hint)}`}`);
+  }
+  console.log(`  ${dim(`Scope: ${selectionReason}`)}`);
+  if (selectionReason.startsWith('selective')) {
+    for (const iu of targetIUs) console.log(`    ${yellow('▸')} ${dim(iu.name)}`);
   }
   console.log();
 
@@ -1387,6 +1898,31 @@ async function cmdRegen(args: string[]): Promise<void> {
   }
   if (split.sharedFiles.length) manifestManager.recordSharedFiles(split.sharedFiles);
 
+  // A regen replaces the file, so any waiver/promotion that labeled a *previous*
+  // manual divergence in a regenerated file is now resolved — a waiver labels one
+  // divergence, not the file forever (immutable-code discipline).
+  const waiverStore = new WaiverStore(phoenixDir);
+  let clearedWaivers = 0;
+  let resolvedPromotions = 0;
+  for (const result of results) {
+    for (const [filePath] of result.files) {
+      clearedWaivers += waiverStore.clearForFile(filePath).length;
+      resolvedPromotions += waiverStore.resolvePromotions(filePath);
+    }
+  }
+  if (clearedWaivers > 0 || resolvedPromotions > 0) {
+    console.log(`  ${dim(`Labels: cleared ${clearedWaivers} waiver(s), resolved ${resolvedPromotions} promotion(s) on regenerated files`)}`);
+  }
+
+  journalRegen(phoenixDir, results, ius);
+
+  // Clear the invalidation marks for the IUs we just regenerated — the stale
+  // work is done. Remaining stale IUs (if this was a targeted regen) persist.
+  invStore.clearKeys(targetIUs.map(iuKey));
+
+  // Derive and persist IU→IU dependencies from the freshly generated imports.
+  persistIUDependencies(phoenixDir, projectRoot, loadIUs(phoenixDir));
+
   // Re-generate scaffold wiring. Pass the architecture so the unified app/server
   // wiring (src/server.ts) is refreshed too — otherwise removing or renaming an IU
   // leaves stale imports to deleted modules and the app won't compile.
@@ -1409,7 +1945,7 @@ async function cmdRegen(args: string[]): Promise<void> {
   // Compile gate over the whole assembled project (regen touched a subset, but the
   // system as a whole must still typecheck).
   await runCompileGateAndReport(projectRoot, phoenixDir, allIUs, {
-    llm, target: regenArch, manifestManager, onGenerationFailure,
+    llm, target: regenArch, manifestManager, onGenerationFailure, canonNodes,
   });
 }
 
@@ -1423,7 +1959,7 @@ function cmdDrift(): void {
     return;
   }
 
-  const report = detectDrift(manifest, projectRoot);
+  const report = detectDrift(manifest, projectRoot, new WaiverStore(phoenixDir).asMap());
 
   // Map IU id → name so shared-file regions show whose contribution drifted.
   const iuNames = new Map(loadIUs(phoenixDir).map(iu => [iu.iu_id, iu.name]));
@@ -1471,6 +2007,268 @@ function cmdDrift(): void {
   }
 }
 
+/**
+ * `phoenix label <file> --kind=<kind> --reason="..."` — the labeling workflow
+ * for manual edits (PRD §9). Turns an unlabeled DRIFTED file (an ERROR that
+ * blocks trust) into a labeled, explainable divergence:
+ *
+ *   waiver               — signed, deliberate acceptance (optionally --expires)
+ *   temporary_patch      — hotfix with an expiry (default 14d)
+ *   promote_to_requirement — harvest the edit into the spec (records a pending
+ *                            promotion; status surfaces it until reconciled)
+ */
+function cmdLabel(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+
+  const positional = args.filter(a => !a.startsWith('--'));
+  const file = positional[0];
+  const kindArg = args.find(a => a.startsWith('--kind='))?.split('=')[1];
+  const reason = args.find(a => a.startsWith('--reason='))?.slice('--reason='.length);
+  const expiresArg = args.find(a => a.startsWith('--expires='))?.split('=')[1];
+  const signedByArg = args.find(a => a.startsWith('--signed-by='))?.slice('--signed-by='.length);
+  const listMode = args.includes('--list');
+  const removeMode = args.includes('--remove');
+
+  const waiverStore = new WaiverStore(phoenixDir);
+
+  if (listMode) {
+    const waivers = waiverStore.getAll();
+    const promotions = waiverStore.openPromotions();
+    console.log(bold('🏷️  Labels'));
+    console.log();
+    if (waivers.length === 0 && promotions.length === 0) {
+      console.log(`  ${dim('No active labels.')}`);
+      return;
+    }
+    for (const w of waivers) {
+      const exp = w.expires ? dim(` (expires ${w.expires})`) : '';
+      console.log(`  ${yellow('⚠')} ${w.key} ${dim('—')} ${w.kind}${exp}`);
+      console.log(`    ${dim(w.reason)}${w.signed_by ? dim(` — ${w.signed_by}`) : ''}`);
+    }
+    for (const p of promotions) {
+      console.log(`  ${blue('ℹ')} ${p.file_path} ${dim('—')} promote_to_requirement (pending)`);
+      console.log(`    ${dim(p.reason)}`);
+    }
+    return;
+  }
+
+  if (!file) {
+    console.error(red('✖ Usage: phoenix label <file> --kind=<waiver|temporary_patch|promote_to_requirement> --reason="..."'));
+    console.error(dim('        phoenix label --list                 # show active labels'));
+    console.error(dim('        phoenix label <file> --remove         # remove a label'));
+    process.exit(1);
+  }
+
+  // Normalize to a project-relative key so it matches the manifest/drift keys.
+  const key = relative(projectRoot, resolve(file)) || file;
+
+  if (removeMode) {
+    const removed = waiverStore.remove(key);
+    console.log(removed ? green(`✔ Removed label on ${key}`) : yellow(`⚠ No label found for ${key}`));
+    return;
+  }
+
+  const kind = kindArg as StoredWaiver['kind'] | undefined;
+  const validKinds = ['waiver', 'temporary_patch', 'promote_to_requirement'];
+  if (!kind || !validKinds.includes(kind)) {
+    console.error(red(`✖ --kind must be one of: ${validKinds.join(', ')}`));
+    process.exit(1);
+  }
+  if (!reason) {
+    console.error(red('✖ --reason="..." is required (why does this edit exist?)'));
+    process.exit(1);
+  }
+
+  // Capture the current on-disk hash so the label is tied to THIS divergence.
+  const full = join(projectRoot, key);
+  let labeledHash: string | undefined;
+  if (existsSync(full)) {
+    try { labeledHash = createHash('sha256').update(readFileSync(full, 'utf8')).digest('hex'); } catch { /* ignore */ }
+  }
+
+  // Expiry: temporary_patch defaults to 14d; others honor --expires if given.
+  let expires: string | undefined;
+  if (expiresArg) {
+    expires = parseExpiry(expiresArg);
+    if (!expires) {
+      console.error(red(`✖ --expires: unrecognized value "${expiresArg}" (use ISO date or Nd/Nh/Nm)`));
+      process.exit(1);
+    }
+  } else if (kind === 'temporary_patch') {
+    expires = parseExpiry('14d');
+  }
+
+  const signed_by = kind === 'waiver' ? (signedByArg ?? defaultSigner(projectRoot)) : signedByArg;
+
+  const waiver: StoredWaiver = {
+    key,
+    kind,
+    reason,
+    signed_by,
+    expires,
+    created_at: new Date().toISOString(),
+    labeled_hash: labeledHash,
+  };
+  waiverStore.add(waiver);
+
+  if (kind === 'promote_to_requirement') {
+    // Also record a pending promotion so status surfaces the harvest until it
+    // lands in the spec — the scar-tissue is not lost even if the file regenerates.
+    const iuId = loadIUs(phoenixDir).find(iu => iu.output_files.some(f => f === key || key.endsWith(f)))?.iu_id;
+    waiverStore.addPromotion({
+      file_path: key,
+      iu_id: iuId,
+      reason,
+      created_at: waiver.created_at,
+      labeled_hash: labeledHash,
+    });
+  }
+
+  new Journal(phoenixDir).append({
+    type: 'label',
+    inputs: [key],
+    outputs: [],
+    meta: { kind, reason, signed_by, expires, labeled_hash: labeledHash },
+  });
+
+  console.log(green(`✔ Labeled ${key} as ${kind}`));
+  console.log(`  ${dim('reason:')} ${reason}`);
+  if (signed_by) console.log(`  ${dim('signed by:')} ${signed_by}`);
+  if (expires) console.log(`  ${dim('expires:')} ${expires}`);
+  if (kind === 'promote_to_requirement') {
+    console.log();
+    console.log(`  ${dim('→ Add this requirement to your spec, then run')} ${cyan('phoenix ingest')} ${dim('+')} ${cyan('phoenix regen')}`);
+    console.log(`  ${dim('  The pending promotion shows in `phoenix status` until reconciled.')}`);
+  }
+}
+
+/**
+ * `phoenix attest <iu> --kind=<kind> [--note="..."]` — record human/manual
+ * evidence that Phoenix can't auto-collect: threat_note, human_signoff,
+ * static_analysis, formal_verification, simulation. This is how a high/critical
+ * IU reaches a PASS verdict (PRD §10). Bound to the IU's current artifact hash so
+ * it goes stale if the code is regenerated.
+ */
+function cmdAttest(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const positional = args.filter(a => !a.startsWith('--'));
+  const iuArg = positional[0];
+  const kind = args.find(a => a.startsWith('--kind='))?.split('=')[1];
+  const note = args.find(a => a.startsWith('--note='))?.slice('--note='.length);
+
+  const manualKinds = ['threat_note', 'human_signoff', 'static_analysis', 'formal_verification', 'simulation'];
+  if (!iuArg || !kind || !manualKinds.includes(kind)) {
+    console.error(red(`✖ Usage: phoenix attest <iu> --kind=<${manualKinds.join('|')}> [--note="..."]`));
+    process.exit(1);
+  }
+
+  const ius = loadIUs(phoenixDir);
+  const iu = ius.find(u => u.iu_id.startsWith(iuArg) || u.name === iuArg);
+  if (!iu) {
+    console.error(red(`✖ No IU matching: ${iuArg}`));
+    process.exit(1);
+  }
+
+  const manifest = new ManifestManager(phoenixDir).load();
+  const artifactHash = iuArtifactHash(iu, manifest, projectRoot);
+  const timestamp = new Date().toISOString();
+  const signer = kind === 'human_signoff' ? defaultSigner(projectRoot) : undefined;
+
+  new EvidenceStore(phoenixDir).addRecord({
+    evidence_id: createHash('sha256').update(`${kind}\x00${iu.iu_id}\x00${timestamp}`).digest('hex').slice(0, 16),
+    kind: kind as import('./models/evidence.js').EvidenceKind,
+    status: 'PASS' as import('./models/evidence.js').EvidenceStatus,
+    iu_id: iu.iu_id,
+    canon_ids: iu.source_canon_ids,
+    artifact_hash: artifactHash,
+    message: note ?? `${kind} attested${signer ? ` by ${signer}` : ''}`,
+    timestamp,
+  });
+
+  new Journal(phoenixDir).append({
+    type: 'evidence',
+    inputs: [iu.iu_id],
+    outputs: [],
+    meta: { kind, iu_name: iu.name, note, signer, artifact_hash: artifactHash },
+  });
+
+  console.log(green(`✔ Recorded ${kind} for ${iu.name}`));
+  if (signer) console.log(`  ${dim('signed by:')} ${signer}`);
+  if (note) console.log(`  ${dim('note:')} ${note}`);
+  console.log(`  ${dim('Bound to artifact')} ${artifactHash.slice(0, 12)} ${dim('— regenerating')} ${iu.name} ${dim('will invalidate it.')}`);
+}
+
+/**
+ * `phoenix upgrade [--apply]` — shadow-canonicalization (PRD §5.1). Re-runs the
+ * canonicalization pipeline WITHOUT committing, diffs the result against the
+ * current graph on the stable-anchor layer, and classifies the upgrade
+ * SAFE / COMPACTION_EVENT / REJECT. Only applies with --apply, and never applies
+ * a REJECT. Emits a PipelineUpgrade meta-event to the journal.
+ */
+async function cmdUpgrade(args: string[]): Promise<void> {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const apply = args.includes('--apply');
+
+  const specStore = new SpecStore(phoenixDir);
+  const canonStore = new CanonicalStore(phoenixDir);
+  const oldNodes = canonStore.getAllNodes();
+  if (oldNodes.length === 0) {
+    console.log(yellow('⚠ No canonical graph yet. Run `phoenix bootstrap` first.'));
+    return;
+  }
+
+  const allClauses: Clause[] = [];
+  for (const specFile of findSpecFiles(projectRoot)) {
+    allClauses.push(...specStore.getClauses(relative(projectRoot, specFile)));
+  }
+
+  const llm = resolveProvider(phoenixDir);
+  console.log(bold('🔀 Shadow Canonicalization Upgrade'));
+  console.log(dim('  Runs the new pipeline in parallel and classifies the diff before committing.'));
+  console.log();
+
+  // Run the new pipeline (fresh extraction) without saving.
+  const newNodes = await extractCanonicalNodesLLM(allClauses, llm);
+
+  const oldCfg = {
+    pipeline_id: 'current', model_id: 'stored', promptpack_version: 'stored',
+    extraction_rules_version: 'stored', diff_policy_version: 'stored',
+  };
+  const newCfg = {
+    pipeline_id: 'candidate', model_id: llm ? `${llm.name}/${llm.model}` : 'rule',
+    promptpack_version: 'candidate', extraction_rules_version: 'v2', diff_policy_version: 'candidate',
+  };
+  const result = runShadowPipeline(oldCfg, newCfg, oldNodes, newNodes);
+  const m = result.metrics;
+
+  const classColor = result.classification === 'SAFE' ? green
+    : result.classification === 'COMPACTION_EVENT' ? yellow : red;
+  console.log(`  ${dim('Old nodes:')} ${oldNodes.length}  ${dim('New nodes:')} ${newNodes.length}`);
+  console.log(`  ${dim('Node change:')} ${m.node_change_pct}%  ${dim('Edge change:')} ${m.edge_change_pct}%`);
+  console.log(`  ${dim('Risk escalations:')} ${m.risk_escalations}  ${dim('Orphans:')} ${m.orphan_nodes}  ${dim('Semantic drift:')} ${m.semantic_stmt_drift}%`);
+  console.log(`  ${dim('Classification:')} ${classColor(bold(result.classification))} ${dim('—')} ${result.reason}`);
+  console.log();
+
+  new Journal(phoenixDir).append({
+    type: 'canonicalize',
+    inputs: oldNodes.map(n => n.canon_id),
+    outputs: newNodes.map(n => n.canon_id),
+    meta: { PipelineUpgrade: true, classification: result.classification, reason: result.reason, metrics: m, applied: apply && result.classification !== 'REJECT' },
+  });
+
+  if (result.classification === 'REJECT') {
+    console.log(red('  ✖ Upgrade REJECTED — not applied. Resolve orphans / churn before upgrading.'));
+    return;
+  }
+  if (!apply) {
+    console.log(dim(`  Preview only. Re-run with ${cyan('--apply')} to commit this ${result.classification}.`));
+    return;
+  }
+  canonStore.replaceNodes(newNodes);
+  new CanonStabilityStore(phoenixDir).update(newNodes);
+  console.log(green(`  ✔ Applied ${result.classification}. Canonical graph updated. Re-plan + regen affected IUs.`));
+}
+
 async function cmdCanonicalize(): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const specStore = new SpecStore(phoenixDir);
@@ -1496,9 +2294,25 @@ async function cmdCanonicalize(): Promise<void> {
   console.log();
 
   const canonNodes = await extractCanonicalNodesLLM(allClauses, llm);
-  canonStore.saveNodes(canonNodes);
+  canonStore.replaceNodes(canonNodes);
+
+  // Canonical stability (PRD §20): how much did re-canonicalization churn the
+  // graph, measured on the stable anchor layer? A cosmetic edit should score high.
+  const stability = new CanonStabilityStore(phoenixDir).update(canonNodes);
+
+  new Journal(phoenixDir).append({
+    type: 'canonicalize',
+    inputs: allClauses.map(c => c.clause_id),
+    outputs: canonNodes.map(n => n.canon_id),
+    meta: { node_count: canonNodes.length, stability_retention: stability.retention, model_id: llm ? `${llm.name}/${llm.model}` : 'rule' },
+  });
 
   console.log(`  ${green('✔')} ${canonNodes.length} canonical nodes extracted from ${allClauses.length} clauses`);
+  if (!stability.first_run) {
+    const pct = (stability.retention * 100).toFixed(0);
+    const color = stability.retention >= 0.9 ? green : stability.retention >= 0.7 ? yellow : red;
+    console.log(`  ${dim('Canonical stability:')} ${color(`${pct}%`)} ${dim(`(${stability.kept} kept, ${stability.added} new, ${stability.dropped} dropped)`)}`);
+  }
 
   const byType = new Map<string, number>();
   for (const node of canonNodes) {
@@ -1519,7 +2333,7 @@ async function cmdCanonicalize(): Promise<void> {
 }
 
 function cmdEvaluate(args: string[]): void {
-  const { phoenixDir } = requirePhoenixRoot();
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
   const evidenceStore = new EvidenceStore(phoenixDir);
   const allEvidence = evidenceStore.getAll();
@@ -1529,7 +2343,8 @@ function cmdEvaluate(args: string[]): void {
     ? ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter)
     : ius;
 
-  const evals = evaluateAllPolicies(targetIUs, allEvidence);
+  const artifactHashes = currentArtifactHashes(targetIUs, new ManifestManager(phoenixDir), projectRoot);
+  const evals = evaluateAllPolicies(targetIUs, allEvidence, { currentArtifactHash: artifactHashes });
 
   console.log(bold('📋 Policy Evaluation'));
   console.log();
@@ -1553,12 +2368,64 @@ function cmdEvaluate(args: string[]): void {
   }
 }
 
+/**
+ * `phoenix evals [--iu=<id>]` — generate durable behavioral evaluations from the
+ * canonical graph, check them against the generated code, and record the
+ * unit_tests / property_tests evidence. This is how a medium/high-tier IU stops
+ * being permanently INCOMPLETE: it acquires an oracle.
+ */
+function cmdEvals(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const manifestManager = new ManifestManager(phoenixDir);
+
+  const iuFilter = args.find(a => a.startsWith('--iu='))?.split('=')[1];
+  const targetIUs = iuFilter
+    ? ius.filter(iu => iu.iu_id.startsWith(iuFilter) || iu.name === iuFilter)
+    : ius;
+
+  if (targetIUs.length === 0) {
+    console.log(yellow('⚠ No IUs. Run `phoenix plan` first.'));
+    return;
+  }
+
+  console.log(bold('🎯 Durable Evaluations'));
+  console.log(dim('  The oracle: what regenerated code must satisfy, independent of implementation.'));
+  console.log();
+
+  const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+  for (const iu of targetIUs) {
+    const derived = deriveEvaluations(iu, canonNodes);
+    const primary = iu.output_files[0];
+    const full = primary ? join(projectRoot, primary) : '';
+    const source = full && existsSync(full) ? readFileSync(full, 'utf8') : null;
+
+    console.log(`  ${bold(iu.name)} ${dim(`(${iu.risk_tier})`)} — ${derived.length} eval(s)`);
+    for (const e of derived) {
+      let mark = dim('○ untested');
+      if (source) {
+        const r = checkEvaluation(e, source, canonById);
+        mark = r.status === 'pass' ? green(`✔ ${r.reason}`) : red(`✖ ${r.reason}`);
+      }
+      const bindingColor = e.binding === 'invariant' ? magenta : e.binding === 'failure_mode' ? red : e.binding === 'boundary_contract' ? cyan : green;
+      console.log(`    ${bindingColor(e.binding.padEnd(18))} ${e.assertion.slice(0, 50)} ${mark}`);
+    }
+    console.log();
+  }
+
+  const result = generateCheckAndRecordEvals(phoenixDir, projectRoot, targetIUs, canonNodes, manifestManager);
+  console.log(`  ${dim(`Generated ${result.generated} evals — ${result.passed} pass, ${result.failed} fail. Recorded as evidence.`)}`);
+  console.log(`  ${dim('Run')} ${cyan('phoenix status')} ${dim('to see updated policy verdicts.')}`);
+}
+
 function cmdCascade(): void {
-  const { phoenixDir } = requirePhoenixRoot();
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
   const evidenceStore = new EvidenceStore(phoenixDir);
   const allEvidence = evidenceStore.getAll();
-  const evals = evaluateAllPolicies(ius, allEvidence);
+  const artifactHashes = currentArtifactHashes(ius, new ManifestManager(phoenixDir), projectRoot);
+  const evals = evaluateAllPolicies(ius, allEvidence, { currentArtifactHash: artifactHashes });
   const cascadeEvents = computeCascade(evals, ius);
 
   console.log(bold('🌊 Cascade Effects'));
@@ -1580,9 +2447,8 @@ function cmdCascade(): void {
   }
 }
 
-function cmdBot(args: string[]): void {
+async function cmdBot(args: string[]): Promise<void> {
   if (args.length === 0) {
-    // Show all bot commands
     const commands = getAllCommands();
     console.log(bold('🤖 Phoenix Bots'));
     console.log();
@@ -1591,26 +2457,81 @@ function cmdBot(args: string[]): void {
     }
     console.log();
     console.log(dim('  Usage: phoenix bot "BotName: action arg=value"'));
+    console.log(dim('         phoenix bot "phx confirm <id>"  (or "ok")  — run a pending mutating command'));
     return;
   }
 
-  const raw = args.join(' ');
-  const parsed = parseCommand(raw);
+  const { phoenixDir } = requirePhoenixRoot();
+  const confirmStore = new ConfirmStore(phoenixDir);
+  const raw = args.join(' ').trim();
 
+  // Confirmation replies: `ok` runs the most recent pending; `phx confirm <id>` a specific one.
+  const confirmMatch = raw.match(/^(?:phx\s+confirm\s+(\S+)|ok)$/i);
+  if (confirmMatch) {
+    const pending = confirmMatch[1] ? confirmStore.take(confirmMatch[1]) : (() => {
+      const latest = confirmStore.latest();
+      return latest ? confirmStore.take(latest.confirm_id) : null;
+    })();
+    if (!pending) {
+      console.error(red('✖ No matching pending command to confirm.'));
+      process.exit(1);
+    }
+    console.log(bold(`🤖 ${pending.command.bot}`));
+    console.log(`  ${green('✔')} confirmed: ${pending.intent}`);
+    console.log();
+    await dispatchBotCommand(pending.command);
+    return;
+  }
+
+  const parsed = parseCommand(raw);
   if ('error' in parsed) {
     console.error(red(`✖ ${parsed.error}`));
     process.exit(1);
   }
 
   const response = routeCommand(parsed);
-
   console.log(bold(`🤖 ${response.bot}`));
   console.log();
-  console.log(`  ${response.message}`);
 
   if (response.mutating && response.confirm_id) {
-    console.log();
-    console.log(dim(`  Confirmation ID: ${response.confirm_id}`));
+    // Persist the pending command so it can be confirmed in a later invocation.
+    confirmStore.add({
+      confirm_id: response.confirm_id,
+      command: parsed,
+      intent: response.intent ?? `${parsed.bot} ${parsed.action}`,
+      created_at: new Date().toISOString(),
+    });
+    console.log(`  ${response.message}`);
+    return;
+  }
+
+  // Read-only: actually execute (help/commands/version print their own message).
+  if (['help', 'commands', 'version'].includes(parsed.action)) {
+    console.log(`  ${response.message}`);
+    return;
+  }
+  await dispatchBotCommand(parsed);
+}
+
+/**
+ * Execute a parsed bot command by dispatching to the real CLI command — bots
+ * "behave as normal users" (PRD §14): they run the same operations, not stand-ins.
+ */
+async function dispatchBotCommand(cmd: import('./models/bot.js').BotCommand): Promise<void> {
+  const doc = cmd.args['_'] || cmd.args['doc'];
+  const iu = cmd.args['iu'] || cmd.args['_'];
+  switch (`${cmd.bot}:${cmd.action}`) {
+    case 'SpecBot:ingest': cmdIngest(doc ? [doc] : []); break;
+    case 'SpecBot:diff': cmdDiff(doc ? [doc] : []); break;
+    case 'SpecBot:clauses': cmdClauses(doc ? [doc] : []); break;
+    case 'ImplBot:plan': await cmdPlan(); break;
+    case 'ImplBot:regen': await cmdRegen(iu ? [`--iu=${iu}`] : []); break;
+    case 'ImplBot:drift': cmdDrift(); break;
+    case 'PolicyBot:status': cmdStatus(); break;
+    case 'PolicyBot:evidence': cmdEvaluate(iu ? [`--iu=${iu}`] : []); break;
+    case 'PolicyBot:cascade': cmdCascade(); break;
+    case 'PolicyBot:evaluate': cmdEvaluate(iu ? [`--iu=${iu}`] : []); break;
+    default: console.log(dim(`  (no executor for ${cmd.bot}:${cmd.action})`));
   }
 }
 
@@ -1845,6 +2766,123 @@ function readinessToIcon(readiness: ReadinessLevel): string {
   }
 }
 
+/**
+ * `phoenix why <file>` — the query the whole "provenance is version control"
+ * thesis exists for. Walks the journal + graphs backward from a generated file
+ * to the spec lines, decisions, and generation record that produced it:
+ *   file → regen event (model, promptpack) → IU → canonical nodes → source clauses → spec lines.
+ */
+function cmdWhy(args: string[]): void {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const target = args.find(a => !a.startsWith('--'));
+  if (!target) {
+    console.error(red('✖ Usage: phoenix why <file>'));
+    process.exit(1);
+  }
+  const key = relative(projectRoot, resolve(target)) || target;
+
+  const journal = new Journal(phoenixDir);
+  const events = journal.readAll();
+  const ius = loadIUs(phoenixDir);
+  const canonStore = new CanonicalStore(phoenixDir);
+  const canonById = new Map(canonStore.getAllNodes().map(n => [n.canon_id, n]));
+  const specStore = new SpecStore(phoenixDir);
+
+  console.log(bold(`🔎 Why does ${key} exist?`));
+  console.log();
+
+  // The most recent regen event that produced this file.
+  const regen = [...events].reverse().find(e => e.type === 'regen' && e.outputs.includes(key));
+  if (!regen) {
+    console.log(yellow(`  No regeneration record found for ${key}.`));
+    console.log(dim('  (Run `phoenix bootstrap` or `phoenix regen` to build the provenance chain.)'));
+    return;
+  }
+
+  const iuId = regen.meta.iu_id as string;
+  const iu = ius.find(u => u.iu_id === iuId);
+  console.log(`  ${dim('Generated by:')} ${cyan(regen.meta.iu_name as string)} ${dim(`(IU ${String(iuId).slice(0, 8)})`)}`);
+  console.log(`  ${dim('Model:')} ${regen.meta.model_id} ${dim('·')} ${dim('promptpack')} ${String(regen.meta.promptpack_hash).slice(0, 12)} ${dim('·')} ${regen.timestamp}`);
+  console.log();
+
+  // The canonical requirements that drove it, and their source spec lines.
+  const canonIds = iu?.source_canon_ids ?? regen.inputs;
+  console.log(`  ${bold('Requirements that drove this code:')}`);
+  const seenClauses = new Set<string>();
+  for (const cid of canonIds) {
+    const node = canonById.get(cid);
+    if (!node) continue;
+    const typeColor = node.type === 'CONSTRAINT' ? red : node.type === 'INVARIANT' ? magenta : node.type === 'REQUIREMENT' ? green : blue;
+    console.log(`    ${typeColor(node.type)} ${node.statement.slice(0, 70)}${node.statement.length > 70 ? '…' : ''}`);
+    for (const clauseId of node.source_clause_ids) {
+      if (seenClauses.has(clauseId)) continue;
+      seenClauses.add(clauseId);
+      const clause = specStore.getClause(clauseId);
+      if (clause) {
+        const loc = `${clause.source_doc_id}:L${clause.source_line_range[0]}`;
+        console.log(`      ${dim('←')} ${dim(loc)} ${dim(`"${clause.raw_text.slice(0, 50).replace(/\n/g, ' ')}"`)}`);
+      }
+    }
+  }
+  console.log();
+
+  // Any invalidations or labels that touched this file/IU.
+  const related = events.filter(e =>
+    (e.type === 'invalidate' && (e.outputs.includes(iuId) || (e.meta.stale as string[] | undefined)?.includes(regen.meta.iu_name as string))) ||
+    (e.type === 'label' && e.inputs.includes(key)),
+  );
+  if (related.length > 0) {
+    console.log(`  ${bold('History:')}`);
+    for (const e of related) {
+      if (e.type === 'invalidate') console.log(`    ${yellow('▸')} ${dim(e.timestamp)} invalidated (spec change)`);
+      if (e.type === 'label') console.log(`    ${blue('🏷')} ${dim(e.timestamp)} labeled ${e.meta.kind}: ${e.meta.reason}`);
+    }
+    console.log();
+  }
+
+  console.log(dim(`  Provenance chain verified against ${events.length} journal events.`));
+}
+
+/** `phoenix journal [--verify]` — show or verify the provenance chain. */
+function cmdJournal(args: string[]): void {
+  const { phoenixDir } = requirePhoenixRoot();
+  const journal = new Journal(phoenixDir);
+  const events = journal.readAll();
+
+  console.log(bold('📜 Provenance Journal'));
+  console.log();
+
+  if (events.length === 0) {
+    console.log(dim('  No events yet. Run `phoenix bootstrap`.'));
+    return;
+  }
+
+  const verify = journal.verify();
+  if (verify.ok) {
+    console.log(`  ${green('✔')} chain intact ${dim(`(${events.length} events, tamper-evident)`)}`);
+  } else {
+    console.log(`  ${red('✖')} chain broken at seq ${verify.brokenSeq}: ${verify.reason}`);
+  }
+  console.log();
+
+  if (args.includes('--verify')) return;
+
+  const limit = 25;
+  const shown = events.slice(-limit);
+  if (events.length > limit) console.log(dim(`  (showing last ${limit} of ${events.length})`));
+  for (const e of shown) {
+    const typeColor = e.type === 'regen' ? green : e.type === 'invalidate' ? yellow : e.type === 'label' ? blue : cyan;
+    const summary = e.type === 'regen' ? `${e.meta.iu_name} → ${e.outputs.length} file(s)`
+      : e.type === 'canonicalize' ? `${e.meta.node_count} nodes`
+      : e.type === 'plan' ? `${e.meta.iu_count} IUs`
+      : e.type === 'invalidate' ? `${(e.meta.stale as string[])?.length ?? 0} stale`
+      : e.type === 'label' ? `${e.meta.kind}`
+      : e.type === 'ingest' ? `${e.meta.total_clauses} clauses`
+      : '';
+    console.log(`  ${dim(`#${e.seq}`)} ${typeColor(e.type.padEnd(12))} ${dim(e.timestamp.slice(11, 19))} ${summary}`);
+  }
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -1868,16 +2906,24 @@ ${bold('Spec Management:')}
 ${bold('Canonical Graph:')}
   ${cyan('canonicalize')}          Extract canonical nodes from ingested clauses
   ${cyan('canon')}                 Show the canonical graph
+  ${cyan('upgrade')} [--apply]      Shadow-canonicalize: classify a pipeline upgrade before committing
 
 ${bold('Implementation:')}
   ${cyan('plan')}                  Plan Implementation Units from canonical graph
-  ${cyan('regen')} [--iu=<id>]    Regenerate code (all or specific IU)
+  ${cyan('regen')} [--iu=<id>]    Regenerate code — selective by default (only stale IUs)
                          ${dim('Uses LLM if ANTHROPIC_API_KEY or OPENAI_API_KEY is set')}
+                         ${dim('--all    Regenerate every IU (ignore the invalidation set)')}
                          ${dim('--stubs  Force stub generation (skip LLM)')}
 
 ${bold('Verification:')}
   ${cyan('status')}                Trust dashboard — the primary UX
   ${cyan('drift')}                 Check generated files for drift
+  ${cyan('label')} <file>          Label a manual edit (waiver | temporary_patch | promote_to_requirement)
+                         ${dim('--kind=<kind> --reason="..." [--expires=Nd] [--signed-by=NAME]')}
+                         ${dim('--list to show labels, --remove to clear one')}
+  ${cyan('evals')} [--iu=<id>]    Generate durable evaluations (the oracle) + record evidence
+  ${cyan('attest')} <iu>          Record manual evidence (threat_note|human_signoff|static_analysis|…)
+                         ${dim('--kind=<kind> [--note="..."]')}
   ${cyan('evaluate')} [--iu=<id>] Evaluate evidence against policy
   ${cyan('cascade')}               Show cascade failure effects
   ${cyan('audit')} [--iu=<id>]    Replacement audit — readiness per IU
@@ -1885,6 +2931,8 @@ ${bold('Verification:')}
 ${bold('Inspection:')}
   ${cyan('inspect')} [--port=N]    Interactive pipeline visualisation (opens browser)
   ${cyan('graph')}                 Show provenance graph summary
+  ${cyan('why')} <file>            Trace a generated file back to the spec lines that produced it
+  ${cyan('journal')} [--verify]    Show/verify the append-only provenance chain
   ${cyan('bot')} "<command>"       Route a bot command (e.g., "SpecBot: help")
 
 ${bold('Meta:')}
@@ -1925,6 +2973,9 @@ async function main(): Promise<void> {
     case 'canon-extract':
       await cmdCanonicalize();
       break;
+    case 'upgrade':
+      await cmdUpgrade(commandArgs);
+      break;
     case 'canon':
       cmdCanon();
       break;
@@ -1938,12 +2989,22 @@ async function main(): Promise<void> {
     case 'drift':
       cmdDrift();
       break;
+    case 'label':
+      cmdLabel(commandArgs);
+      break;
     case 'evaluate':
     case 'eval':
       cmdEvaluate(commandArgs);
       break;
     case 'cascade':
       cmdCascade();
+      break;
+    case 'evals':
+    case 'eval-gen':
+      cmdEvals(commandArgs);
+      break;
+    case 'attest':
+      cmdAttest(commandArgs);
       break;
     case 'audit':
       cmdAudit(commandArgs);
@@ -1954,8 +3015,14 @@ async function main(): Promise<void> {
     case 'graph':
       cmdGraph();
       break;
+    case 'why':
+      cmdWhy(commandArgs);
+      break;
+    case 'journal':
+      cmdJournal(commandArgs);
+      break;
     case 'bot':
-      cmdBot(commandArgs);
+      await cmdBot(commandArgs);
       break;
     case 'version':
     case '--version':

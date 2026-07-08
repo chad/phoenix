@@ -69,7 +69,9 @@ Every object in Phoenix (clause, canonical node, IU, evidence record) is identif
 
 - **Deduplication** — identical content is stored once
 - **Integrity** — any tampering changes the hash
-- **Determinism** — same input always produces same output
+- **Reproducibility** — the rule-based stages are deterministic (same input → same output). LLM-assisted stages (canonicalization, clustering, code generation) are not byte-deterministic; instead each generation records its model id, true promptpack hash, and toolchain version in the provenance journal, so the run is reproducible *from its record* and gated by durable evaluations.
+
+Two identity layers work together: **canon_id** is content-addressed (changes on any edit — the content version), while **canon_anchor** is the stable identity (type + domain tags — survives rewording), which is what makes canonical stability measurable and selective invalidation precise.
 
 ### Selective Invalidation
 

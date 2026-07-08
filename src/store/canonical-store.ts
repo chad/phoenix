@@ -64,6 +64,35 @@ export class CanonicalStore {
   }
 
   /**
+   * Replace the entire canonical graph with a fresh node set. Canonicalization is
+   * a full re-extraction, so nodes for clauses that no longer exist must be
+   * dropped — otherwise stale nodes accumulate forever (conceptual-mass bloat)
+   * and pollute IU planning, invalidation, and stability measurement. Returns the
+   * canon_ids that were removed (now candidates for content-store GC).
+   */
+  replaceNodes(nodes: CanonicalNode[]): string[] {
+    const previous = this.loadGraph();
+    const keptIds = new Set(nodes.map(n => n.canon_id));
+    const removed = Object.keys(previous.nodes).filter(id => !keptIds.has(id));
+
+    const graph: CanonicalGraph = { nodes: {}, provenance: {} };
+    for (const node of nodes) {
+      this.contentStore.put(node.canon_id, node);
+      graph.nodes[node.canon_id] = node;
+      for (const clauseId of node.source_clause_ids) {
+        (graph.provenance[node.canon_id] ??= []);
+        if (!graph.provenance[node.canon_id].includes(clauseId)) {
+          graph.provenance[node.canon_id].push(clauseId);
+        }
+      }
+    }
+    this.saveGraph(graph);
+    // Reclaim the orphaned blobs — a dropped node's content should not linger.
+    for (const id of removed) this.contentStore.remove(id);
+    return removed;
+  }
+
+  /**
    * Get a canonical node by ID.
    */
   getNode(canonId: string): CanonicalNode | null {

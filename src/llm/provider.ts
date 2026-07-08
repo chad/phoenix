@@ -34,9 +34,9 @@ export interface LLMConfig {
   model: string;
 }
 
-/** Default models per provider. */
+/** Default models per provider. Kept current — a stale id 404s and blocks codegen. */
 export const DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-sonnet-4-20250514',
+  anthropic: 'claude-sonnet-5',
   openai: 'gpt-4o',
   'claude-cli': 'sonnet',
 };

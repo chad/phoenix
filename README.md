@@ -104,15 +104,32 @@ Opens an interactive pipeline visualizer in your browser. Click the **Spec** tab
 ## CLI
 
 ```bash
+# Pipeline
 phoenix init [--arch=NAME]    # Initialize a project
 phoenix bootstrap             # Full pipeline: ingest → canonicalize → plan → generate
-phoenix ingest [--verbose]    # Ingest spec changes (shows diff before applying)
+phoenix ingest [--verbose]    # Ingest spec changes — classifies each change, marks affected IUs stale
 phoenix diff                  # Show clause-level diffs
-phoenix canonicalize          # Extract canonical requirements
-phoenix regen [--iu=ID]       # Regenerate code (all or specific IU)
-phoenix status                # Trust dashboard
+phoenix canonicalize          # Extract canonical requirements (reports canonical stability)
+phoenix upgrade [--apply]     # Shadow-canonicalize: classify a pipeline upgrade before committing
+phoenix plan                  # Plan Implementation Units
+phoenix regen [--iu=ID|--all] # Regenerate — SELECTIVE by default (only the stale subtree)
+
+# Trust surface
+phoenix status                # Trust dashboard — the primary UX
+phoenix drift                 # Check generated files for drift
+phoenix label <file> --kind=… # Label a manual edit (waiver | temporary_patch | promote_to_requirement)
+phoenix evals [--iu=ID]       # Generate durable evaluations (the oracle) + record evidence
+phoenix attest <iu> --kind=…  # Record manual evidence (threat_note | human_signoff | static_analysis | …)
+phoenix evaluate              # Evaluate evidence against risk-tier policy
+
+# Provenance
+phoenix why <file>            # Trace a generated file back to the spec lines that produced it
+phoenix journal [--verify]    # Show/verify the append-only, hash-chained provenance chain
 phoenix inspect               # Interactive pipeline visualization
+phoenix bot "<command>"       # Bots that execute real operations (SpecBot/ImplBot/PolicyBot)
 ```
+
+Set `PHOENIX_NO_LLM=1` to force deterministic stub generation (offline / reproducible runs).
 
 ## Examples
 
@@ -156,20 +173,30 @@ The LLM receives a structured prompt with:
 
 If generation fails or doesn't typecheck, the system retries with error feedback. If that fails, it falls back to architecture-aware stubs that still produce valid, mountable modules.
 
-### Drift detection
+### Drift detection & labeling
 
-Phoenix tracks a manifest of every generated file's content hash. `phoenix status` compares the working tree against the manifest and flags any unlabeled manual edits. This is how Phoenix knows if you've modified generated code and need to either promote the change to a spec requirement or add a waiver.
+Phoenix tracks a manifest of every generated file's content hash. `phoenix status` compares the working tree against the manifest and flags any unlabeled manual edits as errors. `phoenix label` turns an edit into an explained divergence: a signed **waiver**, an expiring **temporary_patch**, or a **promote_to_requirement** that records a pending promotion until the change is harvested into the spec — so a hand-fix is never silently lost on the next regeneration.
+
+### Selective invalidation
+
+Change one spec line and `phoenix ingest` classifies the change (A/B/C/D), then walks the provenance graph — clause → canonical nodes → IUs → dependent IUs — to mark exactly the affected subtree stale. `phoenix regen` then regenerates only that subtree by default. A formatting-only edit invalidates nothing; a meaning change invalidates precisely its dependents.
+
+### Provenance & trust
+
+Every transformation appends a hash-chained event to `.phoenix/journal.jsonl`. `phoenix why <file>` traces any generated file back through its IU, model, and promptpack to the exact spec lines that produced it; `phoenix journal --verify` proves the chain is intact. Durable evaluations (`phoenix evals`) derived from the canonical graph give regeneration an oracle, and are recorded as risk-tiered evidence. The truthfulness of `phoenix status` itself is measured by a fault-injection CI harness (precision + recall over seeded faults).
 
 ## Status
 
-Alpha. The core pipeline works end-to-end — spec to working app with full traceability. The `sqlite-web-api` architecture target generates functional CRUD APIs with web UIs from behavioral specs.
+Alpha. The full pipeline works end-to-end — spec to working app with complete, verifiable traceability. The `sqlite-web-api` architecture target generates functional CRUD APIs with web UIs from behavioral specs.
+
+Implemented: A/B/C/D classification + D-rate trust loop, selective invalidation, two-layer identity (stable anchors + content hashes) with a canonical-stability metric, evidence collection with artifact-hash staleness, drift labeling, IU dependency graph + IU-level boundary enforcement, cascade, durable-evaluation generation, an append-only hash-chained provenance journal with `phoenix why`, shadow-pipeline upgrades, executing bots, and a fault-injection meta-eval of the trust dashboard.
 
 What's next:
 - More architecture targets (Express + Postgres, Cloudflare Workers + D1, CLI apps)
-- Smarter IU planner (merge cross-cutting concerns into parent resources)
-- Selective regeneration from spec edits (the pipeline supports it, the UX needs work)
-- Test generation and evidence collection
+- Incremental (per-clause) canonicalization to make the whole cycle selective, not just regen
+- Running generated evaluations against a live app (integration-level oracle) in addition to the structural check
 - Multi-file spec projects with cross-references
+- Freeq transport for the bots
 
 ## License
 

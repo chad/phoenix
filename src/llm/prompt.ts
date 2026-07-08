@@ -5,10 +5,34 @@
  * inputs, outputs) into a prompt that produces working TypeScript.
  */
 
+import { createHash } from 'node:crypto';
 import type { ImplementationUnit } from '../models/iu.js';
 import type { CanonicalNode } from '../models/canonical.js';
 import type { ResolvedTarget } from '../models/architecture.js';
 import type { NegativeKnowledge } from '../models/negative-knowledge.js';
+
+/**
+ * The TRUE promptpack hash (PRD §8 reproducibility). The old hash was
+ * sha256(JSON.stringify(iu.contract)) — it did not hash the actual prompt, so
+ * two runs with completely different prompt templates recorded the same hash,
+ * making a generation impossible to reproduce from its record. This hashes what
+ * actually shapes the output: the system prompt (template + architecture rules),
+ * the full user prompt (requirements, vocabularies, sibling contracts, negative
+ * knowledge), and the model id. Change any of them → the hash changes.
+ */
+export function promptpackHash(input: {
+  systemPrompt: string;
+  userPrompt: string;
+  modelId: string;
+  toolchainVersion: string;
+}): string {
+  return createHash('sha256')
+    .update(input.systemPrompt).update('\x00')
+    .update(input.userPrompt).update('\x00')
+    .update(input.modelId).update('\x00')
+    .update(input.toolchainVersion)
+    .digest('hex');
+}
 
 export const SYSTEM_PROMPT = `You are a senior TypeScript engineer generating production-quality module implementations for Phoenix VCS.
 

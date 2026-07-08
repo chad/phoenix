@@ -45,7 +45,12 @@ export class AnthropicProvider implements LLMProvider {
     if (options?.system) {
       body.system = options.system;
     }
-    if (options?.temperature !== undefined) {
+    // Claude 5-family models (sonnet-5, opus-…-5, haiku-…-5, fable-5, mythos-5)
+    // deprecated the temperature parameter and reject any value. Omit it for
+    // those up front; honor it for everything else. The reactive strip in the
+    // retry loop catches any future model that deprecates it without a name match.
+    const deprecatesTemperature = /(?:sonnet|opus|haiku|fable|mythos)-5\b|-5-2\d/.test(this.model);
+    if (options?.temperature !== undefined && !deprecatesTemperature) {
       body.temperature = options.temperature;
     }
 
@@ -70,6 +75,12 @@ export class AnthropicProvider implements LLMProvider {
 
         if (!res.ok) {
           const text = await res.text();
+          // Self-heal: a model that deprecated `temperature` returns 400. Strip it
+          // and retry immediately rather than collapsing the module to a stub.
+          if (res.status === 400 && 'temperature' in body && /temperature/i.test(text) && /deprecat|not supported|unsupported|invalid/i.test(text)) {
+            delete body.temperature;
+            continue;
+          }
           if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES) {
             await backoff(attempt);
             continue;
