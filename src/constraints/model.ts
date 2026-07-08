@@ -23,6 +23,15 @@ export interface BoundAssertion {
   unit?: string;
 }
 
+/** An enum / value-set constraint: "cadence must be one of daily, weekly". */
+export interface MembershipAssertion {
+  kind: 'membership';
+  values: string[];
+}
+
+/** The (growing) closed assertion algebra — see docs/DESIGN-shacl-spine.md §4. */
+export type Assertion = BoundAssertion | MembershipAssertion;
+
 export interface ConstraintSource {
   canon_id?: string;
   doc?: string;
@@ -33,7 +42,7 @@ export interface ConstraintSource {
 export interface StructuredConstraint {
   constraint_id: string;
   binding: AttributeRef;
-  assertion: BoundAssertion;
+  assertion: Assertion;
   source: ConstraintSource;
 }
 
@@ -44,7 +53,7 @@ export interface StructuredConstraint {
  */
 export interface BindingDefect {
   subject: string;               // the unresolved subject phrase
-  assertion: BoundAssertion;
+  assertion: Assertion;
   source: ConstraintSource;
   reason: string;
 }

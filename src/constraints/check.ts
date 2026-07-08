@@ -24,16 +24,25 @@ export interface BoundCheck {
   detail: string;
 }
 
+export interface ConstraintCheck {
+  result: CheckResult;
+  detail: string;
+}
+
 /**
  * Check a Bound constraint against a module's source. `source` is null when the
  * module has not been generated yet (⇒ indeterminate, not a failure).
  */
 export function checkBound(c: StructuredConstraint, source: string | null): BoundCheck {
+  if (c.assertion.kind !== 'bound') {
+    return { result: 'indeterminate', detail: 'not a bound assertion' };
+  }
+  const assertion = c.assertion;
   if (source == null) {
     return { result: 'indeterminate', detail: 'module not generated yet' };
   }
   const attr = c.binding.attribute;
-  const method = zodMethod(c.assertion.op);
+  const method = zodMethod(assertion.op);
 
   // Locate the field's Zod declaration: `name: z.string()....` possibly across the
   // rest of the chain on the same logical line. Match the attribute as a schema key.
@@ -58,10 +67,54 @@ export function checkBound(c: StructuredConstraint, source: string | null): Boun
   if (found === undefined) {
     return { result: 'absent', found: undefined, detail: `no .${method}() on "${attr}"` };
   }
-  if (found === c.assertion.value) {
+  if (found === assertion.value) {
     return { result: 'conforms', found, detail: `.${method}(${found}) matches` };
   }
-  return { result: 'violates', found, detail: `.${method}(${found}) but spec requires .${method}(${c.assertion.value})` };
+  return { result: 'violates', found, detail: `.${method}(${found}) but spec requires .${method}(${assertion.value})` };
+}
+
+/**
+ * Check a Membership (enum) constraint against a module's source. Conforms when the
+ * field's Zod declaration is a `z.enum([...])` (or literal union) covering exactly
+ * the spec's value set; violates when the enforced set differs; absent when the
+ * field is present but unconstrained; indeterminate when the field isn't found.
+ */
+export function checkMembership(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  if (c.assertion.kind !== 'membership') return { result: 'indeterminate', detail: 'not a membership assertion' };
+  const attr = c.binding.attribute;
+  const want = [...c.assertion.values].map(v => v.toLowerCase()).sort();
+
+  const fieldRe = new RegExp(`\\b${escapeRe(attr)}\\s*:\\s*z\\.[^\\n]*`, 'i');
+  const decl = source.match(fieldRe);
+  if (!decl) {
+    return new RegExp(`\\b${escapeRe(attr)}\\b`, 'i').test(source)
+      ? { result: 'absent', detail: `no enum on "${attr}" (field present, value-set unconstrained)` }
+      : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
+  }
+  // Collect the enum's string literals: z.enum(['a','b']) or z.union([z.literal('a'),…]).
+  const enumMatch = decl[0].match(/z\.enum\(\s*\[([^\]]*)\]/i);
+  const literals = [...decl[0].matchAll(/z\.literal\(\s*['"]([^'"]+)['"]/gi)].map(m => m[1].toLowerCase());
+  let got: string[] | null = null;
+  if (enumMatch) {
+    got = [...enumMatch[1].matchAll(/['"]([^'"]+)['"]/g)].map(m => m[1].toLowerCase()).sort();
+  } else if (literals.length > 0) {
+    got = literals.sort();
+  }
+  if (!got) return { result: 'absent', detail: `no z.enum()/literal union on "${attr}"` };
+  const same = got.length === want.length && got.every((v, i) => v === want[i]);
+  return same
+    ? { result: 'conforms', detail: `enum [${got.join(', ')}] matches` }
+    : { result: 'violates', detail: `enum [${got.join(', ')}] but spec requires [${want.join(', ')}]` };
+}
+
+/** Dispatch a constraint to its kind's static checker. */
+export function checkConstraint(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (c.assertion.kind === 'bound') {
+    const r = checkBound(c, source);
+    return { result: r.result, detail: r.detail };
+  }
+  return checkMembership(c, source);
 }
 
 function escapeRe(s: string): string {

@@ -59,8 +59,8 @@ import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
 import { deriveEvaluations, checkEvaluation } from './evals.js';
-import { mineEntityAttributes, extractBoundConstraints } from './constraints/extract.js';
-import { checkBound } from './constraints/check.js';
+import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
+import { checkConstraint } from './constraints/check.js';
 import { verdictOf, verdictSeverity } from './models/validation.js';
 import type { ValidationResult } from './models/validation.js';
 import { runSuite } from './eval/harness.js';
@@ -338,7 +338,7 @@ function computeConstraintDiagnostics(
 
   const entityAttrs = mineEntityAttributes(ius, canonNodes, allClauses);
   const clauseById = new Map(allClauses.map(c => [c.clause_id, c]));
-  const { constraints, defects } = extractBoundConstraints(canonNodes, entityAttrs, (cid) => {
+  const { constraints, defects } = extractConstraints(canonNodes, entityAttrs, (cid) => {
     const c = clauseById.get(cid);
     return c ? { doc: c.source_doc_id, line: c.source_line_range[0], text: c.raw_text } : {};
   });
@@ -370,15 +370,21 @@ function computeConstraintDiagnostics(
       const full = file ? join(projectRoot, file) : '';
       if (full && existsSync(full)) source = readFileSync(full, 'utf8');
     }
-    const check = checkBound(c, source);
+    const check = checkConstraint(c, source);
+    const a = c.assertion;
+    const shape = a.kind === 'bound'
+      ? `${a.op} ${a.value}${a.unit ? ' ' + a.unit : ''}`
+      : `∈ {${a.values.join(', ')}}`;
+    const enforce = a.kind === 'bound'
+      ? `.${a.op === '<=' ? 'max' : 'min'}(${a.value})`
+      : `z.enum([${a.values.map(v => `'${v}'`).join(', ')}])`;
     const result: ValidationResult = {
       focus: { label: `${c.binding.entity}.${c.binding.attribute}`, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: iu?.iu_id },
       path: c.binding.attribute,
-      value: check.found,
-      source_component: 'bound',
+      source_component: a.kind,
       result: check.result,
       method: 'static',
-      message: `${c.binding.entity}.${c.binding.attribute} ${c.assertion.op} ${c.assertion.value}${c.assertion.unit ? ' ' + c.assertion.unit : ''}: ${check.detail}`,
+      message: `${c.binding.entity}.${c.binding.attribute} ${shape}: ${check.detail}`,
       recommended_actions: [],
       provenance: { source_doc: c.source.doc, line: c.source.line },
     };
@@ -386,9 +392,9 @@ function computeConstraintDiagnostics(
     const sev = verdictSeverity(verdict);
     if (!sev) continue; // conforms → OK → no diagnostic
     result.recommended_actions = check.result === 'absent'
-      ? [`Enforce ${c.binding.entity}.${c.binding.attribute} .${c.assertion.op === '<=' ? 'max' : 'min'}(${c.assertion.value}) in the generated schema, then regenerate`]
+      ? [`Enforce ${c.binding.entity}.${c.binding.attribute} ${enforce} in the generated schema, then regenerate`]
       : check.result === 'violates'
-        ? [`Generated code enforces the wrong bound (${check.found}); regenerate to match the spec (${c.assertion.value})`]
+        ? [`Generated code enforces the wrong ${a.kind}; regenerate to match the spec (${shape})`]
         : [`Generate ${c.binding.entity} to reason about this constraint`];
     diagnostics.push({
       severity: sev,

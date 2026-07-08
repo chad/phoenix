@@ -28,8 +28,8 @@ import { DiffType } from '../models/clause.js';
 import { computeInvalidation, iuKey } from '../invalidation.js';
 import type { ImplementationUnit } from '../models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from '../models/iu.js';
-import { checkBound } from '../constraints/check.js';
-import { extractBoundConstraints, mineEntityAttributes, parseBound } from '../constraints/extract.js';
+import { checkBound, checkConstraint } from '../constraints/check.js';
+import { extractBoundConstraints, extractConstraints, mineEntityAttributes } from '../constraints/extract.js';
 import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation } from '../evals.js';
 import { Journal } from '../journal.js';
@@ -190,13 +190,28 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'constraint.non-bound-kinds-are-captured', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
-    redReason: 'Only the Bound kind is implemented. An enum ("cadence must be one of daily, weekly"), a format/pattern, a uniqueness, or a reference constraint is invisible to the structured-constraint layer — it produces no constraint and is neither lowered nor checked. Fix: implement the Membership/Pattern/Uniqueness/Reference kinds from the algebra (docs/PROPOSAL-constraint-algebra.md §5) with their lowering + static checker.',
-    description: 'A non-Bound constraint (an enum membership) is captured as a structured constraint.',
+    id: 'constraint.membership-kind-is-captured-and-checked', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'An enum constraint is captured as a Membership constraint and statically checked against the code.',
     run: () => {
-      // The enum lives in a definition/constraint; the structured layer only knows Bound.
-      const captured = parseBound('cadence must be one of daily, weekly') !== null;
-      return { passed: captured, detail: captured ? 'membership captured' : 'membership dropped — only Bound is implemented' };
+      const attrs = mineEntityAttributes([iu('habit')], [canon(CanonicalType.DEFINITION, 'a habit has a name and a cadence', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'cadence must be one of daily, weekly', 'c', 'cl', ['cadence'])], attrs);
+      const m = constraints.find(c => c.assertion.kind === 'membership');
+      if (!m) return { passed: false, detail: 'membership constraint not captured' };
+      // And the static checker distinguishes conforming from non-enforcing code.
+      const good = checkConstraint(m, `const S = z.object({ cadence: z.enum(['daily','weekly']) });`);
+      const bad = checkConstraint(m, `const S = z.object({ cadence: z.string() });`);
+      return { passed: good.result === 'conforms' && bad.result === 'absent', detail: `bound=${m.binding.entity}.${m.binding.attribute}, good=${good.result}, bad=${bad.result}` };
+    },
+  },
+  {
+    id: 'constraint.other-kinds-not-yet-implemented', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
+    redReason: 'Bound and Membership are implemented; Pattern (regex/format), Uniqueness, Reference, Cardinality, and the Expr/Invariant kinds are not yet extracted or checked, so format/uniqueness/FK constraints remain invisible to the structured layer. Fix: continue implementing kinds from the algebra (docs/PROPOSAL-constraint-algebra.md §5) with their lowering + static checker.',
+    description: 'A pattern/format constraint (e.g. "must be a valid email") is captured as a structured constraint.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('customer')], [canon(CanonicalType.DEFINITION, 'a customer has an email', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a customer email must be a valid email address', 'c', 'cl', ['email'])], attrs);
+      const captured = constraints.length > 0;
+      return { passed: captured, detail: captured ? 'pattern captured' : 'pattern dropped — Pattern kind not implemented' };
     },
   },
 

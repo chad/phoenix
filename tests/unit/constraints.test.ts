@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mineEntityAttributes, parseBound, extractBoundConstraints } from '../../src/constraints/extract.js';
-import { checkBound } from '../../src/constraints/check.js';
+import { mineEntityAttributes, parseBound, parseMembership, extractBoundConstraints, extractConstraints } from '../../src/constraints/extract.js';
+import { checkBound, checkMembership } from '../../src/constraints/check.js';
 import { verdictOf } from '../../src/models/validation.js';
 import type { CanonicalNode } from '../../src/models/canonical.js';
 import { CanonicalType } from '../../src/models/canonical.js';
@@ -92,6 +92,50 @@ describe('checkBound — the static oracle', () => {
   });
   it('is indeterminate when the module is not generated yet', () => {
     expect(checkBound(c, null).result).toBe('indeterminate');
+  });
+});
+
+describe('parseMembership', () => {
+  it('parses "must be one of" enums', () => {
+    expect(parseMembership('cadence must be one of daily, weekly')).toEqual({ kind: 'membership', values: ['daily', 'weekly'] });
+  });
+  it('parses "either X or Y" enums', () => {
+    expect(parseMembership('a cadence of either daily or weekly')).toEqual({ kind: 'membership', values: ['daily', 'weekly'] });
+  });
+  it('returns null for non-enums and single values', () => {
+    expect(parseMembership('a habit name must not be empty')).toBeNull();
+    expect(parseMembership('must be one of daily')).toBeNull();
+  });
+});
+
+describe('extractConstraints — Membership binds by proximity, not first-attribute', () => {
+  it('binds "cadence of either daily or weekly" to cadence (nearest the cue), not name', () => {
+    const attrs = mineEntityAttributes([iu('habit')], [node(CanonicalType.DEFINITION, 'a habit has a name, a color, and a cadence of either daily or weekly')]);
+    // head-noun mining excludes value words:
+    expect(attrs.get('habit')!.has('either')).toBe(false);
+    expect(attrs.get('habit')!.has('daily')).toBe(false);
+    const { constraints } = extractConstraints([node(CanonicalType.DEFINITION, 'a habit has a name, a color, and a cadence of either daily or weekly')], attrs);
+    const m = constraints.find(c => c.assertion.kind === 'membership');
+    expect(m?.binding).toEqual({ entity: 'habit', attribute: 'cadence' });
+  });
+});
+
+describe('checkMembership — the enum static checker', () => {
+  const c: StructuredConstraint = {
+    constraint_id: 'm', binding: { entity: 'habit', attribute: 'cadence' },
+    assertion: { kind: 'membership', values: ['daily', 'weekly'] }, source: { statement: 's' },
+  };
+  it('conforms for z.enum with the exact set', () => {
+    expect(checkMembership(c, `z.object({ cadence: z.enum(['daily','weekly']) })`).result).toBe('conforms');
+  });
+  it('conforms for a literal union with the exact set', () => {
+    expect(checkMembership(c, `z.object({ cadence: z.union([z.literal('daily'), z.literal('weekly')]) })`).result).toBe('conforms');
+  });
+  it('violates for a different value set', () => {
+    expect(checkMembership(c, `z.object({ cadence: z.enum(['daily','monthly']) })`).result).toBe('violates');
+  });
+  it('is absent when the field has no enum', () => {
+    expect(checkMembership(c, `z.object({ cadence: z.string() })`).result).toBe('absent');
   });
 });
 
