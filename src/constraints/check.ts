@@ -108,13 +108,44 @@ export function checkMembership(c: StructuredConstraint, source: string | null):
     : { result: 'violates', detail: `enum [${got.join(', ')}] but spec requires [${want.join(', ')}]` };
 }
 
+/**
+ * Check a Pattern (format) constraint against a module's source. Conforms when the
+ * field's Zod declaration carries the matching format validator (.email()/.url()/
+ * .uuid()/.datetime() or a .regex()); absent when the field is present but
+ * unvalidated; indeterminate when the field isn't found.
+ */
+export function checkPattern(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  if (c.assertion.kind !== 'pattern') return { result: 'indeterminate', detail: 'not a pattern assertion' };
+  const attr = c.binding.attribute;
+  const fmt = c.assertion.format;
+  const fieldRe = new RegExp(`\\b${escapeRe(attr)}\\s*:\\s*z\\.[^\\n]*`, 'i');
+  const decl = source.match(fieldRe);
+  if (!decl) {
+    return new RegExp(`\\b${escapeRe(attr)}\\b`, 'i').test(source)
+      ? { result: 'absent', detail: `no format validator on "${attr}" (field present, format unchecked)` }
+      : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
+  }
+  const validators: Record<string, RegExp> = {
+    email: /\.email\(|\.regex\(/i,
+    url: /\.url\(|\.regex\(/i,
+    uuid: /\.uuid\(|\.regex\(/i,
+    date: /\.datetime\(|\.date\(|\.regex\(/i,
+    regex: /\.regex\(/i,
+  };
+  return validators[fmt].test(decl[0])
+    ? { result: 'conforms', detail: `${fmt} format enforced` }
+    : { result: 'absent', detail: `no ${fmt} validator on "${attr}"` };
+}
+
 /** Dispatch a constraint to its kind's static checker. */
 export function checkConstraint(c: StructuredConstraint, source: string | null): ConstraintCheck {
   if (c.assertion.kind === 'bound') {
     const r = checkBound(c, source);
     return { result: r.result, detail: r.detail };
   }
-  return checkMembership(c, source);
+  if (c.assertion.kind === 'membership') return checkMembership(c, source);
+  return checkPattern(c, source);
 }
 
 function escapeRe(s: string): string {

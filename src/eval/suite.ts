@@ -204,14 +204,27 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'constraint.other-kinds-not-yet-implemented', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
-    redReason: 'Bound and Membership are implemented; Pattern (regex/format), Uniqueness, Reference, Cardinality, and the Expr/Invariant kinds are not yet extracted or checked, so format/uniqueness/FK constraints remain invisible to the structured layer. Fix: continue implementing kinds from the algebra (docs/PROPOSAL-constraint-algebra.md §5) with their lowering + static checker.',
-    description: 'A pattern/format constraint (e.g. "must be a valid email") is captured as a structured constraint.',
+    id: 'constraint.pattern-kind-is-captured-and-checked', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'A format constraint ("must be a valid email") is captured as a Pattern constraint and statically checked.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('customer')], [canon(CanonicalType.DEFINITION, 'a customer has an email and a name', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a customer email must be a valid email address', 'c', 'cl', ['email'])], attrs);
+      const p = constraints.find(c => c.assertion.kind === 'pattern');
+      if (!p) return { passed: false, detail: 'pattern constraint not captured' };
+      const good = checkConstraint(p, `const S = z.object({ email: z.string().email() });`);
+      const bad = checkConstraint(p, `const S = z.object({ email: z.string() });`);
+      return { passed: good.result === 'conforms' && bad.result === 'absent', detail: `good=${good.result}, bad=${bad.result}` };
+    },
+  },
+  {
+    id: 'constraint.relational-kinds-not-yet-implemented', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
+    redReason: 'Bound, Membership, and Pattern are implemented; Uniqueness, Reference (FK), and Cardinality are not yet extracted or checked, so "email must be unique" / "must reference an existing X" / "at least one line item" remain invisible to the structured layer. Fix: continue implementing kinds from the algebra (docs/PROPOSAL-constraint-algebra.md §5) with their lowering + static checker.',
+    description: 'A uniqueness constraint ("email must be unique") is captured as a structured constraint.',
     run: () => {
       const attrs = mineEntityAttributes([iu('customer')], [canon(CanonicalType.DEFINITION, 'a customer has an email', 'd')]);
-      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a customer email must be a valid email address', 'c', 'cl', ['email'])], attrs);
-      const captured = constraints.length > 0;
-      return { passed: captured, detail: captured ? 'pattern captured' : 'pattern dropped — Pattern kind not implemented' };
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a customer email must be unique', 'c', 'cl', ['email'])], attrs);
+      const captured = constraints.some(c => (c.assertion as { kind: string }).kind === 'uniqueness');
+      return { passed: captured, detail: captured ? 'uniqueness captured' : 'uniqueness dropped — kind not implemented' };
     },
   },
 

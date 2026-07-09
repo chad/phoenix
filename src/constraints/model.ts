@@ -29,8 +29,17 @@ export interface MembershipAssertion {
   values: string[];
 }
 
+/** A format / regex constraint: "email must be a valid email address". */
+export interface PatternAssertion {
+  kind: 'pattern';
+  /** A named format when recognized (email, url, uuid, date), else 'regex'. */
+  format: 'email' | 'url' | 'uuid' | 'date' | 'regex';
+  /** The raw regex when format === 'regex'. */
+  regex?: string;
+}
+
 /** The (growing) closed assertion algebra — see docs/DESIGN-shacl-spine.md §4. */
-export type Assertion = BoundAssertion | MembershipAssertion;
+export type Assertion = BoundAssertion | MembershipAssertion | PatternAssertion;
 
 export interface ConstraintSource {
   canon_id?: string;

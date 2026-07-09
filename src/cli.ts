@@ -375,10 +375,14 @@ function computeConstraintDiagnostics(
     const a = c.assertion;
     const shape = a.kind === 'bound'
       ? `${a.op} ${a.value}${a.unit ? ' ' + a.unit : ''}`
-      : `∈ {${a.values.join(', ')}}`;
+      : a.kind === 'membership'
+        ? `∈ {${a.values.join(', ')}}`
+        : `format: ${a.format}`;
     const enforce = a.kind === 'bound'
       ? `.${a.op === '<=' ? 'max' : 'min'}(${a.value})`
-      : `z.enum([${a.values.map(v => `'${v}'`).join(', ')}])`;
+      : a.kind === 'membership'
+        ? `z.enum([${a.values.map(v => `'${v}'`).join(', ')}])`
+        : `.${a.format}()`;
     const result: ValidationResult = {
       focus: { label: `${c.binding.entity}.${c.binding.attribute}`, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: iu?.iu_id },
       path: c.binding.attribute,

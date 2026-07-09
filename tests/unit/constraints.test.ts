@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mineEntityAttributes, parseBound, parseMembership, extractBoundConstraints, extractConstraints } from '../../src/constraints/extract.js';
-import { checkBound, checkMembership } from '../../src/constraints/check.js';
+import { mineEntityAttributes, parseBound, parseMembership, parsePattern, extractBoundConstraints, extractConstraints } from '../../src/constraints/extract.js';
+import { checkBound, checkMembership, checkPattern } from '../../src/constraints/check.js';
 import { verdictOf } from '../../src/models/validation.js';
 import type { CanonicalNode } from '../../src/models/canonical.js';
 import { CanonicalType } from '../../src/models/canonical.js';
@@ -136,6 +136,23 @@ describe('checkMembership — the enum static checker', () => {
   });
   it('is absent when the field has no enum', () => {
     expect(checkMembership(c, `z.object({ cadence: z.string() })`).result).toBe('absent');
+  });
+});
+
+describe('parsePattern + checkPattern', () => {
+  it('recognizes named formats', () => {
+    expect(parsePattern('a customer email must be a valid email address')).toEqual({ kind: 'pattern', format: 'email' });
+    expect(parsePattern('the link must be a valid url')).toEqual({ kind: 'pattern', format: 'url' });
+    expect(parsePattern('a habit has an email')).toBeNull(); // no normative cue
+  });
+  const c: StructuredConstraint = {
+    constraint_id: 'p', binding: { entity: 'customer', attribute: 'email' },
+    assertion: { kind: 'pattern', format: 'email' }, source: { statement: 's' },
+  };
+  it('conforms with .email()/.regex(), absent without', () => {
+    expect(checkPattern(c, `z.object({ email: z.string().email() })`).result).toBe('conforms');
+    expect(checkPattern(c, `z.object({ email: z.string().regex(/@/) })`).result).toBe('conforms');
+    expect(checkPattern(c, `z.object({ email: z.string() })`).result).toBe('absent');
   });
 });
 

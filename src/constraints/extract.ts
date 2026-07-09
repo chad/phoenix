@@ -18,7 +18,7 @@ import type { CanonicalNode } from '../models/canonical.js';
 import { CanonicalType } from '../models/canonical.js';
 import type { Clause } from '../models/clause.js';
 import type { ImplementationUnit } from '../models/iu.js';
-import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, Assertion, AttributeRef } from './model.js';
+import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, Assertion, AttributeRef } from './model.js';
 
 const STOP = new Set([
   'the', 'a', 'an', 'is', 'are', 'be', 'to', 'of', 'in', 'for', 'on', 'with', 'and',
@@ -113,9 +113,21 @@ export function parseMembership(text: string): MembershipAssertion | null {
   return values.length >= 2 ? { kind: 'membership', values } : null;
 }
 
-/** Parse any supported assertion kind from a statement. Bound takes priority. */
+/** Parse a format/pattern assertion, or null. Recognizes common named formats. */
+export function parsePattern(text: string): PatternAssertion | null {
+  const s = text.toLowerCase();
+  // Require a normative cue so a passing mention ("has an email") isn't a constraint.
+  if (!/\b(?:must|valid|be a|be an|format|matches?|conform)\b/.test(s)) return null;
+  if (/\bemail\b/.test(s)) return { kind: 'pattern', format: 'email' };
+  if (/\b(?:url|uri|link|https?)\b/.test(s)) return { kind: 'pattern', format: 'url' };
+  if (/\buuid\b/.test(s)) return { kind: 'pattern', format: 'uuid' };
+  if (/\b(?:iso ?8601|date|timestamp)\b/.test(s) && /\bvalid\b/.test(s)) return { kind: 'pattern', format: 'date' };
+  return null;
+}
+
+/** Parse any supported assertion kind from a statement. Priority: bound, membership, pattern. */
 export function parseAssertion(text: string): Assertion | null {
-  return parseBound(text) ?? parseMembership(text);
+  return parseBound(text) ?? parseMembership(text) ?? parsePattern(text);
 }
 
 /** Resolve the subject of a bounded statement to a known entity.attribute.
@@ -182,7 +194,9 @@ function resolveBinding(
 }
 
 function id(binding: AttributeRef, a: Assertion): string {
-  const shape = a.kind === 'bound' ? `${a.op}:${a.value}` : `in:${[...a.values].sort().join('|')}`;
+  const shape = a.kind === 'bound' ? `${a.op}:${a.value}`
+    : a.kind === 'membership' ? `in:${[...a.values].sort().join('|')}`
+    : `fmt:${a.format}${a.regex ?? ''}`;
   return createHash('sha256').update([a.kind, binding.entity, binding.attribute, shape].join('\x00')).digest('hex').slice(0, 16);
 }
 
