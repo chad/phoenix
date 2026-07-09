@@ -42,32 +42,38 @@ knowledge. It is, for the project, what `phoenix status` is for a generated app.
 must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 
 - **Green health: 100%** — every proven capability still holds (0 regressions).
-- **Overall pass rate: 86%** (18/21 cases) — the remaining 14% is the honest backlog.
+- **Overall pass rate: 91%** (21/23 cases) — the remaining 9% is the honest backlog.
 
-### Closed since the first snapshot (red → green)
+### Closed by the Red→Green loop (red → green)
 
 - ✅ **`canonicalization.compound-sentence-preserves-subject`** — the segmenter now
   carries the subject noun-phrase across compound-modal splits. Verified on
-  momentum: the canonical node is `"a habit name must not exceed 80 characters"`,
-  not the subjectless/"line" fragment.
-- ✅ **Membership (enum) constraint kind** — added `constraint.membership-kind-is-
-  captured-and-checked`; enums bind by proximity and are statically checked against
-  `z.enum`/literal unions. Verified on momentum: `habit.cadence ∈ {daily, weekly}`
-  binds correctly and the generated code conforms.
+  momentum: the canonical node is `"a habit name must not exceed 80 characters"`.
+- ✅ **Membership (enum) constraint kind** — enums bind by proximity and are checked
+  against `z.enum`/literal unions. Verified on momentum: `habit.cadence ∈ {daily,
+  weekly}` binds correctly and the generated code conforms.
+- ✅ **`oracle.catches-logic-mutation`** — the oracle now does a real enforcement
+  check (non-negativity, bounds, enums, non-empty) and abstains (`indeterminate`)
+  on properties it can't statically verify — it never false-greens.
+- ✅ **Pattern (format) constraint kind** — `.email()/.url()/.uuid()` etc. are
+  captured and statically checked.
+- ✅ **`regeneration.dependents-are-regenerated`** — a contract change now
+  regenerates the transitive dependents (not just flags them), via
+  `dependentsToRegenerate` wired into `phoenix regen`.
 
-### The known-red backlog (3)
+### The known-red backlog (2)
 
-1. **`constraint.other-kinds-not-yet-implemented`** — `Bound` and `Membership` are
-   done; `Pattern` (regex/format), `Uniqueness`, `Reference`, `Cardinality`, and the
-   `Expr`/`Invariant` kinds are not yet extracted or checked. *Fix: continue
-   implementing kinds from the algebra (`docs/PROPOSAL-constraint-algebra.md` §5).*
-2. **`oracle.catches-logic-mutation`** — the oracle is structural term-matching, not
-   behavioral; code that mentions the fields but violates the invariant passes.
-   *Fix: executable/property evals + a per-eval mutation gate.*
-3. **`regeneration.dependents-are-regenerated`** — dependents of a changed IU are
-   flagged for re-validation but not rebuilt, so an upstream contract change can
-   break a downstream module until a manual `regen --all`. *Fix: act on the
-   revalidate set.*
+1. **`constraint.relational-kinds-not-yet-implemented`** — `Bound`, `Membership`, and
+   `Pattern` are done; `Uniqueness`, `Reference` (FK), and `Cardinality` are not yet
+   extracted or checked. *Fix: continue implementing kinds from the algebra
+   (`docs/PROPOSAL-constraint-algebra.md` §5).*
+2. **`regeneration.http-dependencies-detected`** — IU dependencies are derived from
+   relative imports only; a module that consumes another over HTTP (the generated
+   web UIs `fetch` sibling routes) creates no import edge, so the dependency is
+   invisible. This is the remaining half of the momentum dashboard-broke bug (the
+   contract-aware regen is wired, but the dependency itself isn't detected). *Fix:
+   derive dependencies from sibling-route/fetch targets, not just imports.*
 
 Each red is a concrete next piece of work with a known fix — the eval doubles as the
-roadmap. Two were closed this session by the Red→Green loop; three remain.
+roadmap. Five were closed this session; two remain (one discovered by fixing another
+— honest whack-a-mole, tracked rather than hidden).

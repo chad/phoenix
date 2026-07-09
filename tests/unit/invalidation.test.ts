@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { computeInvalidation, iuKey } from '../../src/invalidation.js';
+import { computeInvalidation, iuKey, dependentsToRegenerate } from '../../src/invalidation.js';
 import { InvalidationStore } from '../../src/store/invalidation-store.js';
 import { DiffType } from '../../src/models/clause.js';
 import type { Clause, ClauseDiff } from '../../src/models/clause.js';
@@ -142,5 +142,23 @@ describe('iuKey', () => {
     expect(iuKey(iu('id1', 'task', []))).toBe('task');
     const noName = { ...iu('id1', '', []), name: '' };
     expect(iuKey(noName)).toBe('src/generated/.ts');
+  });
+});
+
+describe('dependentsToRegenerate — contract-aware dependent regeneration', () => {
+  it('returns transitive dependents of a contract-changed IU, excluding roots and unrelated', () => {
+    const habit = iu('iu-habit', 'habit', ['cn']);
+    const dashboard = iu('iu-dashboard', 'dashboard', [], ['iu-habit']);
+    const report = iu('iu-report', 'report', [], ['iu-dashboard']); // transitive
+    const settings = iu('iu-settings', 'settings', []);              // unrelated
+    const deps = dependentsToRegenerate(new Set(['iu-habit']), [habit, dashboard, report, settings]);
+    expect([...deps].sort()).toEqual(['iu-dashboard', 'iu-report']);
+    expect(deps.has('iu-habit')).toBe(false);
+    expect(deps.has('iu-settings')).toBe(false);
+  });
+  it('is empty when nothing depends on the changed IU', () => {
+    const a = iu('iu-a', 'a', []);
+    const b = iu('iu-b', 'b', []);
+    expect(dependentsToRegenerate(new Set(['iu-a']), [a, b]).size).toBe(0);
   });
 });

@@ -25,7 +25,7 @@ import type { CanonicalNode } from '../models/canonical.js';
 import { classifyChange } from '../classifier.js';
 import { ChangeClass } from '../models/classification.js';
 import { DiffType } from '../models/clause.js';
-import { computeInvalidation, iuKey } from '../invalidation.js';
+import { computeInvalidation, iuKey, dependentsToRegenerate } from '../invalidation.js';
 import type { ImplementationUnit } from '../models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from '../models/iu.js';
 import { checkBound, checkConstraint } from '../constraints/check.js';
@@ -36,6 +36,7 @@ import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
 import type { CheckMethod, CheckResult } from '../models/validation.js';
 import { resolveTarget } from '../architectures/index.js';
+import { extractDependencies } from '../dep-extractor.js';
 
 // ─── test-data helpers ───────────────────────────────────────────────────────
 
@@ -289,20 +290,27 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
 
   // ── regeneration ──
   {
-    id: 'regeneration.dependents-are-regenerated', capability: 'regeneration', tier: 'unit', expect: 'red',
-    redReason: 'Selective invalidation flags a changed IU\'s dependents for RE-VALIDATION but the regen loop only rebuilds directly-stale IUs. So an upstream contract change (e.g. an entity schema) can break a downstream module (the dashboard) until a manual `regen --all`. Fix: act on the revalidate set — re-check dependents\' contracts and regenerate those whose upstream contract changed.',
-    description: 'When an IU changes, a dependent that consumes its contract is rebuilt (not just flagged).',
+    id: 'regeneration.dependents-are-regenerated', capability: 'regeneration', tier: 'unit', expect: 'green',
+    description: 'When an IU\'s contract changes, its transitive dependents are scheduled for regeneration (not just flagged).',
     run: () => {
-      const before = parseSpec('# A\n\n## S\n\n- A habit name must not exceed 80 characters\n', 'd.md')[0];
-      const after = parseSpec('# A\n\n## S\n\n- A habit name must not exceed 60 characters\n', 'd.md')[0];
-      const diff = { diff_type: DiffType.MODIFIED, clause_id_before: before.clause_id, clause_id_after: after.clause_id, clause_before: before, clause_after: after };
-      const nodes = [canon(CanonicalType.CONSTRAINT, 's', 'cn', before.clause_id)];
       const habit = iu('habit', ['cn']);
-      const dash = iu('dashboard', [], ['iu-habit']);
-      const res = computeInvalidation({ changes: [{ diff: diff as never, classification: { change_class: ChangeClass.B, confidence: .8, signals: {} as never } }], canonNodes: nodes, ius: [habit, dash] });
-      // A dependent is only rebuilt if it lands in the STALE set (what regen rebuilds).
-      const dependentRebuilt = res.stale.some(s => s.key === iuKey(dash));
-      return { passed: dependentRebuilt, detail: dependentRebuilt ? 'dependent rebuilt' : 'dependent only flagged for re-validation, not rebuilt' };
+      const dashboard = iu('dashboard', [], ['iu-habit']);   // dashboard consumes habit
+      const report = iu('report', [], ['iu-dashboard']);      // report consumes dashboard (transitive)
+      const unrelated = iu('settings', []);
+      const deps = dependentsToRegenerate(new Set(['iu-habit']), [habit, dashboard, report, unrelated]);
+      const ok = deps.has('iu-dashboard') && deps.has('iu-report') && !deps.has('iu-settings') && !deps.has('iu-habit');
+      return { passed: ok, detail: `dependents=[${[...deps].sort()}]` };
+    },
+  },
+
+  {
+    id: 'regeneration.http-dependencies-detected', capability: 'regeneration', tier: 'unit', expect: 'red',
+    redReason: 'IU→IU dependencies are derived from relative code imports only. A module that consumes another over HTTP (a fetch to a sibling route, as the generated web UIs do) creates no import edge, so the dependency is invisible — the consumer is neither flagged nor regenerated when the producer\'s contract changes. This is the remaining half of the momentum dashboard-broke bug (contract-aware dependent regen is now wired, but the dependency itself is undetected). Fix: also derive dependencies from sibling-route/fetch targets, not just imports.',
+    description: 'A module that calls another module over HTTP is detected as depending on it.',
+    run: () => {
+      const g = extractDependencies("const res = await fetch('/habit', { method: 'POST', body });", 'dashboard.ts');
+      const detected = g.imports.some(i => i.is_relative && /habit/.test(i.source));
+      return { passed: detected, detail: detected ? 'http dependency detected' : 'fetch to a sibling module is not detected as a dependency (only imports are)' };
     },
   },
 

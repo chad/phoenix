@@ -54,7 +54,7 @@ import { WaiverStore, defaultSigner, parseExpiry } from './waivers.js';
 import type { StoredWaiver } from './waivers.js';
 import { deriveIUDependencies, applyDerivedDependencies, buildFileToIUMap, resolveRelativeImport } from './iu-deps.js';
 import { recordLowTierEvidence, iuArtifactHash } from './evidence-collector.js';
-import { computeInvalidation, iuKey } from './invalidation.js';
+import { computeInvalidation, iuKey, dependentsToRegenerate } from './invalidation.js';
 import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
@@ -1979,7 +1979,39 @@ async function cmdRegen(args: string[]): Promise<void> {
 
   const manifestManager = new ManifestManager(phoenixDir);
   const previousMasses = loadPreviousMasses(manifestManager);
+
+  // Snapshot the target IUs' OLD contracts from disk (pre-write) so we can detect a
+  // contract change after regeneration and pull in dependents that would break.
+  const oldContracts = loadExistingContracts(projectRoot, targetIUs, regenArch);
+
   const results = await generateAll(targetIUs, regenCtx);
+
+  // Contract-aware dependent regeneration: if a regenerated IU's contract CHANGED,
+  // regenerate its transitive dependents against the new contract — otherwise a
+  // downstream consumer (e.g. the dashboard) breaks until a manual `regen --all`.
+  // Skipped for --all (everything already regenerates).
+  if (!forceAll && regenArch) {
+    const changed = new Set<string>();
+    for (const r of results) {
+      const iu = targetIUs.find(i => i.iu_id === r.iu_id);
+      if (!iu) continue;
+      const primary = r.files.get(iu.output_files[0]) ?? [...r.files.values()][0];
+      const newContract = primary ? regenArch.runtime.extractContract(primary) : undefined;
+      const old = oldContracts.get(r.iu_id);
+      if (newContract && old !== undefined && newContract !== old) changed.add(r.iu_id);
+    }
+    if (changed.size > 0) {
+      const already = new Set(results.map(r => r.iu_id));
+      const depIds = dependentsToRegenerate(changed, ius);
+      const depIUs = ius.filter(iu => depIds.has(iu.iu_id) && !already.has(iu.iu_id));
+      if (depIUs.length > 0) {
+        console.log(`  ${yellow('▸')} ${dim(`${depIUs.length} dependent(s) regenerated (upstream contract changed): ${depIUs.map(d => d.name).join(', ')}`)}`);
+        const depResults = await generateAll(depIUs, regenCtx);
+        results.push(...depResults);
+        targetIUs = [...targetIUs, ...depIUs]; // so downstream (writes, manifest, clearKeys) include them
+      }
+    }
+  }
 
   // Shared aggregate (migrations): this may be a PARTIAL regen, so preserve regions
   // owned by IUs not in this batch and merge the freshly-generated ones over them.
