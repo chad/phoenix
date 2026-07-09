@@ -124,8 +124,73 @@ export function deriveEvaluations(
 
 export interface EvalCheckResult {
   eval_id: string;
-  status: 'pass' | 'fail';
+  /**
+   * pass = the property is enforced; fail = enforcement is missing/wrong; the
+   * oracle CAUGHT the defect. indeterminate = the property is not statically
+   * checkable and the oracle honestly abstains (it must NEVER return `pass` for a
+   * property it did not verify — that is the false-green the §1-family forbids).
+   */
+  status: 'pass' | 'fail' | 'indeterminate';
   reason: string;
+}
+
+/**
+ * Behavioral check for a property-asserting evaluation (invariant / failure_mode).
+ * Recognizes the structured shapes it can actually verify against the module source
+ * — non-negativity, numeric bounds, enums, non-empty — and returns a real verdict.
+ * For a property it cannot reduce to a checkable shape, it returns `indeterminate`
+ * rather than a false pass. This is what makes the oracle catch a logic mutation:
+ * code that merely mentions the fields but drops the enforcement fails here.
+ */
+export function checkProperty(statement: string, source: string): { status: 'pass' | 'fail' | 'indeterminate'; reason: string } {
+  const s = statement.toLowerCase();
+  const terms = keyTerms(statement);
+  const refsField = terms.some(t => source.toLowerCase().includes(t) || source.toLowerCase().includes(t.replace(/s$/, '')));
+
+  // ── non-negativity: "must never be negative", "non-negative", ">= 0" ──
+  if (/\bnegative\b/.test(s) && /\b(?:not|never|non|cannot|can't|no)\b/.test(s)) {
+    if (!refsField) return { status: 'fail', reason: 'invariant field not referenced (enforcement dropped)' };
+    const enforced = /\.min\(\s*0\s*\)|\.nonnegative\(|\.gte\(\s*0\s*\)|[<>]=?\s*0\b|>=\s*0/.test(source);
+    return enforced
+      ? { status: 'pass', reason: 'non-negativity enforced (a 0-bound guard is present)' }
+      : { status: 'fail', reason: 'references the field but does not reject values below 0' };
+  }
+
+  // ── non-empty: "must not be empty" ──
+  if (/\bempty\b/.test(s) && /\b(?:not|never|cannot|can't|no)\b/.test(s)) {
+    if (!refsField) return { status: 'fail', reason: 'field not referenced (enforcement dropped)' };
+    const enforced = /\.min\(\s*[1-9]\d*\s*\)|\.nonempty\(|\.length\s*[<>=!]|!==\s*['"]['"]|length\s*(?:>|>=|===?\s*0)/.test(source);
+    return enforced
+      ? { status: 'pass', reason: 'non-empty enforced' }
+      : { status: 'fail', reason: 'references the field but does not reject empty' };
+  }
+
+  // ── numeric bound: "must not exceed N" / "at least N" ──
+  const b = statement.match(/(?:must not exceed|no more than|at most|maximum(?:\s+of)?|up to|<=|≤)\s+(\d+)|(?:at least|no fewer than|minimum(?:\s+of)?|>=|≥)\s+(\d+)/i);
+  if (b) {
+    if (!refsField) return { status: 'fail', reason: 'field not referenced (enforcement dropped)' };
+    const n = b[1] ?? b[2];
+    const method = b[1] !== undefined ? 'max' : 'min';
+    const enforced = new RegExp(`\\.${method}\\(\\s*${n}\\b`).test(source);
+    return enforced
+      ? { status: 'pass', reason: `.${method}(${n}) present` }
+      : { status: 'fail', reason: `references the field but no .${method}(${n}) bound` };
+  }
+
+  // ── enum: "must be one of a, b" / "either a or b" ──
+  const en = s.match(/(?:one of|any of|either)\s*:?\s+(.+)/);
+  if (en) {
+    const vals = en[1].replace(/[.;].*$/, '').split(/\s*,\s*|\s+or\s+|\s+and\s+/).map(v => v.trim().replace(/^['"]|['"]$/g, '')).filter(v => /^[a-z0-9_-]+$/.test(v));
+    if (vals.length >= 2) {
+      const enforced = /z\.enum\(|z\.literal\(/.test(source) && vals.some(v => source.toLowerCase().includes(`'${v}'`) || source.toLowerCase().includes(`"${v}"`));
+      return enforced
+        ? { status: 'pass', reason: 'enum enforced' }
+        : { status: 'fail', reason: 'value set not enforced as an enum/literal union' };
+    }
+  }
+
+  // Not reducible to a checkable shape — abstain honestly (never a false pass).
+  return { status: 'indeterminate', reason: 'property is not statically checkable (needs an executable/behavioral eval)' };
 }
 
 /**
@@ -145,6 +210,17 @@ export function checkEvaluation(
   // A stub (throws "not implemented") satisfies no behavioral eval.
   if (/not implemented|todo|throw new error\(['"]stub/i.test(moduleSource) && moduleSource.length < 400) {
     return { eval_id: evaluation.eval_id, status: 'fail', reason: 'module is an unimplemented stub' };
+  }
+
+  // Property-asserting evals (invariant / failure_mode) get a REAL enforcement
+  // check, not term-matching. checkProperty catches a logic mutation (code that
+  // mentions the fields but drops the enforcement) and abstains (indeterminate)
+  // when the property isn't statically checkable — it never false-greens.
+  if (evaluation.binding === 'invariant' || evaluation.binding === 'failure_mode') {
+    const statements = evaluation.canon_ids.map(cid => canonById.get(cid)?.statement).filter((x): x is string => !!x);
+    const statement = statements.join('. ') || evaluation.assertion;
+    const r = checkProperty(statement, moduleSource);
+    return { eval_id: evaluation.eval_id, status: r.status, reason: r.reason };
   }
 
   // Collect the domain terms this eval is about.

@@ -109,6 +109,7 @@ import type { DriftReport, DriftEntry } from './models/manifest.js';
 import { DriftStatus } from './models/manifest.js';
 import { BootstrapState, DRateLevel } from './models/classification.js';
 import type { PolicyEvaluation, CascadeEvent } from './models/evidence.js';
+import { EvidenceStatus } from './models/evidence.js';
 
 // ─── ANSI Colors ─────────────────────────────────────────────────────────────
 
@@ -461,7 +462,9 @@ function generateCheckAndRecordEvals(
 
     // Check each eval against the generated module; stamp status; persist.
     const results = derived.map(e => checkEvaluation(e, source, canonById));
-    const statusById = new Map(results.map(r => [r.eval_id, r.status]));
+    // 'indeterminate' (the oracle honestly abstained) maps to 'untested' on the
+    // durable eval — it is NOT a pass.
+    const statusById = new Map(results.map(r => [r.eval_id, r.status === 'indeterminate' ? 'untested' as const : r.status]));
     for (const e of derived) {
       e.last_status = statusById.get(e.eval_id) ?? 'untested';
       e.last_verified_at = timestamp;
@@ -474,20 +477,27 @@ function generateCheckAndRecordEvals(
     const artifactHash = iuArtifactHash(iu, manifest, projectRoot);
     const required = new Set(iu.evidence_policy.required);
 
+    // Tri-state evidence: any fail ⇒ FAIL; else any unverified (indeterminate/
+    // untested) ⇒ PENDING (honest — not a pass); else PASS. A property the oracle
+    // could not verify must never satisfy the policy on its own.
+    const evStatus = (subset: typeof derived): EvidenceStatus => {
+      if (subset.some(e => e.last_status === 'fail')) return EvidenceStatus.FAIL;
+      if (subset.some(e => e.last_status !== 'pass')) return EvidenceStatus.PENDING;
+      return EvidenceStatus.PASS;
+    };
+
     // unit_tests ← boundary_contract + domain_rule + failure_mode evals.
     if (required.has('unit_tests')) {
       const behavioral = derived.filter(e => e.binding !== 'invariant');
-      const anyFail = behavioral.some(e => e.last_status === 'fail');
       if (behavioral.length > 0) {
-        evidence.push(makeEvalEvidence('unit_tests', iu, artifactHash, !anyFail, behavioral.length, timestamp));
+        evidence.push(makeEvalEvidence('unit_tests', iu, artifactHash, evStatus(behavioral), behavioral.length, timestamp));
       }
     }
     // property_tests ← invariant evals (the properties that must always hold).
     if (required.has('property_tests')) {
       const invariants = derived.filter(e => e.binding === 'invariant');
-      const anyFail = invariants.some(e => e.last_status === 'fail');
       if (invariants.length > 0) {
-        evidence.push(makeEvalEvidence('property_tests', iu, artifactHash, !anyFail, invariants.length, timestamp));
+        evidence.push(makeEvalEvidence('property_tests', iu, artifactHash, evStatus(invariants), invariants.length, timestamp));
       }
     }
   }
@@ -500,18 +510,19 @@ function makeEvalEvidence(
   kind: 'unit_tests' | 'property_tests',
   iu: ImplementationUnit,
   artifactHash: string,
-  pass: boolean,
+  status: EvidenceStatus,
   count: number,
   timestamp: string,
 ): import('./models/evidence.js').EvidenceRecord {
+  const verb = status === EvidenceStatus.PASS ? 'passed' : status === EvidenceStatus.FAIL ? 'failed' : 'could not be verified by';
   return {
     evidence_id: createHash('sha256').update(`${kind}\x00${iu.iu_id}\x00${timestamp}`).digest('hex').slice(0, 16),
     kind: kind as import('./models/evidence.js').EvidenceKind,
-    status: (pass ? 'PASS' : 'FAIL') as import('./models/evidence.js').EvidenceStatus,
+    status,
     iu_id: iu.iu_id,
     canon_ids: iu.source_canon_ids,
     artifact_hash: artifactHash,
-    message: `${count} durable ${kind === 'unit_tests' ? 'behavioral' : 'invariant'} eval(s) ${pass ? 'passed' : 'failed'} structural check`,
+    message: `${count} durable ${kind === 'unit_tests' ? 'behavioral' : 'invariant'} eval(s) ${verb} the static oracle`,
     timestamp,
   };
 }

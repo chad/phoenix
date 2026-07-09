@@ -260,9 +260,8 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'oracle.catches-logic-mutation', capability: 'oracle', tier: 'unit', expect: 'red',
-    redReason: 'The oracle is structural term-matching, not behavioral: code that still MENTIONS the constrained fields but violates the invariant (e.g. allows a negative order total) passes the check. It cannot catch a logic bug. Fix: executable/property evaluations + a per-eval mutation gate (a mutant that breaks the property must turn the eval red).',
-    description: 'The oracle flags code that references the fields but violates the invariant.',
+    id: 'oracle.catches-logic-mutation', capability: 'oracle', tier: 'unit', expect: 'green',
+    description: 'The oracle flags code that references the fields but violates the invariant (drops the enforcement).',
     run: () => {
       const nodes = [canon(CanonicalType.INVARIANT, 'an order total must never be negative', 'cn', 'cl', ['order', 'total'])];
       const unit = iu('order', ['cn']);
