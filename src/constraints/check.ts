@@ -18,6 +18,40 @@ import type { CheckResult } from '../models/validation.js';
 
 const zodMethod = (op: string) => (op === '<=' ? 'max' : 'min');
 
+/**
+ * Locate a field's Zod/schema declaration, allowing a QUALIFIED name: the spec
+ * attribute `email` matches a generated field `owner_email` (a common LLM choice).
+ * Returns the declaration text (up to the next field boundary), or null.
+ */
+function findFieldDecl(source: string, attr: string): string | null {
+  // Capture the field's WHOLE chain — possibly multi-line (`.refine(...)` on the next
+  // line) and containing bracketed enums — by consuming until the field-terminating
+  // comma at paren/bracket depth 0, or the start of the next field. Depth tracking
+  // keeps an enum array's internal commas and continuation lines inside the field.
+  const re = new RegExp(`\\b(?:[a-z0-9]+_)?${escapeRe(attr)}\\s*:\\s*z\\.`, 'i');
+  const m = re.exec(source);
+  if (!m) return null;
+  let depth = 0;
+  let out = '';
+  for (let i = m.index; i < source.length; i++) {
+    const ch = source[i];
+    if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) { if (depth === 0) break; depth--; }
+    else if (ch === ',' && depth <= 0) break; // field terminator
+    else if (ch === '\n' && depth <= 0) {
+      const after = source.slice(i + 1);
+      if (!/^\s*\./.test(after) && /^\s*(?:[\w$]+\s*:|\}|\))/.test(after)) break; // next field / end
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/** Whether the attribute (or a qualified form of it) is referenced anywhere. */
+function fieldMentioned(source: string, attr: string): boolean {
+  return new RegExp(`\\b(?:[a-z0-9]+_)?${escapeRe(attr)}\\b`, 'i').test(source);
+}
+
 export interface BoundCheck {
   result: CheckResult;
   found?: number;      // the bound value found in code, if any
@@ -44,21 +78,18 @@ export function checkBound(c: StructuredConstraint, source: string | null): Boun
   const attr = c.binding.attribute;
   const method = zodMethod(assertion.op);
 
-  // Locate the field's Zod declaration: `name: z.string()....` possibly across the
-  // rest of the chain on the same logical line. Match the attribute as a schema key.
-  const fieldRe = new RegExp(`\\b${escapeRe(attr)}\\s*:\\s*z\\.[^\\n,;]*`, 'i');
-  const decl = source.match(fieldRe);
-  if (!decl) {
+  const declText = findFieldDecl(source, attr);
+  if (!declText) {
     // The field itself isn't in the schema. If the module references the attribute at
     // all, treat the missing bound as absent; otherwise we can't reason ⇒ indeterminate.
-    return new RegExp(`\\b${escapeRe(attr)}\\b`, 'i').test(source)
+    return fieldMentioned(source, attr)
       ? { result: 'absent', detail: `no ${method}() bound on "${attr}" (field present, bound missing)` }
       : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
   }
 
   const boundRe = new RegExp(`\\.${method}\\(\\s*(\\d+)`, 'g');
   let found: number | undefined;
-  for (const m of decl[0].matchAll(boundRe)) {
+  for (const m of declText.matchAll(boundRe)) {
     const n = parseInt(m[1], 10);
     // For a max bound, the relevant one is the max(); take the first match on the field.
     found = n;
@@ -85,16 +116,15 @@ export function checkMembership(c: StructuredConstraint, source: string | null):
   const attr = c.binding.attribute;
   const want = [...c.assertion.values].map(v => v.toLowerCase()).sort();
 
-  const fieldRe = new RegExp(`\\b${escapeRe(attr)}\\s*:\\s*z\\.[^\\n]*`, 'i');
-  const decl = source.match(fieldRe);
-  if (!decl) {
-    return new RegExp(`\\b${escapeRe(attr)}\\b`, 'i').test(source)
+  const declText = findFieldDecl(source, attr);
+  if (!declText) {
+    return fieldMentioned(source, attr)
       ? { result: 'absent', detail: `no enum on "${attr}" (field present, value-set unconstrained)` }
       : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
   }
   // Collect the enum's string literals: z.enum(['a','b']) or z.union([z.literal('a'),…]).
-  const enumMatch = decl[0].match(/z\.enum\(\s*\[([^\]]*)\]/i);
-  const literals = [...decl[0].matchAll(/z\.literal\(\s*['"]([^'"]+)['"]/gi)].map(m => m[1].toLowerCase());
+  const enumMatch = declText.match(/z\.enum\(\s*\[([^\]]*)\]/i);
+  const literals = [...declText.matchAll(/z\.literal\(\s*['"]([^'"]+)['"]/gi)].map(m => m[1].toLowerCase());
   let got: string[] | null = null;
   if (enumMatch) {
     got = [...enumMatch[1].matchAll(/['"]([^'"]+)['"]/g)].map(m => m[1].toLowerCase()).sort();
@@ -119,21 +149,22 @@ export function checkPattern(c: StructuredConstraint, source: string | null): Co
   if (c.assertion.kind !== 'pattern') return { result: 'indeterminate', detail: 'not a pattern assertion' };
   const attr = c.binding.attribute;
   const fmt = c.assertion.format;
-  const fieldRe = new RegExp(`\\b${escapeRe(attr)}\\s*:\\s*z\\.[^\\n]*`, 'i');
-  const decl = source.match(fieldRe);
-  if (!decl) {
-    return new RegExp(`\\b${escapeRe(attr)}\\b`, 'i').test(source)
+  const declText = findFieldDecl(source, attr);
+  if (!declText) {
+    return fieldMentioned(source, attr)
       ? { result: 'absent', detail: `no format validator on "${attr}" (field present, format unchecked)` }
       : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
   }
+  // A `.refine(...)` on the field is a custom validator (LLMs use `.refine(isValidDate,…)`
+  // for dates) — count it as format enforcement rather than a false "unchecked".
   const validators: Record<string, RegExp> = {
-    email: /\.email\(|\.regex\(/i,
-    url: /\.url\(|\.regex\(/i,
-    uuid: /\.uuid\(|\.regex\(/i,
-    date: /\.datetime\(|\.date\(|\.regex\(/i,
-    regex: /\.regex\(/i,
+    email: /\.email\(|\.regex\(|\.refine\(/i,
+    url: /\.url\(|\.regex\(|\.refine\(/i,
+    uuid: /\.uuid\(|\.regex\(|\.refine\(/i,
+    date: /\.datetime\(|\.date\(|\.regex\(|\.refine\(/i,
+    regex: /\.regex\(|\.refine\(/i,
   };
-  return validators[fmt].test(decl[0])
+  return validators[fmt].test(declText)
     ? { result: 'conforms', detail: `${fmt} format enforced` }
     : { result: 'absent', detail: `no ${fmt} validator on "${attr}"` };
 }
@@ -148,15 +179,17 @@ export function checkPattern(c: StructuredConstraint, source: string | null): Co
 export function checkUniqueness(c: StructuredConstraint, source: string | null): ConstraintCheck {
   if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
   const attr = c.binding.attribute;
-  const a = escapeRe(attr);
-  if (!new RegExp(`\\b${a}\\b`, 'i').test(source)) {
+  // Allow a qualified column name (owner_email for email).
+  const a = `(?:[a-z0-9]+_)?${escapeRe(attr)}`;
+  if (!fieldMentioned(source, attr) && !new RegExp(`\\b${a}\\b`, 'i').test(source)) {
     return { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
   }
   const uniqueRe = new RegExp(
     `\\b${a}\\b[^,\\n)]*\\bunique\\b` +          // column ... UNIQUE
     `|\\bunique\\b[^,\\n(]*\\(\\s*[^)]*\\b${a}\\b` + // UNIQUE( ... email ... )
     `|create\\s+unique\\s+index[^;]*\\b${a}\\b` +    // CREATE UNIQUE INDEX ... email
-    `|\\b${a}\\b\\s*:[^,\\n]*\\.unique\\(`,          // email: ....unique()  (ORM)
+    `|\\b${a}\\b\\s*:[^,\\n]*\\.unique\\(` +         // email: ....unique()  (ORM)
+    `|where\\s+${a}\\s*=`,                            // SELECT ... WHERE owner_email = ?  (app-level guard)
     'i');
   return uniqueRe.test(source)
     ? { result: 'conforms', detail: `uniqueness enforced on "${attr}"` }

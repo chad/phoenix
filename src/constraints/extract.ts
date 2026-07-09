@@ -76,6 +76,24 @@ export function mineEntityAttributes(
       }
     }
   }
+
+  // Second pass: mine attributes from constraint-shaped statements too (including
+  // CONSTRAINT/INVARIANT nodes, which the definition-only first pass skips). A
+  // definition may not enumerate every field ("a transaction records money … with a
+  // memo" omits amount/date), but a constraint names it directly: "a transaction
+  // <attr> must …". Take the last content noun between the entity and the modal.
+  const entityNames = [...attrs.keys()];
+  const allTexts = [...canonNodes.map(n => n.statement), ...clauses.map(c => c.normalized_text)];
+  for (const text of allTexts) {
+    const lower = text.toLowerCase();
+    for (const entity of entityNames) {
+      const m = lower.match(new RegExp(`\\b${entity}\\b(.*?)\\b(?:must|is|are|should|shall|cannot|can't|has to|have to)\\b`, 'i'));
+      if (!m) continue;
+      const between = m[1].split(/[^a-z-]+/).map(singular).filter(w => w.length > 2 && !STOP.has(w) && !ARTICLES.has(w) && !ADJ.has(w));
+      const attr = between[between.length - 1]; // the noun immediately before the modal
+      if (attr) attrs.get(entity)!.add(attr);
+    }
+  }
   return attrs;
 }
 
@@ -105,7 +123,13 @@ export function parseMembership(text: string): MembershipAssertion | null {
   // Guard: only treat as membership when the "one of / either" cue is present.
   const m = text.match(MEMBERSHIP_RE);
   if (!m) return null;
-  const tail = m[1].replace(/[.;].*$/, ''); // stop at sentence end
+  const tail = m[1]
+    .replace(/[.;].*$/, '')                                          // stop at sentence end
+    // stop at the next attribute clause: "credit or debit, and a status of…" →
+    // "credit or debit". A new "<conj> a/an/the/its <noun>" begins a different field,
+    // so its values must not bleed into this enum. (A plain list "red, and blue"
+    // is preserved — "blue" is not an article.)
+    .replace(/,?\s+(?:and|with|but|plus|as well as)\s+(?:a|an|the|its|each|their)\s.*$/i, '');
   const values = tail
     .split(/\s*,\s*|\s+or\s+|\s+and\s+/i)
     .map(v => v.trim().toLowerCase().replace(/^['"]|['"]$/g, ''))
