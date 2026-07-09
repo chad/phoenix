@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mineEntityAttributes, parseBound, parseMembership, parsePattern, extractBoundConstraints, extractConstraints } from '../../src/constraints/extract.js';
-import { checkBound, checkMembership, checkPattern } from '../../src/constraints/check.js';
+import { checkBound, checkMembership, checkPattern, checkUniqueness } from '../../src/constraints/check.js';
+import { parseUniqueness } from '../../src/constraints/extract.js';
 import { verdictOf } from '../../src/models/validation.js';
 import type { CanonicalNode } from '../../src/models/canonical.js';
 import { CanonicalType } from '../../src/models/canonical.js';
@@ -153,6 +154,28 @@ describe('parsePattern + checkPattern', () => {
     expect(checkPattern(c, `z.object({ email: z.string().email() })`).result).toBe('conforms');
     expect(checkPattern(c, `z.object({ email: z.string().regex(/@/) })`).result).toBe('conforms');
     expect(checkPattern(c, `z.object({ email: z.string() })`).result).toBe('absent');
+  });
+});
+
+describe('parseUniqueness + checkUniqueness', () => {
+  it('recognizes uniqueness (and not a plain email/format statement)', () => {
+    expect(parseUniqueness('a customer email must be unique')).toEqual({ kind: 'uniqueness' });
+    expect(parseUniqueness('a customer email must be a valid email')).toBeNull();
+  });
+  it('uniqueness wins over pattern when both email and unique appear', () => {
+    const attrs = mineEntityAttributes([iu('customer')], [node(CanonicalType.DEFINITION, 'a customer has an email')]);
+    const { constraints } = extractConstraints([node(CanonicalType.CONSTRAINT, 'a customer email must be unique', ['email'])], attrs);
+    expect(constraints.find(c => c.assertion.kind === 'uniqueness')).toBeTruthy();
+    expect(constraints.find(c => c.assertion.kind === 'pattern')).toBeFalsy();
+  });
+  const c: StructuredConstraint = {
+    constraint_id: 'u', binding: { entity: 'customer', attribute: 'email' },
+    assertion: { kind: 'uniqueness' }, source: { statement: 's' },
+  };
+  it('conforms on a UNIQUE column/index, absent without', () => {
+    expect(checkUniqueness(c, 'CREATE TABLE customer (id INTEGER, email TEXT UNIQUE)').result).toBe('conforms');
+    expect(checkUniqueness(c, 'CREATE UNIQUE INDEX idx ON customer(email)').result).toBe('conforms');
+    expect(checkUniqueness(c, 'CREATE TABLE customer (id INTEGER, email TEXT)').result).toBe('absent');
   });
 });
 

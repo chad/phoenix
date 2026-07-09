@@ -138,6 +138,31 @@ export function checkPattern(c: StructuredConstraint, source: string | null): Co
     : { result: 'absent', detail: `no ${fmt} validator on "${attr}"` };
 }
 
+/**
+ * Check a Uniqueness constraint against a module's source. Uniqueness is enforced at
+ * the storage layer, so this looks in the generated schema/migration for a UNIQUE
+ * declaration on the attribute's column (`email TEXT UNIQUE`, `UNIQUE(email)`,
+ * `CREATE UNIQUE INDEX … (email)`, or an ORM `.unique()`). Conforms when found;
+ * absent when the column exists without it; indeterminate when the column isn't found.
+ */
+export function checkUniqueness(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  const attr = c.binding.attribute;
+  const a = escapeRe(attr);
+  if (!new RegExp(`\\b${a}\\b`, 'i').test(source)) {
+    return { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
+  }
+  const uniqueRe = new RegExp(
+    `\\b${a}\\b[^,\\n)]*\\bunique\\b` +          // column ... UNIQUE
+    `|\\bunique\\b[^,\\n(]*\\(\\s*[^)]*\\b${a}\\b` + // UNIQUE( ... email ... )
+    `|create\\s+unique\\s+index[^;]*\\b${a}\\b` +    // CREATE UNIQUE INDEX ... email
+    `|\\b${a}\\b\\s*:[^,\\n]*\\.unique\\(`,          // email: ....unique()  (ORM)
+    'i');
+  return uniqueRe.test(source)
+    ? { result: 'conforms', detail: `uniqueness enforced on "${attr}"` }
+    : { result: 'absent', detail: `no UNIQUE constraint on "${attr}"` };
+}
+
 /** Dispatch a constraint to its kind's static checker. */
 export function checkConstraint(c: StructuredConstraint, source: string | null): ConstraintCheck {
   if (c.assertion.kind === 'bound') {
@@ -145,7 +170,8 @@ export function checkConstraint(c: StructuredConstraint, source: string | null):
     return { result: r.result, detail: r.detail };
   }
   if (c.assertion.kind === 'membership') return checkMembership(c, source);
-  return checkPattern(c, source);
+  if (c.assertion.kind === 'pattern') return checkPattern(c, source);
+  return checkUniqueness(c, source);
 }
 
 function escapeRe(s: string): string {

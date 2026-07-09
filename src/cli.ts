@@ -377,12 +377,16 @@ function computeConstraintDiagnostics(
       ? `${a.op} ${a.value}${a.unit ? ' ' + a.unit : ''}`
       : a.kind === 'membership'
         ? `∈ {${a.values.join(', ')}}`
-        : `format: ${a.format}`;
+        : a.kind === 'pattern'
+          ? `format: ${a.format}`
+          : 'must be unique';
     const enforce = a.kind === 'bound'
       ? `.${a.op === '<=' ? 'max' : 'min'}(${a.value})`
       : a.kind === 'membership'
         ? `z.enum([${a.values.map(v => `'${v}'`).join(', ')}])`
-        : `.${a.format}()`;
+        : a.kind === 'pattern'
+          ? `.${a.format}()`
+          : 'a UNIQUE constraint';
     const result: ValidationResult = {
       focus: { label: `${c.binding.entity}.${c.binding.attribute}`, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: iu?.iu_id },
       path: c.binding.attribute,

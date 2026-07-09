@@ -42,7 +42,7 @@ knowledge. It is, for the project, what `phoenix status` is for a generated app.
 must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 
 - **Green health: 100%** — every proven capability still holds (0 regressions).
-- **Overall pass rate: 91%** (21/23 cases) — the remaining 9% is the honest backlog.
+- **Overall pass rate: 96%** (23/24 cases) — the remaining 4% is the honest backlog.
 
 ### Closed by the Red→Green loop (red → green)
 
@@ -60,20 +60,25 @@ must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 - ✅ **`regeneration.dependents-are-regenerated`** — a contract change now
   regenerates the transitive dependents (not just flags them), via
   `dependentsToRegenerate` wired into `phoenix regen`.
+- ✅ **Uniqueness constraint kind** — "email must be unique" is captured and checked
+  for a `UNIQUE` declaration. (Its addition caught a real ordering bug as a
+  REGRESSION — pattern was matching "email" first — which was then fixed; the loop
+  working as designed.)
+- ✅ **`regeneration.http-dependencies-detected`** — IU dependencies are now derived
+  from HTTP `fetch('/route')` calls to a sibling module's mount, not just relative
+  imports. This closes the *other half* of the momentum dashboard-broke bug: the
+  dashboard's dependency on `habit` (via fetch) is now detected, so a `habit`
+  contract change will regenerate the dashboard.
 
-### The known-red backlog (2)
+### The known-red backlog (1)
 
-1. **`constraint.relational-kinds-not-yet-implemented`** — `Bound`, `Membership`, and
-   `Pattern` are done; `Uniqueness`, `Reference` (FK), and `Cardinality` are not yet
-   extracted or checked. *Fix: continue implementing kinds from the algebra
-   (`docs/PROPOSAL-constraint-algebra.md` §5).*
-2. **`regeneration.http-dependencies-detected`** — IU dependencies are derived from
-   relative imports only; a module that consumes another over HTTP (the generated
-   web UIs `fetch` sibling routes) creates no import edge, so the dependency is
-   invisible. This is the remaining half of the momentum dashboard-broke bug (the
-   contract-aware regen is wired, but the dependency itself isn't detected). *Fix:
-   derive dependencies from sibling-route/fetch targets, not just imports.*
+1. **`constraint.advanced-kinds-not-yet-implemented`** — `Bound`, `Membership`,
+   `Pattern`, and `Uniqueness` are done. The genuinely-hard tail is not: `Reference`
+   (FK), `Cardinality` ("at least one line item"), and arbitrary `Expr`/`Invariant`
+   relations. These need cross-entity/relational or executable checking, not a
+   single-field static check. *Fix: implement Reference/Cardinality and route Expr
+   invariants to executable property evals (the path the oracle now uses).*
 
 Each red is a concrete next piece of work with a known fix — the eval doubles as the
-roadmap. Five were closed this session; two remain (one discovered by fixing another
-— honest whack-a-mole, tracked rather than hidden).
+roadmap. Seven capabilities were closed this session by the Red→Green loop; one
+honest red remains for the genuinely-hard tail.

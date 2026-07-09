@@ -38,8 +38,13 @@ export interface PatternAssertion {
   regex?: string;
 }
 
+/** A uniqueness constraint: "a customer email must be unique". */
+export interface UniquenessAssertion {
+  kind: 'uniqueness';
+}
+
 /** The (growing) closed assertion algebra — see docs/DESIGN-shacl-spine.md §4. */
-export type Assertion = BoundAssertion | MembershipAssertion | PatternAssertion;
+export type Assertion = BoundAssertion | MembershipAssertion | PatternAssertion | UniquenessAssertion;
 
 export interface ConstraintSource {
   canon_id?: string;

@@ -36,7 +36,7 @@ import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
 import type { CheckMethod, CheckResult } from '../models/validation.js';
 import { resolveTarget } from '../architectures/index.js';
-import { extractDependencies } from '../dep-extractor.js';
+import { extractFetchRoutes } from '../iu-deps.js';
 
 // ─── test-data helpers ───────────────────────────────────────────────────────
 
@@ -218,14 +218,27 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'constraint.relational-kinds-not-yet-implemented', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
-    redReason: 'Bound, Membership, and Pattern are implemented; Uniqueness, Reference (FK), and Cardinality are not yet extracted or checked, so "email must be unique" / "must reference an existing X" / "at least one line item" remain invisible to the structured layer. Fix: continue implementing kinds from the algebra (docs/PROPOSAL-constraint-algebra.md §5) with their lowering + static checker.',
-    description: 'A uniqueness constraint ("email must be unique") is captured as a structured constraint.',
+    id: 'constraint.uniqueness-kind-is-captured-and-checked', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'A uniqueness constraint ("email must be unique") is captured and statically checked for a UNIQUE declaration.',
     run: () => {
-      const attrs = mineEntityAttributes([iu('customer')], [canon(CanonicalType.DEFINITION, 'a customer has an email', 'd')]);
+      const attrs = mineEntityAttributes([iu('customer')], [canon(CanonicalType.DEFINITION, 'a customer has an email and a name', 'd')]);
       const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a customer email must be unique', 'c', 'cl', ['email'])], attrs);
-      const captured = constraints.some(c => (c.assertion as { kind: string }).kind === 'uniqueness');
-      return { passed: captured, detail: captured ? 'uniqueness captured' : 'uniqueness dropped — kind not implemented' };
+      const u = constraints.find(c => c.assertion.kind === 'uniqueness');
+      if (!u) return { passed: false, detail: 'uniqueness not captured' };
+      const good = checkConstraint(u, 'CREATE TABLE customer (id INTEGER, email TEXT UNIQUE, name TEXT)');
+      const bad = checkConstraint(u, 'CREATE TABLE customer (id INTEGER, email TEXT, name TEXT)');
+      return { passed: good.result === 'conforms' && bad.result === 'absent', detail: `good=${good.result}, bad=${bad.result}` };
+    },
+  },
+  {
+    id: 'constraint.advanced-kinds-not-yet-implemented', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
+    redReason: 'Bound, Membership, Pattern, and Uniqueness are implemented. The genuinely-hard tail is not: Reference (FK, "must reference an existing X"), Cardinality ("at least one line item"), and arbitrary Expr/Invariant relations ("if shipped then shipped_at is set"). These need cross-entity/relational or executable checking, not a single-field static check. Fix: implement Reference/Cardinality kinds and route Expr invariants to executable property evals (the same path the oracle now uses).',
+    description: 'A cardinality constraint ("an order must have at least one line item") is captured as a structured constraint.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('order')], [canon(CanonicalType.DEFINITION, 'an order has a total and line items', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'an order must have at least one line item', 'c', 'cl', ['order', 'line', 'item'])], attrs);
+      const captured = constraints.some(c => (c.assertion as { kind: string }).kind === 'cardinality');
+      return { passed: captured, detail: captured ? 'cardinality captured' : 'cardinality dropped — kind not implemented' };
     },
   },
 
@@ -304,13 +317,13 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
   },
 
   {
-    id: 'regeneration.http-dependencies-detected', capability: 'regeneration', tier: 'unit', expect: 'red',
-    redReason: 'IU→IU dependencies are derived from relative code imports only. A module that consumes another over HTTP (a fetch to a sibling route, as the generated web UIs do) creates no import edge, so the dependency is invisible — the consumer is neither flagged nor regenerated when the producer\'s contract changes. This is the remaining half of the momentum dashboard-broke bug (contract-aware dependent regen is now wired, but the dependency itself is undetected). Fix: also derive dependencies from sibling-route/fetch targets, not just imports.',
-    description: 'A module that calls another module over HTTP is detected as depending on it.',
+    id: 'regeneration.http-dependencies-detected', capability: 'regeneration', tier: 'unit', expect: 'green',
+    description: 'A module that calls another module over HTTP (fetch to a sibling route) is detected as depending on it.',
     run: () => {
-      const g = extractDependencies("const res = await fetch('/habit', { method: 'POST', body });", 'dashboard.ts');
-      const detected = g.imports.some(i => i.is_relative && /habit/.test(i.source));
-      return { passed: detected, detail: detected ? 'http dependency detected' : 'fetch to a sibling module is not detected as a dependency (only imports are)' };
+      // The dashboard fetches the habit module's route; both quote styles + templates.
+      const routes = extractFetchRoutes("await fetch('/habit', {method:'POST'}); await fetch(`/streak/${id}`); await fetch('/check-in');");
+      const ok = routes.includes('habit') && routes.includes('streak') && routes.includes('check-in');
+      return { passed: ok, detail: `routes=[${routes.sort()}]` };
     },
   },
 

@@ -18,7 +18,7 @@ import type { CanonicalNode } from '../models/canonical.js';
 import { CanonicalType } from '../models/canonical.js';
 import type { Clause } from '../models/clause.js';
 import type { ImplementationUnit } from '../models/iu.js';
-import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, Assertion, AttributeRef } from './model.js';
+import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, UniquenessAssertion, Assertion, AttributeRef } from './model.js';
 
 const STOP = new Set([
   'the', 'a', 'an', 'is', 'are', 'be', 'to', 'of', 'in', 'for', 'on', 'with', 'and',
@@ -125,9 +125,18 @@ export function parsePattern(text: string): PatternAssertion | null {
   return null;
 }
 
-/** Parse any supported assertion kind from a statement. Priority: bound, membership, pattern. */
+/** Parse a uniqueness assertion, or null: "must be unique" / "must be a unique X". */
+export function parseUniqueness(text: string): UniquenessAssertion | null {
+  return /\b(?:must be|is|should be)\b[^.]*\bunique\b|\buniquely\b/i.test(text) ? { kind: 'uniqueness' } : null;
+}
+
+/**
+ * Parse any supported assertion kind. Uniqueness is checked BEFORE pattern because
+ * "a customer email must be unique" mentions "email" and would otherwise be
+ * mis-parsed as an email-format constraint — the "unique" signal must win.
+ */
 export function parseAssertion(text: string): Assertion | null {
-  return parseBound(text) ?? parseMembership(text) ?? parsePattern(text);
+  return parseBound(text) ?? parseMembership(text) ?? parseUniqueness(text) ?? parsePattern(text);
 }
 
 /** Resolve the subject of a bounded statement to a known entity.attribute.
@@ -196,7 +205,8 @@ function resolveBinding(
 function id(binding: AttributeRef, a: Assertion): string {
   const shape = a.kind === 'bound' ? `${a.op}:${a.value}`
     : a.kind === 'membership' ? `in:${[...a.values].sort().join('|')}`
-    : `fmt:${a.format}${a.regex ?? ''}`;
+    : a.kind === 'pattern' ? `fmt:${a.format}${a.regex ?? ''}`
+    : 'unique';
   return createHash('sha256').update([a.kind, binding.entity, binding.attribute, shape].join('\x00')).digest('hex').slice(0, 16);
 }
 
