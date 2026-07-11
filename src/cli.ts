@@ -397,7 +397,10 @@ function computeConstraintDiagnostics(
     const paths = ius.filter(u => {
       const src = iuSourceById.get(u.iu_id); if (!src) return false;
       const s = src.toLowerCase();
-      const writesGoverned = [...writeEntities].some(e => new RegExp(`(?:insert into|update|delete from)\\s+${e}s?\\b`, 'i').test(s));
+      // Real English plurals: `entry` writes the `entries` table — the naive `s?`
+      // form missed y→ies and let the unguarded write path escape unexamined.
+      const plural = (e: string) => e.endsWith('y') ? `(?:${e}|${e.slice(0, -1)}ies|${e}s)` : `${e}(?:e?s)?`;
+      const writesGoverned = [...writeEntities].some(e => new RegExp(`(?:insert into|update|delete from)\\s+${plural(e)}\\b`, 'i').test(s));
       return writesGoverned || writeEntities.has(u.name.toLowerCase().replace(/s$/, ''));
     });
     if (paths.length === 0) return { result: 'indeterminate', detail: 'no write path to the governed state found' };

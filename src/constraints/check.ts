@@ -122,7 +122,14 @@ export function checkMembership(c: StructuredConstraint, source: string | null):
   const attr = c.binding.attribute;
   const want = [...c.assertion.values].map(v => v.toLowerCase()).sort();
 
-  const declText = findFieldDecl(source, attr);
+  let declText = findFieldDecl(source, attr);
+  if (!declText) {
+    // The enum may live behind a NAMED CONSTANT: `class: ClassEnum.optional()` with
+    // `const ClassEnum = z.enum([...])` above. Follow one level of indirection.
+    const named = source.match(new RegExp(`\\b(?:[a-z0-9]+_)?${escapeRe(attr)}\\s*:\\s*([A-Za-z_$][\\w$]*)`, 'i'));
+    const constDecl = named ? source.match(new RegExp(`(?:const|let|var)\\s+${escapeRe(named[1])}\\s*=\\s*(z\\.[^;]+)`, 'i')) : null;
+    if (constDecl) declText = constDecl[1];
+  }
   if (!declText) {
     return fieldMentioned(source, attr)
       ? { result: 'absent', detail: `no enum on "${attr}" (field present, value-set unconstrained)` }
@@ -313,7 +320,17 @@ export function checkTemporal(c: StructuredConstraint, source: string | null): C
       : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
   }
   const cue = c.assertion.mode === 'not-future' ? /future/i : /past/i;
-  const enforced = cue.test(declText) || /[<>]=?\s*(?:new\s+Date\(|Date\.now\(|today)/i.test(declText);
+  let enforced = cue.test(declText) || /[<>]=?\s*(?:new\s+Date\(|Date\.now\(|today)/i.test(declText);
+  if (!enforced) {
+    // The validator may sit at the OBJECT level, not on the field chain:
+    // `}).refine(data => new Date(data.date) <= new Date(), { message: '… future', path: ['date'] })`.
+    // An object refine counts when it names both the attribute and the temporal cue.
+    const attrRe = new RegExp(`\\b(?:[a-z0-9]+_)?${escapeRe(attr)}\\b`, 'i');
+    for (const m of source.matchAll(/\.refine\(/g)) {
+      const win = source.slice(m.index!, m.index! + 250);
+      if (attrRe.test(win) && (cue.test(win) || /[<>]=?\s*new\s+Date\(/.test(win))) { enforced = true; break; }
+    }
+  }
   return enforced
     ? { result: 'conforms', detail: `${c.assertion.mode} enforced on "${attr}"` }
     : { result: 'absent', detail: `no ${c.assertion.mode} validator on "${attr}"` };

@@ -161,8 +161,11 @@ export function checkProperty(statement: string, source: string): { status: 'pas
     // word before the negativity cue) and require a 0-comparison or field floor
     // co-located with it. Fall back to a strict field floor when the noun is unknown.
     const cueIdx = s.search(/below\s+(?:zero|0)|negative/);
+    // The guarded noun is the content word before the cue — skipping the linking
+    // verb the canonicalizer may leave there ("balance never BECOMES negative").
+    const LINKING = new Set(['be', 'becomes', 'become', 'goes', 'go', 'falls', 'fall', 'turns', 'turn', 'gets', 'get', 'stays', 'stay', 'remains', 'remain', 'dips', 'dip', 'drops', 'drop']);
     const subject = cueIdx >= 0
-      ? [...s.slice(0, cueIdx).split(/[^a-z]+/).filter(Boolean)].reverse().find(w => w.length > 2 && !GENERIC.has(w))
+      ? [...s.slice(0, cueIdx).split(/[^a-z]+/).filter(Boolean)].reverse().find(w => w.length > 2 && !GENERIC.has(w) && !LINKING.has(w))
       : undefined;
     const src = source.toLowerCase();
     const near = (needle: RegExp): boolean => {

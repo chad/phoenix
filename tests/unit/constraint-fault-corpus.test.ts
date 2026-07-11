@@ -154,6 +154,41 @@ const CORPUS: Case[] = [
     // Present-but-optional is NOT required — the field can be omitted entirely.
     falseGreen: `const S = z.object({ name: z.string().optional(), owner_email: z.string().email() });`,
   },
+  // ── real-world traps from the Dragon's Hoard run (sonnet-generated idioms) ──
+  {
+    kind: 'membership', label: 'membership-named-constant',
+    entities: [iu('adventurer')],
+    defs: [canon(CanonicalType.DEFINITION, 'an adventurer has a name and a class')],
+    // Oxford ", or cleric" once DROPPED the last value from the captured set.
+    rule: canon(CanonicalType.CONSTRAINT, 'an adventurer class must be one of fighter, wizard, rogue, or cleric', ['class']),
+    // The enum lives behind a NAMED CONSTANT — one level of indirection.
+    conforming: `const ClassEnum = z.enum(['fighter', 'wizard', 'rogue', 'cleric']);\nconst S = z.object({ class: ClassEnum.optional().default('fighter') });`,
+    faulted: `const S = z.object({ class: z.string() });`,
+    // Wrong value-set behind the constant must still be caught.
+    falseGreen: `const ClassEnum = z.enum(['fighter', 'wizard', 'rogue']);\nconst S = z.object({ class: ClassEnum });`,
+  },
+  {
+    kind: 'temporal', label: 'temporal-object-refine',
+    entities: [iu('entry')],
+    defs: [canon(CanonicalType.DEFINITION, 'an entry has an amount and a date')],
+    rule: canon(CanonicalType.CONSTRAINT, 'the entry date must not occur in the future', ['entry', 'date']),
+    // The validator sits at the OBJECT level, not on the field chain.
+    conforming: `const S = z.object({ amount: z.number(), date: z.string() }).refine(data => !data.date || new Date(data.date) <= new Date(), { message: 'date must not be in the future', path: ['date'] });`,
+    faulted: `const S = z.object({ amount: z.number(), date: z.string() });`,
+    // An object refine about a DIFFERENT field must not count for this one.
+    falseGreen: `const S = z.object({ amount: z.number(), date: z.string() }).refine(data => data.amount > 0, { message: 'amount must be positive', path: ['amount'] });`,
+  },
+  {
+    kind: 'expr', label: 'expr-canonicalizer-inflection',
+    entities: [iu('balance'), iu('gold')],
+    defs: [canon(CanonicalType.DEFINITION, 'a balance has an amount')],
+    // The canonicalizer normalizes "must never be negative" → "never becomes negative"
+    // and "must reject" → "rejects"; normativity must survive the inflection.
+    rule: canon(CanonicalType.INVARIANT, "an adventurer's gold balance never becomes negative", ['balance']),
+    conforming: `function applyPurchase(b, amount){ if (b.balance - amount < 0) throw new Error('below zero'); b.balance -= amount; }`,
+    faulted: `function applyPurchase(b, amount){ /* gold balance */ b.balance -= amount; }`,
+    falseGreen: `function applyPurchase(b, amount){ const errs = []; if (errs.length > 0) { /* gold balance */ } b.balance -= amount; }`,
+  },
   {
     kind: 'expr', label: 'expr-executable-aggregate',
     entities: [iu('dashboard'), iu('account')],

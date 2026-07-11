@@ -43,7 +43,7 @@ export interface AggregateProperty {
  */
 export function deriveAggregateProperty(statement: string): AggregateProperty | null {
   const m = statement.toLowerCase().match(
-    /\bmust\s+(?:equal|be|match)\b[^.]*?\bsum of\b(?:\s+(?:all|the|its|their))*\s+(?:[a-z-]+\s+)*?([a-z-]+?)s?\s*(?:[.;,]|$)/i,
+    /\b(?:must\s+(?:equal|be|match)|equals?|matches)\b[^.]*?\bsum of\b(?:\s+(?:all|the|its|their))*\s+(?:[a-z-]+\s+)*?([a-z-]+?)s?\s*(?:[.;,]|$)/i,
   );
   if (!m) return null;
   const field = m[1];

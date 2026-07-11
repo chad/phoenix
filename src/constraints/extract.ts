@@ -48,6 +48,17 @@ export function mineEntityAttributes(
   const entities = new Set(ius.map(iu => singular(iu.name.toLowerCase().trim())));
   const attrs = new Map<string, Set<string>>();
   for (const e of entities) attrs.set(e, new Set());
+  // A multi-word IU name ("ledger entry", "gold balance") never matches the
+  // single-noun subjects constraints use ("an entry note…"). Alias each content
+  // word to the SAME attribute set, so "entry" and "ledger entry" are one entity.
+  for (const e of [...entities]) {
+    const words = e.split(/\s+/);
+    if (words.length < 2) continue;
+    for (const w of words.map(singular)) {
+      if (w.length <= 2 || STOP.has(w)) continue;
+      if (!attrs.has(w)) attrs.set(w, attrs.get(e)!);
+    }
+  }
 
   const HAS_RE = /\b(?:an?|each|every)?\s*([a-z][a-z-]+)\s+(?:has|have|contains?|includes?)\s+(.+)/i;
   const texts: string[] = [
@@ -129,7 +140,10 @@ export function parseMembership(text: string): MembershipAssertion | null {
     // "credit or debit". A new "<conj> a/an/the/its <noun>" begins a different field,
     // so its values must not bleed into this enum. (A plain list "red, and blue"
     // is preserved — "blue" is not an article.)
-    .replace(/,?\s+(?:and|with|but|plus|as well as)\s+(?:a|an|the|its|each|their)\s.*$/i, '');
+    .replace(/,?\s+(?:and|with|but|plus|as well as)\s+(?:a|an|the|its|each|their)\s.*$/i, '')
+    // Oxford-comma conjunction: "rogue, or cleric" — the split sees ", " first and
+    // leaves "or cleric" as one token, silently DROPPING the last value. Normalize.
+    .replace(/,\s*(?:or|and)\s+/gi, ', ');
   const values = tail
     .split(/\s*,\s*|\s+or\s+|\s+and\s+/i)
     .map(v => v.trim().toLowerCase().replace(/^['"]|['"]$/g, ''))
@@ -204,12 +218,20 @@ export function parseCardinality(text: string): CardinalityAssertion | null {
 // negative", "is the sum of …"). Deliberately narrow AND safe: the checker abstains
 // when it can't reduce the statement, so breadth here never yields a false red.
 const EXPR_CUES =
-  /\bif\b.+\bthen\b|would\s+(?:take|make|cause|leave|put|bring|result)\b|below\s+(?:zero|0)\b|never\s+be\s+negative|non-?negative|\bsum\s+of\b|\btotal\s+of\b|must\s+(?:not\s+)?(?:equal|match)\b/i;
-const EXPR_NORMATIVE = /\b(?:must|shall|should|cannot|can't|may not|never|always|reject|ensure|require[sd]?|if)\b/i;
+  /\bif\b.+\bthen\b|would\s+(?:take|make|cause|leave|put|bring|result)\b|below\s+(?:zero|0)\b|never\s+(?:be|becomes?|goes?|falls?|turns?)\s+negative|non-?negative|\bsum\s+of\b|\btotal\s+of\b|must\s+(?:not\s+)?(?:equal|match)\b/i;
+// Inflected forms included: the LLM canonicalizer normalizes "must reject" to
+// "rejects" and "must never be" to "never becomes" — normativity must survive that.
+const EXPR_NORMATIVE = /\b(?:must|shall|should|cannot|can't|may not|never|always|reject(?:s|ed|ing)?|ensure[sd]?|require[sd]?|if)\b/i;
+// A declarative aggregate equality ("the board total equals the sum of all …")
+// is normative in substance even with no modal. Guard: a "minus"-formula sentence
+// ("balance is the sum of loot minus purchases") is a DEFINITION, not a property
+// the runner can test as a plain sum — leave it to the definition path.
+const EXPR_DECLARATIVE_AGG = /\bequals?\b[^.]*\bsum of\b/i;
 
 /** Parse a relational/conditional invariant routed to the executable oracle, or null. */
 export function parseExpr(text: string): ExprAssertion | null {
   const s = text.trim().replace(/\s+/g, ' ');
+  if (EXPR_DECLARATIVE_AGG.test(s) && !/\bminus\b/i.test(s)) return { kind: 'expr', statement: s };
   if (!EXPR_NORMATIVE.test(s) || !EXPR_CUES.test(s)) return null;
   return { kind: 'expr', statement: s };
 }
@@ -405,8 +427,17 @@ function bindRelational(
     if (!holder) return { subject: a.relation };
     return { ref: { entity: holder.e, attribute: a.relation } };
   }
-  // expr: the actor that must enforce the invariant. Prefer the entity named nearest
-  // an action verb (reject/record/create/add/update); else the first named entity.
+  // expr: bind to the STATE OWNER — the entity mentioned nearest BEFORE the
+  // invariant cue ("…gold BALANCE never becomes negative" governs the balance,
+  // not the adventurer who happens to be the sentence's grammatical subject).
+  // The write-path analysis still catches every module that writes the state;
+  // this binding only decides which module the nominal fallback checks.
+  const cueM = lower.match(/below\s+(?:zero|0)|negative|in the future|sum of|equal/);
+  if (cueM && cueM.index !== undefined) {
+    const before = mentioned.filter(x => x.p < cueM.index!).sort((x, y) => y.p - x.p);
+    if (before.length > 0) return { ref: { entity: before[0].e, attribute: 'invariant' } };
+  }
+  // Fallback: the entity nearest an action verb (reject/record/…); else the first.
   const actionM = lower.match(/\b(?:reject|record|create|add|update|post|apply|allow|prevent)\b/);
   const anchor = actionM && actionM.index !== undefined ? actionM.index : 0;
   const byAction = [...mentioned].sort((x, y) => Math.abs(x.p - anchor) - Math.abs(y.p - anchor));
