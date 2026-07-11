@@ -15,6 +15,7 @@
 
 import type { StructuredConstraint } from './model.js';
 import type { CheckResult } from '../models/validation.js';
+import { checkProperty } from '../evals.js';
 
 const zodMethod = (op: string) => (op === '<=' ? 'max' : 'min');
 
@@ -196,6 +197,83 @@ export function checkUniqueness(c: StructuredConstraint, source: string | null):
     : { result: 'absent', detail: `no UNIQUE constraint on "${attr}"` };
 }
 
+/**
+ * Check a Reference (foreign-key) constraint against a module's source. "A
+ * transaction must reference an existing account" is enforced either by a schema
+ * FK declaration (`REFERENCES accounts(id)`) or by an application-level existence
+ * guard (`SELECT id FROM accounts WHERE id = ?` before the write). Conforms when
+ * one is found; absent when the reference field is present but unguarded;
+ * indeterminate when the target isn't referenced at all.
+ */
+export function checkReference(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  if (c.assertion.kind !== 'reference') return { result: 'indeterminate', detail: 'not a reference assertion' };
+  const target = c.assertion.target;
+  const t = `(?:[a-z0-9]+_)?${escapeRe(target)}`;
+  const enforced = new RegExp(
+    `references\\s+${t}s?\\b` +                     // SQL: ... REFERENCES accounts(id)
+    `|foreign\\s+key\\b[^;\\n]*\\b${t}s?\\b` +       // SQL: FOREIGN KEY (account_id) REFERENCES accounts
+    `|from\\s+${t}s?\\s+where\\b`,                   // app guard: SELECT id FROM accounts WHERE id = ?
+    'i').test(source);
+  if (enforced) return { result: 'conforms', detail: `referential integrity to "${target}" enforced (FK or existence guard)` };
+  const mentions = new RegExp(`\\b${t}(?:_id)?\\b`, 'i').test(source);
+  return mentions
+    ? { result: 'absent', detail: `references "${target}" but enforces no FK / existence guard` }
+    : { result: 'indeterminate', detail: `no reference to "${target}" found in module` };
+}
+
+/**
+ * Check a Cardinality constraint against a module's source. "An order must have at
+ * least one line item" is enforced by a non-empty / count guard on the related
+ * collection (`.min(1)`, `.nonempty()`, a `.length` comparison, or a rejecting
+ * count check). Conforms when a matching guard is found; absent when the relation
+ * is present but unconstrained; indeterminate when the relation isn't found.
+ */
+export function checkCardinality(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  if (c.assertion.kind !== 'cardinality') return { result: 'indeterminate', detail: 'not a cardinality assertion' };
+  const rel = c.assertion.relation;
+  const r = `(?:[a-z0-9]+_)?${escapeRe(rel)}`;
+  if (!new RegExp(`\\b${r}s?\\b`, 'i').test(source)) {
+    return { result: 'indeterminate', detail: `relation "${rel}" not found in module` };
+  }
+  const { min, max } = c.assertion;
+  // A lower bound of ≥1 is the common "at least one" case → a non-empty guard.
+  const minGuard = min !== undefined && (
+    new RegExp(`\\.min\\(\\s*${min}\\b`).test(source) ||
+    /\.nonempty\(/.test(source) ||
+    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.length\\s*(?:>=?\\s*${min}\\b|>\\s*${Math.max(0, min - 1)}\\b|===?\\s*0\\b|!==?\\s*0\\b)`, 'i').test(source)
+  );
+  const maxGuard = max !== undefined && (
+    new RegExp(`\\.max\\(\\s*${max}\\b`).test(source) ||
+    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.length\\s*(?:<=?\\s*${max}\\b|>\\s*${max}\\b)`, 'i').test(source)
+  );
+  const want = (min !== undefined ? 'min' : '') + (max !== undefined ? 'max' : '');
+  const ok = (min === undefined || minGuard) && (max === undefined || maxGuard);
+  const shape = `${min !== undefined ? `≥${min}` : ''}${max !== undefined ? ` ≤${max}` : ''}`.trim();
+  return ok
+    ? { result: 'conforms', detail: `cardinality ${shape} on "${rel}" enforced` }
+    : { result: 'absent', detail: `no ${want}-count guard on "${rel}" (spec requires ${shape})` };
+}
+
+/**
+ * Check an Expr (relational / conditional) invariant by routing to the executable
+ * oracle (checkProperty). The oracle returns a real verdict when it can reduce the
+ * statement to a checkable shape (non-negativity, threshold, enum, bound, non-empty)
+ * and ABSTAINS otherwise. This is the cross-module capability a single-field static
+ * check cannot provide — e.g. "reject a debit that would take a balance below zero"
+ * is caught when the module never guards the balance, and honestly deferred when the
+ * relation is beyond static reach. It NEVER returns conforms for a property it did
+ * not verify.
+ */
+export function checkExpr(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  if (c.assertion.kind !== 'expr') return { result: 'indeterminate', detail: 'not an expr assertion' };
+  const r = checkProperty(c.assertion.statement, source);
+  const result: CheckResult = r.status === 'pass' ? 'conforms' : r.status === 'fail' ? 'violates' : 'indeterminate';
+  return { result, detail: r.reason };
+}
+
 /** Dispatch a constraint to its kind's static checker. */
 export function checkConstraint(c: StructuredConstraint, source: string | null): ConstraintCheck {
   if (c.assertion.kind === 'bound') {
@@ -204,6 +282,9 @@ export function checkConstraint(c: StructuredConstraint, source: string | null):
   }
   if (c.assertion.kind === 'membership') return checkMembership(c, source);
   if (c.assertion.kind === 'pattern') return checkPattern(c, source);
+  if (c.assertion.kind === 'reference') return checkReference(c, source);
+  if (c.assertion.kind === 'cardinality') return checkCardinality(c, source);
+  if (c.assertion.kind === 'expr') return checkExpr(c, source);
   return checkUniqueness(c, source);
 }
 

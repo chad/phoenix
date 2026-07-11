@@ -31,7 +31,7 @@ import { defaultBoundaryPolicy, defaultEnforcement } from '../models/iu.js';
 import { checkBound, checkConstraint } from '../constraints/check.js';
 import { extractBoundConstraints, extractConstraints, mineEntityAttributes } from '../constraints/extract.js';
 import type { StructuredConstraint } from '../constraints/model.js';
-import { deriveEvaluations, checkEvaluation } from '../evals.js';
+import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
 import type { CheckMethod, CheckResult } from '../models/validation.js';
@@ -231,14 +231,63 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'constraint.advanced-kinds-not-yet-implemented', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
-    redReason: 'Bound, Membership, Pattern, and Uniqueness are implemented. The genuinely-hard tail is not: Reference (FK, "must reference an existing X"), Cardinality ("at least one line item"), and arbitrary Expr/Invariant relations ("if shipped then shipped_at is set"). These need cross-entity/relational or executable checking, not a single-field static check. Fix: implement Reference/Cardinality kinds and route Expr invariants to executable property evals (the same path the oracle now uses).',
-    description: 'A cardinality constraint ("an order must have at least one line item") is captured as a structured constraint.',
+    id: 'constraint.reference-kind-is-captured-and-checked', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'A referential constraint ("must reference an existing account") is captured as a Reference constraint and checked for a FK / existence guard.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('transaction'), iu('account')], [canon(CanonicalType.DEFINITION, 'a transaction has an account and an amount', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a transaction must reference an existing account', 'c', 'cl', ['transaction', 'account'])], attrs);
+      const r = constraints.find(c => c.assertion.kind === 'reference');
+      if (!r) return { passed: false, detail: 'reference constraint not captured' };
+      // Enforced by an app-level existence guard; unenforced when the FK is written blind.
+      const good = checkConstraint(r, 'if (!db.prepare("SELECT id FROM accounts WHERE id = ?").get(account_id)) return err(400);');
+      const bad = checkConstraint(r, 'db.prepare("INSERT INTO transactions (account_id) VALUES (?)").run(account_id);');
+      const target = (r.assertion as { target: string }).target;
+      return { passed: r.binding.entity === 'transaction' && target === 'account' && good.result === 'conforms' && bad.result === 'absent',
+        detail: `bind=${r.binding.entity}→${target}, good=${good.result}, bad=${bad.result}` };
+    },
+  },
+  {
+    id: 'constraint.cardinality-kind-is-captured-and-checked', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'A cardinality constraint ("an order must have at least one line item") is captured as a Cardinality constraint and checked for a non-empty / count guard.',
     run: () => {
       const attrs = mineEntityAttributes([iu('order')], [canon(CanonicalType.DEFINITION, 'an order has a total and line items', 'd')]);
       const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'an order must have at least one line item', 'c', 'cl', ['order', 'line', 'item'])], attrs);
-      const captured = constraints.some(c => (c.assertion as { kind: string }).kind === 'cardinality');
-      return { passed: captured, detail: captured ? 'cardinality captured' : 'cardinality dropped — kind not implemented' };
+      const r = constraints.find(c => c.assertion.kind === 'cardinality');
+      if (!r) return { passed: false, detail: 'cardinality constraint not captured' };
+      const good = checkConstraint(r, 'const S = z.object({ items: z.array(LineItem).min(1) });');
+      const bad = checkConstraint(r, 'const S = z.object({ items: z.array(LineItem) });');
+      return { passed: (r.assertion as { min?: number }).min === 1 && good.result === 'conforms' && bad.result === 'absent',
+        detail: `min=${(r.assertion as { min?: number }).min}, good=${good.result}, bad=${bad.result}` };
+    },
+  },
+  {
+    id: 'constraint.expr-invariant-routed-to-oracle', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'A relational invariant ("reject a debit that would take a balance below zero") is captured as an Expr constraint and routed to the executable oracle — CAUGHT when the guard is missing, conforms when present, and abstained (never false-green) when not statically reducible.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('account')], [canon(CanonicalType.DEFINITION, 'an account has a balance', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'the system must reject a debit that would take an account balance below zero', 'c', 'cl', ['account', 'balance'])], attrs);
+      const e = constraints.find(c => c.assertion.kind === 'expr');
+      if (!e) return { passed: false, detail: 'expr invariant not captured' };
+      const caught = checkConstraint(e, 'function debit(a, amount){ /* account balance */ a.balance -= amount; return a; }');
+      const guarded = checkConstraint(e, 'function debit(a, amount){ if (a.balance - amount < 0) throw new Error("overdraft"); a.balance -= amount; }');
+      const abstains = checkProperty('an account must be archived 90 days after its last transaction', 'function archive(){ /* ... */ }');
+      return { passed: caught.result === 'violates' && guarded.result === 'conforms' && abstains.status === 'indeterminate',
+        detail: `caught=${caught.result}, guarded=${guarded.result}, abstain=${abstains.status}` };
+    },
+  },
+  {
+    id: 'constraint.executable-aggregate-invariants-not-yet-proven', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
+    redReason: 'Reference, Cardinality, and Expr are now implemented: Expr invariants route to the oracle (checkProperty), which CATCHES a missing guard on statically-reducible shapes (sign / threshold / bound / enum / non-empty) and ABSTAINS on the rest — it never false-greens. The genuinely-hard tail remains open: cross-entity AGGREGATE equalities ("a dashboard total equals the sum of all account balances") and TEMPORAL invariants ("archived 90 days after…") cannot be proven by static reduction. A correct implementation is only abstained (INCOMPLETE), never proven OK. Fix: build a real executable, mutation-gated property-eval runner (a live harness) and route these invariants to it — the same gate trust.behavioral-ok-is-withheld is waiting on.',
+    description: 'A cross-entity aggregate invariant is PROVEN (conforms) against a correct implementation, not merely abstained.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('dashboard'), iu('account')], [canon(CanonicalType.DEFINITION, 'a dashboard has a total', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'the dashboard total must equal the sum of all account balances', 'c', 'cl', ['dashboard', 'total', 'account'])], attrs);
+      const e = constraints.find(c => c.assertion.kind === 'expr');
+      // A correct implementation exists, but the static oracle can only ABSTAIN — it
+      // cannot execute the aggregate to prove the equality. So this is honestly red.
+      const correct = 'function total(accts){ return accts.reduce((s,a)=>s+a.balance,0); } // dashboard total = sum of account balances';
+      const r = e ? checkConstraint(e, correct) : { result: 'indeterminate' as const };
+      return { passed: r.result === 'conforms', detail: `oracle=${r.result} (want conforms; abstains today — needs an executable eval)` };
     },
   },
 

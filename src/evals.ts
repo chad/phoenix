@@ -147,8 +147,13 @@ export function checkProperty(statement: string, source: string): { status: 'pas
   const terms = keyTerms(statement);
   const refsField = terms.some(t => source.toLowerCase().includes(t) || source.toLowerCase().includes(t.replace(/s$/, '')));
 
-  // ── non-negativity: "must never be negative", "non-negative", ">= 0" ──
-  if (/\bnegative\b/.test(s) && /\b(?:not|never|non|cannot|can't|no)\b/.test(s)) {
+  // ── non-negativity: "must never be negative", "non-negative", ">= 0", and the
+  //    relational overdraft shape "would take/go below zero" / "go negative" ──
+  const nonNeg =
+    (/\bnegative\b/.test(s) && /\b(?:not|never|non|cannot|can't|no)\b/.test(s)) ||
+    /\bbelow\s+(?:zero|0)\b/.test(s) ||
+    /\bgo(?:es)?\s+negative\b/.test(s);
+  if (nonNeg) {
     if (!refsField) return { status: 'fail', reason: 'invariant field not referenced (enforcement dropped)' };
     const enforced = /\.min\(\s*0\s*\)|\.nonnegative\(|\.gte\(\s*0\s*\)|[<>]=?\s*0\b|>=\s*0/.test(source);
     return enforced

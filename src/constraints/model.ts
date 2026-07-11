@@ -43,8 +43,50 @@ export interface UniquenessAssertion {
   kind: 'uniqueness';
 }
 
+/**
+ * A referential-integrity constraint: "a transaction must reference an existing
+ * account". The `target` is the referenced entity (singular); enforcement is a
+ * foreign-key declaration or an existence guard against the target's table.
+ */
+export interface ReferenceAssertion {
+  kind: 'reference';
+  target: string;
+}
+
+/**
+ * A cardinality constraint on a relation: "an order must have at least one line
+ * item" (min 1), "at most 3 tags" (max 3). `relation` is the related thing's head
+ * noun (singular); enforcement is a non-empty / count guard on the collection.
+ */
+export interface CardinalityAssertion {
+  kind: 'cardinality';
+  min?: number;
+  max?: number;
+  relation: string;
+}
+
+/**
+ * A relational / conditional invariant that is NOT a single-field shape — e.g.
+ * "reject a cleared debit that would take an account balance below zero" or "if
+ * shipped then shipped_at is set". These cannot be decided by a single-attribute
+ * static check; they route to the executable oracle path (checkProperty), which
+ * returns a real verdict when it can reduce the statement and ABSTAINS otherwise —
+ * it never false-greens. `statement` carries the normative sentence verbatim.
+ */
+export interface ExprAssertion {
+  kind: 'expr';
+  statement: string;
+}
+
 /** The (growing) closed assertion algebra — see docs/DESIGN-shacl-spine.md §4. */
-export type Assertion = BoundAssertion | MembershipAssertion | PatternAssertion | UniquenessAssertion;
+export type Assertion =
+  | BoundAssertion
+  | MembershipAssertion
+  | PatternAssertion
+  | UniquenessAssertion
+  | ReferenceAssertion
+  | CardinalityAssertion
+  | ExprAssertion;
 
 export interface ConstraintSource {
   canon_id?: string;

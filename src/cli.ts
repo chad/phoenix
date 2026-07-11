@@ -379,14 +379,26 @@ function computeConstraintDiagnostics(
         ? `∈ {${a.values.join(', ')}}`
         : a.kind === 'pattern'
           ? `format: ${a.format}`
-          : 'must be unique';
+          : a.kind === 'reference'
+            ? `→ existing ${a.target}`
+            : a.kind === 'cardinality'
+              ? `count ${a.min !== undefined ? `≥${a.min}` : ''}${a.max !== undefined ? ` ≤${a.max}` : ''} ${a.relation}`.trim()
+              : a.kind === 'expr'
+                ? `invariant: ${a.statement.slice(0, 48)}${a.statement.length > 48 ? '…' : ''}`
+                : 'must be unique';
     const enforce = a.kind === 'bound'
       ? `.${a.op === '<=' ? 'max' : 'min'}(${a.value})`
       : a.kind === 'membership'
         ? `z.enum([${a.values.map(v => `'${v}'`).join(', ')}])`
         : a.kind === 'pattern'
           ? `.${a.format}()`
-          : 'a UNIQUE constraint';
+          : a.kind === 'reference'
+            ? `a foreign key or existence guard against ${a.target}`
+            : a.kind === 'cardinality'
+              ? `a non-empty / count guard on ${a.relation}`
+              : a.kind === 'expr'
+                ? `an executable guard for this invariant`
+                : 'a UNIQUE constraint';
     const result: ValidationResult = {
       focus: { label: `${c.binding.entity}.${c.binding.attribute}`, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: iu?.iu_id },
       path: c.binding.attribute,
@@ -400,11 +412,13 @@ function computeConstraintDiagnostics(
     const verdict = verdictOf(result.method, result.result);
     const sev = verdictSeverity(verdict);
     if (!sev) continue; // conforms → OK → no diagnostic
-    result.recommended_actions = check.result === 'absent'
-      ? [`Enforce ${c.binding.entity}.${c.binding.attribute} ${enforce} in the generated schema, then regenerate`]
-      : check.result === 'violates'
-        ? [`Generated code enforces the wrong ${a.kind}; regenerate to match the spec (${shape})`]
-        : [`Generate ${c.binding.entity} to reason about this constraint`];
+    result.recommended_actions = a.kind === 'expr'
+      ? [`Add ${enforce} in ${c.binding.entity} so the code cannot reach a state the invariant forbids, then regenerate`]
+      : check.result === 'absent'
+        ? [`Enforce ${c.binding.entity}.${c.binding.attribute} with ${enforce} in the generated code, then regenerate`]
+        : check.result === 'violates'
+          ? [`Generated code enforces the wrong ${a.kind}; regenerate to match the spec (${shape})`]
+          : [`Generate ${c.binding.entity} to reason about this constraint`];
     diagnostics.push({
       severity: sev,
       category: 'constraint',

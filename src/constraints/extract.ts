@@ -18,7 +18,7 @@ import type { CanonicalNode } from '../models/canonical.js';
 import { CanonicalType } from '../models/canonical.js';
 import type { Clause } from '../models/clause.js';
 import type { ImplementationUnit } from '../models/iu.js';
-import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, UniquenessAssertion, Assertion, AttributeRef } from './model.js';
+import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, UniquenessAssertion, ReferenceAssertion, CardinalityAssertion, ExprAssertion, Assertion, AttributeRef } from './model.js';
 
 const STOP = new Set([
   'the', 'a', 'an', 'is', 'are', 'be', 'to', 'of', 'in', 'for', 'on', 'with', 'and',
@@ -154,13 +154,77 @@ export function parseUniqueness(text: string): UniquenessAssertion | null {
   return /\b(?:must be|is|should be)\b[^.]*\bunique\b|\buniquely\b/i.test(text) ? { kind: 'uniqueness' } : null;
 }
 
+// "must reference an existing account" / "belongs to an account" / "for an account
+// that does not exist". The target is the referenced entity (singular head noun).
+const REFERENCE_RE =
+  /\b(?:must\s+)?(?:reference|belong to|point to|refers? to|belongs? to)\s+(?:an?\s+)?(?:existing\s+|valid\s+)?([a-z][a-z-]+)|\bfor\s+(?:an?\s+)?([a-z][a-z-]+)\s+that\s+(?:does\s+not|doesn't|must)\s+exist/i;
+
+/** Parse a referential-integrity assertion ("must reference an existing X"), or null. */
+export function parseReference(text: string): ReferenceAssertion | null {
+  const m = text.match(REFERENCE_RE);
+  if (!m) return null;
+  const raw = (m[1] ?? m[2] ?? '').toLowerCase();
+  const target = singular(raw);
+  return target && target.length > 2 && !STOP.has(target) ? { kind: 'reference', target } : null;
+}
+
+const NUMWORD: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+// "must have at least one line item" / "contains at most 3 tags" — a count on a
+// RELATION (a collection), not a scalar bound. Requires a possessive/containment
+// verb so scalar bounds ("must not exceed 80 characters") don't match here.
+const CARDINALITY_RE =
+  /\b(?:have|has|contains?|includes?|with|hold)\b[^.]*?\b(at least|at most|no fewer than|no more than|minimum(?:\s+of)?|maximum(?:\s+of)?|exactly)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+([a-z][a-z -]*?)(?:\.|,|;|:|$|\s+(?:per|for|in|of|that|which)\b)/i;
+
+/** Parse a cardinality assertion on a relation ("at least one line item"), or null. */
+export function parseCardinality(text: string): CardinalityAssertion | null {
+  const m = text.match(CARDINALITY_RE);
+  if (!m) return null;
+  const qual = m[1].toLowerCase();
+  const n = /^\d+$/.test(m[2]) ? parseInt(m[2], 10) : NUMWORD[m[2].toLowerCase()];
+  if (n === undefined) return null;
+  const relation = singular(m[3].trim().split(/\s+/).pop()!.toLowerCase()); // head noun of the relation
+  // Note: the relation noun is the collection the checker searches for in code
+  // ("item" → matches "items"), so it must NOT be filtered by the bound-noise STOP
+  // set (which includes "item"); reject only non-noun quantifiers/pronouns.
+  const NON_RELATION = new Set(['them', 'it', 'one', 'each', 'other', 'more', 'fewer', 'value', 'thing']);
+  if (!relation || relation.length < 2 || NON_RELATION.has(relation)) return null;
+  const isMax = /most|no more|maximum/.test(qual);
+  return isMax ? { kind: 'cardinality', max: n, relation } : { kind: 'cardinality', min: n, relation };
+}
+
+// A relational / conditional invariant that no single-field kind claims: a
+// conditional ("if shipped then shipped_at set"), a threshold effect ("would take
+// the balance below zero"), or a sign/aggregate invariant ("must never be
+// negative", "is the sum of …"). Deliberately narrow AND safe: the checker abstains
+// when it can't reduce the statement, so breadth here never yields a false red.
+const EXPR_CUES =
+  /\bif\b.+\bthen\b|would\s+(?:take|make|cause|leave|put|bring|result)\b|below\s+(?:zero|0)\b|never\s+be\s+negative|non-?negative|\bsum\s+of\b|\btotal\s+of\b|must\s+(?:not\s+)?(?:equal|match)\b/i;
+const EXPR_NORMATIVE = /\b(?:must|shall|should|cannot|can't|may not|never|always|reject|ensure|require[sd]?|if)\b/i;
+
+/** Parse a relational/conditional invariant routed to the executable oracle, or null. */
+export function parseExpr(text: string): ExprAssertion | null {
+  const s = text.trim().replace(/\s+/g, ' ');
+  if (!EXPR_NORMATIVE.test(s) || !EXPR_CUES.test(s)) return null;
+  return { kind: 'expr', statement: s };
+}
+
 /**
- * Parse any supported assertion kind. Uniqueness is checked BEFORE pattern because
- * "a customer email must be unique" mentions "email" and would otherwise be
- * mis-parsed as an email-format constraint — the "unique" signal must win.
+ * Parse any supported assertion kind. Order matters:
+ *  - Reference & Cardinality first — their cues ("existing X", "at least one X")
+ *    are specific and must not be misread as a scalar bound or pattern.
+ *  - Uniqueness BEFORE pattern — "email must be unique" mentions "email" and would
+ *    otherwise be mis-parsed as an email-format constraint; the "unique" signal wins.
+ *  - Expr LAST — the relational/conditional catch-all, claimed only when no
+ *    single-field kind applies.
  */
 export function parseAssertion(text: string): Assertion | null {
-  return parseBound(text) ?? parseMembership(text) ?? parseUniqueness(text) ?? parsePattern(text);
+  return parseReference(text)
+    ?? parseCardinality(text)
+    ?? parseBound(text)
+    ?? parseMembership(text)
+    ?? parseUniqueness(text)
+    ?? parsePattern(text)
+    ?? parseExpr(text);
 }
 
 /** Resolve the subject of a bounded statement to a known entity.attribute.
@@ -230,8 +294,57 @@ function id(binding: AttributeRef, a: Assertion): string {
   const shape = a.kind === 'bound' ? `${a.op}:${a.value}`
     : a.kind === 'membership' ? `in:${[...a.values].sort().join('|')}`
     : a.kind === 'pattern' ? `fmt:${a.format}${a.regex ?? ''}`
+    : a.kind === 'reference' ? `ref:${a.target}`
+    : a.kind === 'cardinality' ? `card:${a.min ?? ''}..${a.max ?? ''}:${a.relation}`
+    : a.kind === 'expr' ? `expr:${a.statement.slice(0, 60)}`
     : 'unique';
   return createHash('sha256').update([a.kind, binding.entity, binding.attribute, shape].join('\x00')).digest('hex').slice(0, 16);
+}
+
+/**
+ * Bind a relational assertion (reference / cardinality / expr) to the entity whose
+ * generated module must enforce it. Unlike scalar bounds, these don't resolve to a
+ * single mined attribute — they name the governing entity directly (the holder of a
+ * foreign key, the owner of a collection, the actor that must reject a state).
+ *
+ * The holder is the known entity NAMED in the statement, preferring the one that is
+ * NOT the reference target (a FK's holder is the subject, not the pointee). Returns
+ * a binding or an unresolved subject (→ a BindingDefect, the §1 guard).
+ */
+function bindRelational(
+  statement: string,
+  a: ReferenceAssertion | CardinalityAssertion | ExprAssertion,
+  entityAttrs: Map<string, Set<string>>,
+): { ref: AttributeRef } | { subject: string } {
+  const lower = statement.toLowerCase();
+  const pos = (e: string): number => {
+    const m = lower.match(new RegExp(`\\b${e}s?\\b`));
+    return m && m.index !== undefined ? m.index : -1;
+  };
+  const mentioned = [...entityAttrs.keys()]
+    .map(e => ({ e, p: pos(e) }))
+    .filter(x => x.p >= 0)
+    .sort((x, y) => x.p - y.p);
+
+  if (a.kind === 'reference') {
+    // Holder = earliest-named entity that isn't the target; attribute names the ref.
+    const holder = mentioned.find(x => x.e !== a.target) ?? mentioned[0];
+    if (!holder) return { subject: a.target };
+    return { ref: { entity: holder.e, attribute: a.target } };
+  }
+  if (a.kind === 'cardinality') {
+    const holder = mentioned.find(x => x.e !== a.relation) ?? mentioned[0];
+    if (!holder) return { subject: a.relation };
+    return { ref: { entity: holder.e, attribute: a.relation } };
+  }
+  // expr: the actor that must enforce the invariant. Prefer the entity named nearest
+  // an action verb (reject/record/create/add/update); else the first named entity.
+  const actionM = lower.match(/\b(?:reject|record|create|add|update|post|apply|allow|prevent)\b/);
+  const anchor = actionM && actionM.index !== undefined ? actionM.index : 0;
+  const byAction = [...mentioned].sort((x, y) => Math.abs(x.p - anchor) - Math.abs(y.p - anchor));
+  const holder = byAction[0] ?? mentioned[0];
+  if (!holder) return { subject: statement.slice(0, 40) };
+  return { ref: { entity: holder.e, attribute: 'invariant' } };
 }
 
 export interface ExtractionOutput {
@@ -263,7 +376,11 @@ export function extractConstraints(
     const loc = clauseDoc && node.source_clause_ids[0] ? clauseDoc(node.source_clause_ids[0]) : {};
     const source = { canon_id: node.canon_id, statement: node.statement, doc: loc.doc, line: loc.line };
 
-    const bound = resolveBinding(node.statement, node.tags ?? [], entityAttrs, loc.text ?? '');
+    // Relational kinds name the governing entity directly (a FK holder, a collection
+    // owner, an invariant's actor); scalar kinds resolve to a mined attribute.
+    const bound = (assertion.kind === 'reference' || assertion.kind === 'cardinality' || assertion.kind === 'expr')
+      ? bindRelational(node.statement, assertion, entityAttrs)
+      : resolveBinding(node.statement, node.tags ?? [], entityAttrs, loc.text ?? '');
     if ('ref' in bound) {
       const cid = id(bound.ref, assertion);
       if (seen.has(cid)) continue;
