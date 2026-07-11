@@ -188,6 +188,12 @@ export function parseCardinality(text: string): CardinalityAssertion | null {
   // set (which includes "item"); reject only non-noun quantifiers/pronouns.
   const NON_RELATION = new Set(['them', 'it', 'one', 'each', 'other', 'more', 'fewer', 'value', 'thing']);
   if (!relation || relation.length < 2 || NON_RELATION.has(relation)) return null;
+  // A measurement UNIT ("maximum of 80 characters") is a scalar length bound, not a
+  // relation cardinality — "80 characters" is one string's length, not 80 things. Yield
+  // so the bound parser (which owns quantitative units) can claim it. Without this,
+  // cardinality mis-captures a bound as `max 80 characters`, a wrong-kind false green.
+  const UNIT_NOUN = new Set(['character', 'char', 'byte', 'word', 'letter', 'digit', 'kb', 'mb', 'gb']);
+  if (UNIT_NOUN.has(relation)) return null;
   const isMax = /most|no more|maximum/.test(qual);
   return isMax ? { kind: 'cardinality', max: n, relation } : { kind: 'cardinality', min: n, relation };
 }
