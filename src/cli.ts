@@ -60,7 +60,7 @@ import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
-import { checkConstraint } from './constraints/check.js';
+import { checkConstraintAst } from './constraints/check-ast.js';
 import { computeObligations } from './constraints/obligations.js';
 import type { StructuredConstraint } from './constraints/model.js';
 import { verdictOf, verdictSeverity } from './models/validation.js';
@@ -421,7 +421,10 @@ function computeConstraintDiagnostics(
       if (full && existsSync(full)) source = readFileSync(full, 'utf8');
     }
     const exprWP = c.assertion.kind === 'expr' ? checkExprWritePaths(c) : null;
-    const check = exprWP ?? checkConstraint(c, source);
+    // AST-first (proven equivalent-or-better by the differential harness); the AST path
+    // itself delegates to the regex checker for non-Zod / non-TS sources, so regex stays
+    // reachable as the fallback it was always meant to be.
+    const check = exprWP ?? checkConstraintAst(c, source);
     const culpritIU = exprWP?.culprit ?? iu;
     const a = c.assertion;
     const shape = a.kind === 'bound'
