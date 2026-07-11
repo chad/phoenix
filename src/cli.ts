@@ -61,6 +61,7 @@ import { Journal } from './journal.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
 import { checkConstraint } from './constraints/check.js';
+import { computeObligations } from './constraints/obligations.js';
 import type { StructuredConstraint } from './constraints/model.js';
 import { verdictOf, verdictSeverity } from './models/validation.js';
 import type { ValidationResult, CheckResult } from './models/validation.js';
@@ -485,7 +486,66 @@ function computeConstraintDiagnostics(
       recommended_actions: result.recommended_actions,
     });
   }
+
+  // ── Obligation ledger: no normative sentence may be SILENTLY unverified ──
+  // A spec sentence carrying a normative marker ("must", "never", "only", "unique"…)
+  // is an obligation. It is TRACKED when it produced a structured constraint (any of
+  // the 7 kinds), a binding defect (already a diagnostic), or a derived evaluation
+  // that actually ran (pass/fail — not an abstain). An obligation that produced NONE
+  // of these is silent coverage loss — the promise the extractor dropped on the floor
+  // — and must be surfaced. This closes the system-level false green: the spec made a
+  // promise `status` did not even know existed.
+  diagnostics.push(...computeObligationDiagnostics(canonNodes, ius, allClauses, constraints, defects, iuSourceById));
   return diagnostics;
+}
+
+/**
+ * The obligation ledger (see the tail of computeConstraintDiagnostics). Reports one
+ * `warning · obligation` per normative sentence that produced nothing checkable, so
+ * silent coverage loss is impossible. The accounting core (computeObligations) is a
+ * pure function in src/constraints/obligations.ts and exhaustively unit-tested; here
+ * we only compute the eval-derived tracking set (which needs the IU sources) and map
+ * the unverified obligations to diagnostics.
+ */
+function computeObligationDiagnostics(
+  canonNodes: CanonicalNode[],
+  ius: ImplementationUnit[],
+  allClauses: Clause[],
+  constraints: StructuredConstraint[],
+  defects: import('./constraints/model.js').BindingDefect[],
+  iuSourceById: Map<string, string>,
+): Diagnostic[] {
+  const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+
+  // A derived evaluation that ran to a verdict (pass/fail) tracks its node. Only
+  // single-node evals count: the coarse contract-output eval spans every source node
+  // and would over-credit them, so it is excluded here.
+  const trackedByEval = new Set<string>();
+  for (const iu of ius) {
+    const src = iuSourceById.get(iu.iu_id);
+    if (!src) continue;
+    for (const e of deriveEvaluations(iu, canonNodes)) {
+      if (e.canon_ids.length !== 1) continue;
+      const r = checkEvaluation(e, src, canonById);
+      if (r.status === 'pass' || r.status === 'fail') trackedByEval.add(e.canon_ids[0]);
+    }
+  }
+
+  const obligations = computeObligations(canonNodes, allClauses, constraints, defects, trackedByEval);
+  return obligations.filter(o => o.state === 'unverified').map(o => {
+    const snippet = o.statement.length > 90 ? o.statement.slice(0, 88).trimEnd() + '…' : o.statement;
+    return {
+      severity: 'warning' as const,
+      category: 'obligation' as const,
+      subject: `"${snippet}"`,
+      message: `normative ("${o.marker}") but produced no checkable constraint (unverified)`,
+      source_file: o.doc,
+      source_line: o.line,
+      recommended_actions: [
+        'Reword the spec so the rule is machine-checkable, add a constraint kind that captures it, or attach a durable eval — do not leave it silently unverified',
+      ],
+    };
+  });
 }
 
 /** Current artifact hash per IU — the identity of the generation on disk now. */

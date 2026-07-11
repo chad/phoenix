@@ -12,6 +12,7 @@ export type DiagnosticCategory =
   | 'd-rate'
   | 'canon'
   | 'constraint'
+  | 'obligation'
   | 'evidence'
   | 'regen'
   | 'build';
