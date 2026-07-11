@@ -42,7 +42,7 @@ knowledge. It is, for the project, what `phoenix status` is for a generated app.
 must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 
 - **Green health: 100%** — every proven capability still holds (0 regressions).
-- **Overall pass rate: 96%** (23/24 cases) — the remaining 4% is the honest backlog.
+- **Overall pass rate: 96%** (26/27 cases) — the remaining 4% is the honest backlog.
 
 ### Closed by the Red→Green loop (red → green)
 
@@ -70,15 +70,29 @@ must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
   dashboard's dependency on `habit` (via fetch) is now detected, so a `habit`
   contract change will regenerate the dashboard.
 
+### Closed since (red → green)
+
+- ✅ **Reference (FK) constraint kind** — "a transaction must reference an existing
+  account" is captured and checked against a schema FK or an app-level existence guard.
+- ✅ **Cardinality constraint kind** — "an order must have at least one line item" is
+  captured and checked for a non-empty / count guard on the relation.
+- ✅ **Expr/Invariant routed to the oracle** — relational/conditional invariants
+  ("reject a debit that would take a balance below zero") route to `checkProperty`,
+  which CATCHES a missing guard on reducible shapes and ABSTAINS otherwise. Status is
+  **write-path aware**: it checks the invariant against *every* module that writes the
+  governed rows and names the culprit path.
+
 ### The known-red backlog (1)
 
-1. **`constraint.advanced-kinds-not-yet-implemented`** — `Bound`, `Membership`,
-   `Pattern`, and `Uniqueness` are done. The genuinely-hard tail is not: `Reference`
-   (FK), `Cardinality` ("at least one line item"), and arbitrary `Expr`/`Invariant`
-   relations. These need cross-entity/relational or executable checking, not a
-   single-field static check. *Fix: implement Reference/Cardinality and route Expr
-   invariants to executable property evals (the path the oracle now uses).*
+1. **`constraint.executable-aggregate-invariants-not-yet-proven`** — Reference,
+   Cardinality, and Expr are done. The genuinely-hard tail remains: cross-entity
+   **aggregate equalities** ("a dashboard total equals the sum of all account
+   balances") and **temporal** invariants ("archived 90 days after…") cannot be
+   *proven* by static reduction — a correct implementation is honestly abstained
+   (INCOMPLETE), never false-greened. *Fix: build a real executable, mutation-gated
+   property-eval runner and route these invariants to it (the same gate
+   `trust.behavioral-ok-is-withheld` awaits).*
 
 Each red is a concrete next piece of work with a known fix — the eval doubles as the
-roadmap. Seven capabilities were closed this session by the Red→Green loop; one
-honest red remains for the genuinely-hard tail.
+roadmap. Ten capabilities have now been closed by the Red→Green loop; one honest red
+remains for the genuinely-hard executable/aggregate tail.
