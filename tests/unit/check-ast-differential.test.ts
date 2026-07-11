@@ -147,6 +147,37 @@ describe('differential: regex vs AST checkers over the fault corpus', () => {
   });
 });
 
+/**
+ * The exceptions the gate allows: cases where the AST checker is PROVABLY more correct.
+ * The regex path reads source as TEXT, so an enforcement token that appears only in a
+ * COMMENT (or any dead text) false-greens it — the field is certified though nothing
+ * enforces the rule. The AST path reads the real Zod chain and correctly reports the
+ * enforcement absent. Ground truth is unambiguous (the enforcement is textually a
+ * comment), so these are permanent traps proving why the migration matters — mirrored
+ * as false-green samples in constraint-fault-corpus.test.ts (which now gates the AST
+ * default).
+ */
+describe('differential: AST is PROVABLY more correct than regex (documented exceptions)', () => {
+  const bound: StructuredConstraint = {
+    constraint_id: 'x', binding: { entity: 'habit', attribute: 'name' },
+    assertion: { kind: 'bound', op: '<=', value: 80, unit: 'chars' }, source: { statement: 's' },
+  };
+  const membership: StructuredConstraint = {
+    constraint_id: 'y', binding: { entity: 'habit', attribute: 'cadence' },
+    assertion: { kind: 'membership', values: ['daily', 'weekly'] }, source: { statement: 's' },
+  };
+  const traps: { name: string; c: StructuredConstraint; code: string }[] = [
+    { name: 'bound token in a comment', c: bound, code: `const S = z.object({ name: z.string().min(1) /* note: .max(80) enforced at the gateway */ });` },
+    { name: 'enum in a comment', c: membership, code: `const S = z.object({ cadence: z.string() /* was z.enum(['daily','weekly']) */ });` },
+  ];
+  for (const t of traps) {
+    it(`${t.name}: regex false-greens, AST catches (absent)`, () => {
+      expect(checkConstraint(t.c, t.code).result, 'the regex path is fooled by the comment (false green)').toBe('conforms');
+      expect(checkConstraintAst(t.c, t.code).result, 'the AST path reads the real chain — enforcement is absent').not.toBe('conforms');
+    });
+  }
+});
+
 // ── (b) the real Ledger app — every generated module against its constraints ──
 const LEDGER = join(homedir(), 'ledger');
 

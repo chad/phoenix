@@ -24,7 +24,10 @@ import type { CanonicalNode } from '../../src/models/canonical.js';
 import type { ImplementationUnit } from '../../src/models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from '../../src/models/iu.js';
 import { mineEntityAttributes, extractConstraints } from '../../src/constraints/extract.js';
-import { checkConstraint } from '../../src/constraints/check.js';
+// The corpus gates the PRODUCTION default checker. Since the AST migration (P2) that is
+// checkConstraintAst — proven equivalent-or-better than the regex path by the differential
+// harness, and strictly better on the comment-injection traps below.
+import { checkConstraintAst as checkConstraint } from '../../src/constraints/check-ast.js';
 import { checkProperty } from '../../src/evals.js';
 
 function iu(name: string): ImplementationUnit {
@@ -149,6 +152,25 @@ describe('meta-eval: constraint fault-injection (false-green = 0 is the gate)', 
       expect(trap, `${tc.kind}: FALSE GREEN — plausible-but-wrong code certified`).not.toBe('conforms');
     });
   }
+
+  it('the AST default catches comment-injection traps the regex path false-greened', () => {
+    // Enforcement that appears only in a COMMENT is dead text — the field enforces
+    // nothing. The regex checker read source as text and certified these (a false green);
+    // the AST checker reads the real Zod chain and reports the enforcement absent. These
+    // are the P2 "AST provably more correct" traps, locked here as regression guards.
+    const boundTrap = checkConstraint(
+      { constraint_id: 'x', binding: { entity: 'habit', attribute: 'name' },
+        assertion: { kind: 'bound', op: '<=', value: 80, unit: 'chars' }, source: { statement: 's' } },
+      `const S = z.object({ name: z.string().min(1) /* note: .max(80) enforced at the gateway */ });`,
+    );
+    expect(boundTrap.result, 'a .max in a comment must NOT certify the bound').not.toBe('conforms');
+    const enumTrap = checkConstraint(
+      { constraint_id: 'y', binding: { entity: 'habit', attribute: 'cadence' },
+        assertion: { kind: 'membership', values: ['daily', 'weekly'] }, source: { statement: 's' } },
+      `const S = z.object({ cadence: z.string() /* was z.enum(['daily','weekly']) */ });`,
+    );
+    expect(enumTrap.result, 'an enum in a comment must NOT certify membership').not.toBe('conforms');
+  });
 
   it('the checkProperty regression: a stray `> 0` is NOT a non-negativity guard', () => {
     // The exact false-green found in the field: an unrelated length check must not
