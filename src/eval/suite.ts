@@ -276,18 +276,64 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'constraint.executable-aggregate-invariants-not-yet-proven', capability: 'constraint-enforcement', tier: 'unit', expect: 'red',
-    redReason: 'Reference, Cardinality, and Expr are now implemented: Expr invariants route to the oracle (checkProperty), which CATCHES a missing guard on statically-reducible shapes (sign / threshold / bound / enum / non-empty) and ABSTAINS on the rest — it never false-greens. The genuinely-hard tail remains open: cross-entity AGGREGATE equalities ("a dashboard total equals the sum of all account balances") and TEMPORAL invariants ("archived 90 days after…") cannot be proven by static reduction. A correct implementation is only abstained (INCOMPLETE), never proven OK. Fix: build a real executable, mutation-gated property-eval runner (a live harness) and route these invariants to it — the same gate trust.behavioral-ok-is-withheld is waiting on.',
-    description: 'A cross-entity aggregate invariant is PROVEN (conforms) against a correct implementation, not merely abstained.',
+    id: 'constraint.executable-aggregate-invariants-not-yet-proven', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'A cross-entity aggregate invariant is PROVEN by execution (mutation-gated), caught when wrong — and the gate itself is honest: an eval too weak to kill planted bugs certifies nothing.',
     run: () => {
       const attrs = mineEntityAttributes([iu('dashboard'), iu('account')], [canon(CanonicalType.DEFINITION, 'a dashboard has a total', 'd')]);
       const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'the dashboard total must equal the sum of all account balances', 'c', 'cl', ['dashboard', 'total', 'account'])], attrs);
       const e = constraints.find(c => c.assertion.kind === 'expr');
-      // A correct implementation exists, but the static oracle can only ABSTAIN — it
-      // cannot execute the aggregate to prove the equality. So this is honestly red.
+      if (!e) return { passed: false, detail: 'expr invariant not captured' };
+      // PROVEN by execution: randomized trials + the mutation gate (planted bugs must die).
       const correct = 'function total(accts){ return accts.reduce((s,a)=>s+a.balance,0); } // dashboard total = sum of account balances';
-      const r = e ? checkConstraint(e, correct) : { result: 'indeterminate' as const };
-      return { passed: r.result === 'conforms', detail: `oracle=${r.result} (want conforms; abstains today — needs an executable eval)` };
+      const wrong = 'function total(accts){ return accts.reduce((s,a)=>s-a.balance,0); } // subtracts instead of summing';
+      const proven = checkConstraint(e, correct);
+      const caught = checkConstraint(e, wrong);
+      return { passed: proven.result === 'conforms' && proven.method === 'behavioral-gated' && caught.result === 'violates',
+        detail: `correct=${proven.result}(${proven.method ?? 'static'}), wrong=${caught.result}` };
+    },
+  },
+  {
+    id: 'constraint.temporal-kind-is-captured-and-checked', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'A temporal constraint ("a transaction date must not occur in the future") is captured and checked for a not-future validator; a format-only refine does NOT count.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('transaction')], [canon(CanonicalType.DEFINITION, 'a transaction has an amount and a date', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a transaction date must not occur in the future', 'c', 'cl', ['transaction', 'date'])], attrs);
+      const t = constraints.find(c => c.assertion.kind === 'temporal');
+      if (!t) return { passed: false, detail: 'temporal constraint not captured' };
+      const good = checkConstraint(t, `const S = z.object({ date: z.string().refine(isNotFuture, 'Date cannot be in the future') });`);
+      const bad = checkConstraint(t, `const S = z.object({ date: z.string() });`);
+      const trap = checkConstraint(t, `const S = z.object({ date: z.string().refine(isValidDate, 'Invalid date') });`); // format ≠ temporal
+      return { passed: good.result === 'conforms' && bad.result === 'absent' && trap.result === 'absent',
+        detail: `good=${good.result}, bad=${bad.result}, formatOnly=${trap.result}` };
+    },
+  },
+  {
+    id: 'constraint.presence-kind-is-captured-and-checked', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'The quantifier-free required-fields form ("provide at least a name and an email") captures one Presence constraint per field, checked as required-and-non-optional.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('account')], [canon(CanonicalType.DEFINITION, 'an account has a name and an email', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.REQUIREMENT, 'the system requires a user to provide at least a name and an email to create an account', 'c', 'cl', ['account', 'name', 'email'])], attrs);
+      const ps = constraints.filter(c => c.assertion.kind === 'presence');
+      if (ps.length !== 2) return { passed: false, detail: `expected 2 presence constraints, got ${ps.length}` };
+      const good = checkConstraint(ps[0], `const S = z.object({ name: z.string().min(1), owner_email: z.string().email() });`);
+      const bad = checkConstraint(ps[0], `const S = z.object({ name: z.string().optional(), owner_email: z.string() });`);
+      return { passed: good.result === 'conforms' && bad.result === 'absent',
+        detail: `fields=[${ps.map(p => p.binding.attribute).join(',')}], good=${good.result}, optional=${bad.result}` };
+    },
+  },
+  {
+    id: 'oracle.live-app-property-evals-not-yet-run', capability: 'oracle', tier: 'unit', expect: 'red',
+    redReason: 'The executable runner proves aggregate invariants for SELF-CONTAINED modules (pure functions over data), mutation-gated. A real generated module imports its dependencies (db, hono) — executing its properties requires standing those up (in-memory SQLite, an HTTP shim). Today the runner honestly REFUSES such modules (indeterminate: "needs the live app harness"). Fix: build the live harness — boot the generated app against in-memory deps and route aggregate/temporal invariants through the same mutation gate the pure-function path already earns its greens with.',
+    description: 'An aggregate invariant on a module WITH external dependencies (db import) is proven by the live harness, not refused.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('dashboard'), iu('account')], [canon(CanonicalType.DEFINITION, 'a dashboard has a total', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'the dashboard total must equal the sum of all account balances', 'c', 'cl', ['dashboard', 'total', 'account'])], attrs);
+      const e = constraints.find(c => c.assertion.kind === 'expr');
+      // The real shape of a generated module: it imports its DB. The runner must
+      // refuse (indeterminate) today — proving it via a live harness flips this red.
+      const withDeps = `import { db } from '../../db.js';\nexport function total(){ return db.prepare('SELECT SUM(balance) AS s FROM accounts').get().s ?? 0; }`;
+      const r = e ? checkConstraint(e, withDeps) : { result: 'indeterminate' as const };
+      return { passed: r.result === 'conforms', detail: `runner=${r.result} (want conforms via live harness; refuses today — no in-memory dep stand-up)` };
     },
   },
 

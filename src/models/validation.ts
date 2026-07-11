@@ -15,7 +15,7 @@
  */
 
 export type CheckResult = 'conforms' | 'violates' | 'absent' | 'indeterminate';
-export type CheckMethod = 'static' | 'property' | 'behavioral' | 'live' | 'manual';
+export type CheckMethod = 'static' | 'property' | 'behavioral' | 'behavioral-gated' | 'live' | 'manual';
 
 /** A reference into the canonical/IU graph — the thing being validated. */
 export interface Ref {
@@ -45,8 +45,10 @@ export type Verdict = 'ok' | 'error' | 'incomplete';
  *  - `absent` here means "target-selected, statically-lowerable, but no enforcement
  *    artifact found" (the §1 max-80 cell). A shape that did not select the focus must
  *    emit NO result at all — do not pass not-applicable through this function.
- *  - property/behavioral `conforms` is NOT ok yet (no per-eval mutation gate); it
- *    degrades to `incomplete`.
+ *  - UNGATED property/behavioral `conforms` is NOT ok — it degrades to `incomplete`.
+ *    `behavioral-gated` is the exception that proves the rule: the executable runner
+ *    only emits it when the eval demonstrably killed every planted bug (the per-eval
+ *    mutation gate the incomplete-degrade was always waiting on).
  *  - `Operational`/`live` is quarantined and must not be routed here.
  */
 export function verdictOf(method: CheckMethod, result: CheckResult): Verdict {
@@ -58,8 +60,9 @@ export function verdictOf(method: CheckMethod, result: CheckResult): Verdict {
     case 'absent':
       return method === 'static' ? 'error' : 'incomplete';
     case 'conforms':
-      // Only static and (signed, unexpired) manual conformance is trustworthy today.
-      return method === 'static' || method === 'manual' ? 'ok' : 'incomplete';
+      // Trustworthy conformance: static, (signed, unexpired) manual, or a
+      // mutation-gated behavioral pass — an eval proven able to catch planted bugs.
+      return method === 'static' || method === 'manual' || method === 'behavioral-gated' ? 'ok' : 'incomplete';
   }
 }
 

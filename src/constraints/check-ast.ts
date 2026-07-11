@@ -23,7 +23,7 @@
 
 import ts from 'typescript';
 import type { StructuredConstraint } from './model.js';
-import type { CheckResult } from '../models/validation.js';
+import type { CheckResult, CheckMethod } from '../models/validation.js';
 import {
   checkConstraint as checkConstraintRegex,
   checkBound as checkBoundRegex,
@@ -38,6 +38,8 @@ import {
 export interface ConstraintCheck {
   result: CheckResult;
   detail: string;
+  /** Mirrors check.ts's contract: 'behavioral-gated' marks an executed, mutation-gated verdict. */
+  method?: CheckMethod;
 }
 
 /** One `.method(args)` link in a Zod call chain, in root→leaf order (string, min, max). */

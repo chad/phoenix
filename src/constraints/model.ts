@@ -78,6 +78,29 @@ export interface ExprAssertion {
   statement: string;
 }
 
+/**
+ * A temporal constraint on a date-like attribute: "a transaction date must not
+ * occur in the future". Enforcement is a validator comparing the value against
+ * now/today (e.g. a `.refine(isNotFuture, …)` on the field).
+ */
+export interface TemporalAssertion {
+  kind: 'temporal';
+  mode: 'not-future' | 'not-past';
+}
+
+/**
+ * A required-field (presence) constraint, from the quantifier-free "at least"
+ * form: "provide at least a name and an email". Each named field must exist in
+ * the input schema and must NOT be optional/nullish. The parser returns the field
+ * list in `fields`; extraction emits ONE constraint per resolved field, so a
+ * bound PresenceAssertion governs exactly its binding's attribute.
+ */
+export interface PresenceAssertion {
+  kind: 'presence';
+  /** Transient (parser → extraction): the fields named by the sentence. */
+  fields?: string[];
+}
+
 /** The (growing) closed assertion algebra — see docs/DESIGN-shacl-spine.md §4. */
 export type Assertion =
   | BoundAssertion
@@ -86,7 +109,9 @@ export type Assertion =
   | UniquenessAssertion
   | ReferenceAssertion
   | CardinalityAssertion
-  | ExprAssertion;
+  | ExprAssertion
+  | TemporalAssertion
+  | PresenceAssertion;
 
 export interface ConstraintSource {
   canon_id?: string;

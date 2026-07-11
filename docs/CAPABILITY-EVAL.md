@@ -42,7 +42,7 @@ knowledge. It is, for the project, what `phoenix status` is for a generated app.
 must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 
 - **Green health: 100%** — every proven capability still holds (0 regressions).
-- **Overall pass rate: 96%** (26/27 cases) — the remaining 4% is the honest backlog.
+- **Overall pass rate: 97%** (29/30 cases) — the remaining 3% is the honest backlog.
 
 ### Closed by the Red→Green loop (red → green)
 
@@ -98,17 +98,34 @@ must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
   (a `.max()`/`z.enum()` living only in a comment). SQL kinds and the Expr oracle stay
   on the (still reachable) regex/oracle fallback.
 
+- ✅ **Executable aggregate invariants (mutation-gated)** — the runner
+  (`src/constraints/exec-runner.ts`) EXECUTES a self-contained module against
+  randomized trials in a vm sandbox and *earns* `conforms` through the mutation gate:
+  planted bugs (sum→difference, seeded-init, constant-return) must all be killed by
+  the property eval, or the pass degrades to `indeterminate`. This opens the first
+  trustworthy non-static verdict cell: `verdictOf('behavioral-gated','conforms') → ok`
+  — the per-eval mutation gate `trust.behavioral-ok-is-withheld` was always waiting
+  on. Wrong implementations *violate* (caught by execution), dependent modules are
+  honestly refused (see the red below).
+- ✅ **Temporal constraint kind** — "a transaction date must not occur in the future"
+  is captured and checked for a not-future validator (`.refine(isNotFuture, …)`); a
+  format-only refine (`isValidDate`) does NOT count as temporal enforcement.
+- ✅ **Presence constraint kind** — the quantifier-free required-fields form
+  ("provide at least a name and an email") emits one constraint per field, checked
+  as present-and-non-optional in the input schema. Together with temporal, this
+  cleared both of ~/ledger's unverified obligations.
+
 ### The known-red backlog (1)
 
-1. **`constraint.executable-aggregate-invariants-not-yet-proven`** — Reference,
-   Cardinality, and Expr are done. The genuinely-hard tail remains: cross-entity
-   **aggregate equalities** ("a dashboard total equals the sum of all account
-   balances") and **temporal** invariants ("archived 90 days after…") cannot be
-   *proven* by static reduction — a correct implementation is honestly abstained
-   (INCOMPLETE), never false-greened. *Fix: build a real executable, mutation-gated
-   property-eval runner and route these invariants to it (the same gate
-   `trust.behavioral-ok-is-withheld` awaits).*
+1. **`oracle.live-app-property-evals-not-yet-run`** — the executable runner proves
+   invariants for SELF-CONTAINED modules only. A real generated module imports its
+   dependencies (db, hono); executing its properties requires standing those up
+   (in-memory SQLite, an HTTP shim). Today the runner honestly REFUSES such modules
+   (`indeterminate: needs the live app harness`). *Fix: build the live harness — boot
+   the generated app against in-memory deps and route aggregate/temporal invariants
+   through the same mutation gate the pure-function path already earns its greens
+   with.*
 
 Each red is a concrete next piece of work with a known fix — the eval doubles as the
-roadmap. Ten capabilities have now been closed by the Red→Green loop; one honest red
-remains for the genuinely-hard executable/aggregate tail.
+roadmap. Thirteen capabilities have now been closed by the Red→Green loop; one honest
+red remains for the live-app execution tail.

@@ -14,8 +14,9 @@
  */
 
 import type { StructuredConstraint } from './model.js';
-import type { CheckResult } from '../models/validation.js';
+import type { CheckResult, CheckMethod } from '../models/validation.js';
 import { checkProperty } from '../evals.js';
+import { deriveAggregateProperty, runAggregateProperty } from './exec-runner.js';
 
 const zodMethod = (op: string) => (op === '<=' ? 'max' : 'min');
 
@@ -62,6 +63,10 @@ export interface BoundCheck {
 export interface ConstraintCheck {
   result: CheckResult;
   detail: string;
+  /** How the verdict was reached. Defaults to 'static'; the executable runner
+   *  reports 'behavioral-gated' — the only non-static method that may reach OK,
+   *  and only because its conforms is earned through the mutation gate. */
+  method?: CheckMethod;
 }
 
 /**
@@ -270,8 +275,68 @@ export function checkExpr(c: StructuredConstraint, source: string | null): Const
   if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
   if (c.assertion.kind !== 'expr') return { result: 'indeterminate', detail: 'not an expr assertion' };
   const r = checkProperty(c.assertion.statement, source);
-  const result: CheckResult = r.status === 'pass' ? 'conforms' : r.status === 'fail' ? 'violates' : 'indeterminate';
-  return { result, detail: r.reason };
+  if (r.status !== 'indeterminate') {
+    const result: CheckResult = r.status === 'pass' ? 'conforms' : 'violates';
+    return { result, detail: r.reason };
+  }
+  // Static reduction abstained — try the EXECUTABLE path for recognized aggregate
+  // shapes. `conforms` here is mutation-gated: the runner only passes an eval that
+  // provably catches planted bugs, so this is an earned green, not a hopeful one.
+  const prop = deriveAggregateProperty(c.assertion.statement);
+  if (prop) {
+    const ex = runAggregateProperty(prop, source);
+    if (ex.status === 'pass' && ex.gated) return { result: 'conforms', detail: ex.reason, method: 'behavioral-gated' };
+    if (ex.status === 'fail') return { result: 'violates', detail: ex.reason, method: 'behavioral-gated' };
+    return { result: 'indeterminate', detail: ex.reason };
+  }
+  return { result: 'indeterminate', detail: r.reason };
+}
+
+/**
+ * Check a Temporal constraint ("a transaction date must not occur in the future")
+ * against a module's source. Enforcement is a validator on the field comparing the
+ * value against now/today — in the generated dialect, a `.refine(isNotFuture, …)`
+ * whose name or message carries the temporal cue, or an explicit comparison with
+ * `new Date()`/`Date.now()`. A `.refine(isValidDate, …)` is a FORMAT validator, not
+ * a temporal one — it must not read as enforcement (that would be a false green).
+ */
+export function checkTemporal(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  if (c.assertion.kind !== 'temporal') return { result: 'indeterminate', detail: 'not a temporal assertion' };
+  const attr = c.binding.attribute;
+  const declText = findFieldDecl(source, attr);
+  if (!declText) {
+    return fieldMentioned(source, attr)
+      ? { result: 'absent', detail: `no temporal validator on "${attr}" (field present, ${c.assertion.mode} unchecked)` }
+      : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
+  }
+  const cue = c.assertion.mode === 'not-future' ? /future/i : /past/i;
+  const enforced = cue.test(declText) || /[<>]=?\s*(?:new\s+Date\(|Date\.now\(|today)/i.test(declText);
+  return enforced
+    ? { result: 'conforms', detail: `${c.assertion.mode} enforced on "${attr}"` }
+    : { result: 'absent', detail: `no ${c.assertion.mode} validator on "${attr}"` };
+}
+
+/**
+ * Check a Presence (required-field) constraint against a module's source. The field
+ * must exist in the input schema and must NOT be `.optional()`/`.nullish()`. The
+ * FIRST declaration in source order is the create/input schema in the generated
+ * dialect (update schemas, where everything is optional, come after) — mirroring
+ * findFieldDecl's first-match rule keeps this checker consistent with the others.
+ */
+export function checkPresence(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
+  if (c.assertion.kind !== 'presence') return { result: 'indeterminate', detail: 'not a presence assertion' };
+  const attr = c.binding.attribute;
+  const declText = findFieldDecl(source, attr);
+  if (!declText) {
+    return fieldMentioned(source, attr)
+      ? { result: 'absent', detail: `required field "${attr}" is not declared in the input schema` }
+      : { result: 'indeterminate', detail: `attribute "${attr}" not found in generated schema` };
+  }
+  return /\.optional\(|\.nullish\(/.test(declText)
+    ? { result: 'absent', detail: `"${attr}" is optional in the input schema; spec requires it` }
+    : { result: 'conforms', detail: `required field "${attr}" present and non-optional` };
 }
 
 /** Dispatch a constraint to its kind's static checker. */
@@ -285,6 +350,8 @@ export function checkConstraint(c: StructuredConstraint, source: string | null):
   if (c.assertion.kind === 'reference') return checkReference(c, source);
   if (c.assertion.kind === 'cardinality') return checkCardinality(c, source);
   if (c.assertion.kind === 'expr') return checkExpr(c, source);
+  if (c.assertion.kind === 'temporal') return checkTemporal(c, source);
+  if (c.assertion.kind === 'presence') return checkPresence(c, source);
   return checkUniqueness(c, source);
 }
 

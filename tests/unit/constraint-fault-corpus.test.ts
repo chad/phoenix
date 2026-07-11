@@ -46,6 +46,8 @@ function hash(s: string): number { let h = 0; for (let i = 0; i < s.length; i++)
 
 interface Case {
   kind: string;
+  /** Display name when several cases share a kind (e.g. the two expr rows). */
+  label?: string;
   entities: ImplementationUnit[];
   defs: CanonicalNode[];           // DEFINITION nodes to mine attributes from
   rule: CanonicalNode;             // the CONSTRAINT/INVARIANT/REQUIREMENT node
@@ -121,6 +123,37 @@ const CORPUS: Case[] = [
     // The real trap this checker once fell into: an unrelated `> 0` reading as a balance guard.
     falseGreen: `function debit(a, amount){ const conditions = []; if (conditions.length > 0) { /* account balance */ } a.balance -= amount; }`,
   },
+  {
+    kind: 'temporal',
+    entities: [iu('transaction')],
+    defs: [canon(CanonicalType.DEFINITION, 'a transaction has an amount and a date')],
+    rule: canon(CanonicalType.CONSTRAINT, 'a transaction date must not occur in the future', ['transaction', 'date']),
+    conforming: `const S = z.object({ date: z.string().refine(isNotFuture, 'Date cannot be in the future') });`,
+    faulted: `const S = z.object({ date: z.string().min(1) });`,
+    // A format refine is NOT a temporal validator — must not read as enforcement.
+    falseGreen: `const S = z.object({ date: z.string().refine(isValidDate, 'Invalid date') });`,
+  },
+  {
+    kind: 'presence',
+    entities: [iu('account')],
+    defs: [canon(CanonicalType.DEFINITION, 'an account has a name and an email')],
+    rule: canon(CanonicalType.REQUIREMENT, 'the system requires a user to provide at least a name to create an account', ['account', 'name']),
+    conforming: `const S = z.object({ name: z.string().min(1), owner_email: z.string().email() });`,
+    faulted: `const S = z.object({ owner_email: z.string().email() }); // name dropped from the input schema`,
+    // Present-but-optional is NOT required — the field can be omitted entirely.
+    falseGreen: `const S = z.object({ name: z.string().optional(), owner_email: z.string().email() });`,
+  },
+  {
+    kind: 'expr', label: 'expr-executable-aggregate',
+    entities: [iu('dashboard'), iu('account')],
+    defs: [canon(CanonicalType.DEFINITION, 'a dashboard has a total')],
+    rule: canon(CanonicalType.CONSTRAINT, 'the dashboard total must equal the sum of all account balances', ['dashboard', 'total', 'account']),
+    // Proven by EXECUTION: randomized trials + the mutation gate (planted bugs must die).
+    conforming: `function total(accts){ return accts.reduce((s,a)=>s+a.balance,0); }`,
+    faulted: `function total(accts){ return accts.reduce((s,a)=>s-a.balance,0); }`,
+    // Plausible-but-wrong: ignores the balances entirely; randomized inputs kill it.
+    falseGreen: `function total(accts){ return accts.length * 100; }`,
+  },
 ];
 
 function constraintFor(tc: Case) {
@@ -134,7 +167,7 @@ describe('meta-eval: constraint fault-injection (false-green = 0 is the gate)', 
   const rows: { kind: string; captured: boolean; conforming: string; faulted: string; falseGreen: string }[] = [];
 
   for (const tc of CORPUS) {
-    it(`${tc.kind}: captured, conforms on good code, caught on faulted + false-green`, () => {
+    it(`${tc.label ?? tc.kind}: captured, conforms on good code, caught on faulted + false-green`, () => {
       const c = constraintFor(tc);
       expect(c, `${tc.kind} constraint should be captured from "${tc.rule.statement}"`).toBeTruthy();
 
@@ -142,7 +175,7 @@ describe('meta-eval: constraint fault-injection (false-green = 0 is the gate)', 
       const bad = checkConstraint(c!, tc.faulted).result;
       const trap = checkConstraint(c!, tc.falseGreen).result;
 
-      rows.push({ kind: tc.kind, captured: true, conforming: good, faulted: bad, falseGreen: trap });
+      rows.push({ kind: tc.label ?? tc.kind, captured: true, conforming: good, faulted: bad, falseGreen: trap });
 
       // No false RED: conforming code must be certified.
       expect(good, `${tc.kind}: conforming code must read as conforms`).toBe('conforms');

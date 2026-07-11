@@ -18,7 +18,7 @@ import type { CanonicalNode } from '../models/canonical.js';
 import { CanonicalType } from '../models/canonical.js';
 import type { Clause } from '../models/clause.js';
 import type { ImplementationUnit } from '../models/iu.js';
-import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, UniquenessAssertion, ReferenceAssertion, CardinalityAssertion, ExprAssertion, Assertion, AttributeRef } from './model.js';
+import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, UniquenessAssertion, ReferenceAssertion, CardinalityAssertion, ExprAssertion, TemporalAssertion, PresenceAssertion, Assertion, AttributeRef } from './model.js';
 
 const STOP = new Set([
   'the', 'a', 'an', 'is', 'are', 'be', 'to', 'of', 'in', 'for', 'on', 'with', 'and',
@@ -214,6 +214,41 @@ export function parseExpr(text: string): ExprAssertion | null {
   return { kind: 'expr', statement: s };
 }
 
+// "a transaction date must not occur in the future" / "the date cannot be in the
+// future" / "dates in the past are rejected". Negation + a temporal direction.
+const TEMPORAL_FUTURE_RE = /\b(?:not|never|cannot|can['’]t|no)\b[^.]*\bin the future\b|\bfuture\s+dates?\s+are\s+(?:not\s+allowed|rejected|invalid)/i;
+const TEMPORAL_PAST_RE = /\b(?:not|never|cannot|can['’]t|no)\b[^.]*\bin the past\b|\bpast\s+dates?\s+are\s+(?:not\s+allowed|rejected|invalid)/i;
+
+/** Parse a temporal assertion ("must not occur in the future"), or null. */
+export function parseTemporal(text: string): TemporalAssertion | null {
+  if (TEMPORAL_FUTURE_RE.test(text)) return { kind: 'temporal', mode: 'not-future' };
+  if (TEMPORAL_PAST_RE.test(text)) return { kind: 'temporal', mode: 'not-past' };
+  return null;
+}
+
+// The quantifier-free required-fields form: "provide at least a name and an email".
+// "at least" followed by an ARTICLE (not a number — numeric counts are cardinality)
+// names fields that must be present. Stop at an infinitive/purpose clause.
+const PRESENCE_RE = /\b(?:provide|providing|include|including|supply|specify|specifying|give|enter|with)\s+at least\s+((?:an?|the)\s+.+)/i;
+
+/** Parse a presence (required-fields) assertion, or null. `fields` carries the
+ *  named field nouns; extraction emits one constraint per resolved field. */
+export function parsePresence(text: string): PresenceAssertion | null {
+  const m = text.match(PRESENCE_RE);
+  if (!m) return null;
+  const tail = m[1]
+    .replace(/[.;].*$/, '')
+    .replace(/\s+(?:to|in order to|when|so that|for)\s.*$/i, ''); // drop the purpose clause
+  const fields: string[] = [];
+  for (const frag of tail.split(/,|\band\b/)) {
+    const fm = frag.trim().match(/^(?:an?|the)\s+([a-z][a-z-]*)/i);
+    if (!fm) continue;
+    const f = singular(fm[1].toLowerCase());
+    if (f.length > 2 && !STOP.has(f)) fields.push(f);
+  }
+  return fields.length > 0 ? { kind: 'presence', fields } : null;
+}
+
 /**
  * Parse any supported assertion kind. Order matters:
  *  - Reference & Cardinality first — their cues ("existing X", "at least one X")
@@ -229,6 +264,11 @@ export function parseAssertion(text: string): Assertion | null {
     ?? parseBound(text)
     ?? parseMembership(text)
     ?? parseUniqueness(text)
+    // Presence & temporal BEFORE pattern: "must provide at least a name and an
+    // email" mentions "email" and would mis-read as an email-format constraint;
+    // "date … in the future" must not be claimed by the date-format reading.
+    ?? parsePresence(text)
+    ?? parseTemporal(text)
     ?? parsePattern(text)
     ?? parseExpr(text);
 }
@@ -303,8 +343,30 @@ function id(binding: AttributeRef, a: Assertion): string {
     : a.kind === 'reference' ? `ref:${a.target}`
     : a.kind === 'cardinality' ? `card:${a.min ?? ''}..${a.max ?? ''}:${a.relation}`
     : a.kind === 'expr' ? `expr:${a.statement.slice(0, 60)}`
+    : a.kind === 'temporal' ? `tmp:${a.mode}`
+    : a.kind === 'presence' ? 'required'
     : 'unique';
   return createHash('sha256').update([a.kind, binding.entity, binding.attribute, shape].join('\x00')).digest('hex').slice(0, 16);
+}
+
+/**
+ * Bind one presence field to its owning entity: the entity whose mined attributes
+ * contain the field, preferring an entity NAMED in the statement ("… to create an
+ * account" → account.name over some other entity that also has a name).
+ */
+function bindPresenceField(
+  statement: string,
+  field: string,
+  entityAttrs: Map<string, Set<string>>,
+): AttributeRef | null {
+  const lower = statement.toLowerCase();
+  let anyOwner: AttributeRef | null = null;
+  for (const [entity, as] of entityAttrs) {
+    if (!as.has(field)) continue;
+    if (new RegExp(`\\b${entity}s?\\b`).test(lower)) return { entity, attribute: field };
+    anyOwner ??= { entity, attribute: field };
+  }
+  return anyOwner;
 }
 
 /**
@@ -381,6 +443,27 @@ export function extractConstraints(
 
     const loc = clauseDoc && node.source_clause_ids[0] ? clauseDoc(node.source_clause_ids[0]) : {};
     const source = { canon_id: node.canon_id, statement: node.statement, doc: loc.doc, line: loc.line };
+
+    // Presence names SEVERAL fields in one sentence ("at least a name and an
+    // email") — emit one constraint per resolved field; unresolved fields defect.
+    if (assertion.kind === 'presence') {
+      for (const field of assertion.fields ?? []) {
+        const ref = bindPresenceField(node.statement, field, entityAttrs);
+        if (ref) {
+          const a: Assertion = { kind: 'presence' }; // fields are transient — the binding carries the attribute
+          const cid = id(ref, a);
+          if (seen.has(cid)) continue;
+          seen.add(cid);
+          constraints.push({ constraint_id: cid, binding: ref, assertion: a, source });
+        } else {
+          defects.push({
+            subject: field, assertion: { kind: 'presence' }, source,
+            reason: `required field "${field}" does not resolve to any known entity.attribute`,
+          });
+        }
+      }
+      continue;
+    }
 
     // Relational kinds name the governing entity directly (a FK holder, a collection
     // owner, an invariant's actor); scalar kinds resolve to a mined attribute.

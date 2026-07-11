@@ -420,7 +420,10 @@ function computeConstraintDiagnostics(
       const full = file ? join(projectRoot, file) : '';
       if (full && existsSync(full)) source = readFileSync(full, 'utf8');
     }
-    const exprWP = c.assertion.kind === 'expr' ? checkExprWritePaths(c) : null;
+    const exprWPRaw = c.assertion.kind === 'expr' ? checkExprWritePaths(c) : null;
+    // A write-path abstention isn't the last word — fall through to the checker,
+    // whose executable runner may still decide a recognized aggregate shape.
+    const exprWP = exprWPRaw && exprWPRaw.result !== 'indeterminate' ? exprWPRaw : null;
     // AST-first (proven equivalent-or-better by the differential harness); the AST path
     // itself delegates to the regex checker for non-Zod / non-TS sources, so regex stays
     // reachable as the fallback it was always meant to be.
@@ -439,7 +442,11 @@ function computeConstraintDiagnostics(
               ? `count ${a.min !== undefined ? `≥${a.min}` : ''}${a.max !== undefined ? ` ≤${a.max}` : ''} ${a.relation}`.trim()
               : a.kind === 'expr'
                 ? `invariant: ${a.statement.slice(0, 48)}${a.statement.length > 48 ? '…' : ''}`
-                : 'must be unique';
+                : a.kind === 'temporal'
+                  ? `${a.mode.replace('-', ' ')}`
+                  : a.kind === 'presence'
+                    ? 'required (non-optional)'
+                    : 'must be unique';
     const enforce = a.kind === 'bound'
       ? `.${a.op === '<=' ? 'max' : 'min'}(${a.value})`
       : a.kind === 'membership'
@@ -452,7 +459,11 @@ function computeConstraintDiagnostics(
               ? `a non-empty / count guard on ${a.relation}`
               : a.kind === 'expr'
                 ? `an executable guard for this invariant`
-                : 'a UNIQUE constraint';
+                : a.kind === 'temporal'
+                  ? `a ${a.mode} validator (e.g. .refine(isNotFuture, …))`
+                  : a.kind === 'presence'
+                    ? `a required (non-optional) field in the input schema`
+                    : 'a UNIQUE constraint';
     // For an Expr invariant, the subject is the specific write path that fails to
     // enforce it (the culprit module), not the nominal binding entity.
     const label = a.kind === 'expr' && exprWP?.culprit ? `${exprWP.culprit.name}.invariant` : `${c.binding.entity}.${c.binding.attribute}`;
@@ -461,7 +472,7 @@ function computeConstraintDiagnostics(
       path: c.binding.attribute,
       source_component: a.kind,
       result: check.result,
-      method: 'static',
+      method: ('method' in check ? check.method : undefined) ?? 'static',
       message: a.kind === 'expr'
         ? `${label} — ${shape}: ${check.detail}`
         : `${c.binding.entity}.${c.binding.attribute} ${shape}: ${check.detail}`,
