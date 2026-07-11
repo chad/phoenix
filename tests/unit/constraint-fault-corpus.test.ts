@@ -124,6 +124,17 @@ const CORPUS: Case[] = [
     falseGreen: `function debit(a, amount){ const conditions = []; if (conditions.length > 0) { /* account balance */ } a.balance -= amount; }`,
   },
   {
+    kind: 'cardinality', label: 'cardinality-unrelated-min',
+    entities: [iu('order')],
+    defs: [canon(CanonicalType.DEFINITION, 'an order has a name and line items')],
+    rule: canon(CanonicalType.CONSTRAINT, 'an order must have at least one line item', ['order', 'line', 'item']),
+    conforming: `const S = z.object({ name: z.string(), items: z.array(LineItem).min(1) });`,
+    faulted: `const S = z.object({ name: z.string(), items: z.array(LineItem) });`,
+    // A .min(1) on an UNRELATED scalar field must not read as a count guard on the
+    // collection — the regex fallback once matched .min(1) source-wide.
+    falseGreen: `const S = z.object({ name: z.string().min(1), items: z.array(LineItem) });`,
+  },
+  {
     kind: 'temporal',
     entities: [iu('transaction')],
     defs: [canon(CanonicalType.DEFINITION, 'a transaction has an amount and a date')],

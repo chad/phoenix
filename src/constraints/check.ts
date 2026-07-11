@@ -244,13 +244,15 @@ export function checkCardinality(c: StructuredConstraint, source: string | null)
   }
   const { min, max } = c.assertion;
   // A lower bound of ≥1 is the common "at least one" case → a non-empty guard.
+  // Every guard must be CO-LOCATED with the relation (within 80 chars of its
+  // mention): a `.min(1)` on an unrelated scalar field ("name must not be empty")
+  // must not read as a count guard on the collection — that is a false green.
   const minGuard = min !== undefined && (
-    new RegExp(`\\.min\\(\\s*${min}\\b`).test(source) ||
-    /\.nonempty\(/.test(source) ||
+    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?(?:\\.min\\(\\s*${min}\\b|\\.nonempty\\()`, 'i').test(source) ||
     new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.length\\s*(?:>=?\\s*${min}\\b|>\\s*${Math.max(0, min - 1)}\\b|===?\\s*0\\b|!==?\\s*0\\b)`, 'i').test(source)
   );
   const maxGuard = max !== undefined && (
-    new RegExp(`\\.max\\(\\s*${max}\\b`).test(source) ||
+    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.max\\(\\s*${max}\\b`, 'i').test(source) ||
     new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.length\\s*(?:<=?\\s*${max}\\b|>\\s*${max}\\b)`, 'i').test(source)
   );
   const want = (min !== undefined ? 'min' : '') + (max !== undefined ? 'max' : '');
