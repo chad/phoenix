@@ -81,6 +81,22 @@ must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
   which CATCHES a missing guard on reducible shapes and ABSTAINS otherwise. Status is
   **write-path aware**: it checks the invariant against *every* module that writes the
   governed rows and names the culprit path.
+- ✅ **The obligation ledger** — a new gate: *no normative spec sentence may be
+  silently unverified*. Every sentence carrying a normative marker (must / never /
+  only / at least / unique / valid / …) is an obligation, resolved to **verified**
+  (it produced a constraint, a binding defect, or a derived eval that ran) or
+  **unverified** (flagged `⚠ obligation`). Closes the system-level false green where
+  the spec made a promise `status` didn't even know existed. The paraphrase corpus
+  (`tests/unit/obligation-coverage.test.ts`) is the extractor-recall benchmark:
+  73 rewordings across the 7 kinds, **silent = 0** (captured 39, flagged 34, wrong 0).
+- ✅ **AST constraint checkers** — the regex Zod checkers (bound / membership /
+  pattern / cardinality) are migrated to the TypeScript compiler API
+  (`src/constraints/check-ast.ts`), reading real Zod call chains rather than source
+  text. Proven equivalent-or-better by a differential harness (0 disagreements over
+  the fault corpus + every ~/ledger constraint) before becoming the status default,
+  and **strictly better** on comment-injection traps the regex path false-greened
+  (a `.max()`/`z.enum()` living only in a comment). SQL kinds and the Expr oracle stay
+  on the (still reachable) regex/oracle fallback.
 
 ### The known-red backlog (1)
 
