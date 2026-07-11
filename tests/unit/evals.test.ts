@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveEvaluations, checkEvaluation } from '../../src/evals.js';
+import { deriveEvaluations, checkEvaluation, checkProperty } from '../../src/evals.js';
 import type { ImplementationUnit } from '../../src/models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from '../../src/models/iu.js';
 import type { CanonicalNode } from '../../src/models/canonical.js';
@@ -69,5 +69,28 @@ describe('checkEvaluation', () => {
   it('fails an unimplemented stub', () => {
     const src = 'export function f(){ throw new Error("stub: not implemented"); }';
     expect(checkEvaluation(invEval, src, canonById).status).toBe('fail');
+  });
+});
+
+describe('checkProperty — the behavioral oracle (catches logic mutations)', () => {
+  it('catches a logic mutation: mentions the fields but drops the 0-guard', () => {
+    const buggy = 'export function createOrder(o){ /* order total */ if (o.total < -1e9) throw new Error("x"); return o; }';
+    expect(checkProperty('an order total must never be negative', buggy).status).toBe('fail');
+  });
+  it('passes correct non-negativity enforcement (a real 0-bound guard)', () => {
+    expect(checkProperty('an order total must never be negative', 'if (o.total < 0) throw new Error("neg")').status).toBe('pass');
+    expect(checkProperty('an order total must never be negative', 'total: z.number().min(0)').status).toBe('pass');
+  });
+  it('checks a numeric max bound', () => {
+    expect(checkProperty('a name must not exceed 80 characters', 'name: z.string().max(80)').status).toBe('pass');
+    expect(checkProperty('a name must not exceed 80 characters', 'name: z.string().min(1)').status).toBe('fail');
+  });
+  it('checks an enum', () => {
+    expect(checkProperty('cadence must be one of daily, weekly', "cadence: z.enum(['daily','weekly'])").status).toBe('pass');
+    expect(checkProperty('cadence must be one of daily, weekly', 'cadence: z.string()').status).toBe('fail');
+  });
+  it('ABSTAINS (indeterminate) on a property it cannot statically check — never a false pass', () => {
+    const r = checkProperty('events must maintain causal ordering across partitions', 'export function handle(e){ return e; }');
+    expect(r.status).toBe('indeterminate');
   });
 });

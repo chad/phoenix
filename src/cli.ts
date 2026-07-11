@@ -54,11 +54,20 @@ import { WaiverStore, defaultSigner, parseExpiry } from './waivers.js';
 import type { StoredWaiver } from './waivers.js';
 import { deriveIUDependencies, applyDerivedDependencies, buildFileToIUMap, resolveRelativeImport } from './iu-deps.js';
 import { recordLowTierEvidence, iuArtifactHash } from './evidence-collector.js';
-import { computeInvalidation, iuKey } from './invalidation.js';
+import { computeInvalidation, iuKey, dependentsToRegenerate } from './invalidation.js';
 import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
-import { deriveEvaluations, checkEvaluation } from './evals.js';
+import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
+import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
+import { checkConstraintAst } from './constraints/check-ast.js';
+import { computeObligations } from './constraints/obligations.js';
+import type { StructuredConstraint } from './constraints/model.js';
+import { verdictOf, verdictSeverity } from './models/validation.js';
+import type { ValidationResult, CheckResult } from './models/validation.js';
+import { runSuite } from './eval/harness.js';
+import { CAPABILITY_SUITE } from './eval/suite.js';
+import { renderScorecard, scorecardArtifact } from './eval/report.js';
 import type { CompileError } from './models/architecture.js';
 
 // Phase E
@@ -102,6 +111,7 @@ import type { DriftReport, DriftEntry } from './models/manifest.js';
 import { DriftStatus } from './models/manifest.js';
 import { BootstrapState, DRateLevel } from './models/classification.js';
 import type { PolicyEvaluation, CascadeEvent } from './models/evidence.js';
+import { EvidenceStatus } from './models/evidence.js';
 
 // ─── ANSI Colors ─────────────────────────────────────────────────────────────
 
@@ -312,6 +322,246 @@ function journalRegen(phoenixDir: string, results: RegenResult[], ius: Implement
   }
 }
 
+/**
+ * Structured-constraint validation (SHACL-spine, first shape family = `Bound`).
+ * Extracts bound constraints from the canonical graph, resolves their bindings
+ * against the mined entity.attribute universe, and statically checks each against
+ * the generated code. Returns Diagnostics via the total-function verdict, so a
+ * spec constraint that the code does not enforce is a hard ERROR — not a false
+ * green (the §1 failure). Unresolvable bindings are ERRORs before codegen.
+ */
+function computeConstraintDiagnostics(
+  projectRoot: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  allClauses: Clause[],
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  if (canonNodes.length === 0) return diagnostics;
+
+  const entityAttrs = mineEntityAttributes(ius, canonNodes, allClauses);
+  const clauseById = new Map(allClauses.map(c => [c.clause_id, c]));
+  const { constraints, defects } = extractConstraints(canonNodes, entityAttrs, (cid) => {
+    const c = clauseById.get(cid);
+    return c ? { doc: c.source_doc_id, line: c.source_line_range[0], text: c.raw_text } : {};
+  });
+
+  // Binding defects: a constraint whose subject resolves to nothing (the §1 mechanism).
+  for (const d of defects) {
+    diagnostics.push({
+      severity: 'error',
+      category: 'constraint',
+      subject: d.subject,
+      message: `Unbound constraint: ${d.reason} — "${d.source.statement.slice(0, 60)}"`,
+      source_file: d.source.doc,
+      source_line: d.source.line,
+      recommended_actions: [
+        'The requirement graph names a subject the graph does not contain — fix the spec wording or the canonicalizer binding',
+      ],
+    });
+  }
+
+  // Resolved constraints: statically check enforcement in the generated code.
+  const iuByEntity = new Map<string, ImplementationUnit>();
+  for (const iu of ius) iuByEntity.set(iu.name.toLowerCase().replace(/s$/, ''), iu);
+
+  // Pre-index every IU's source, and a value→entity map from Membership constraints
+  // ("debit" → transaction.type). These power write-path-aware Expr checking: a state
+  // invariant can be violated by ANY module that writes the governed rows, not just
+  // the module it nominally binds to. balance.ts may guard the overdraft while a
+  // second write path (transaction.ts) does not — the invariant still fails.
+  const iuSourceById = new Map<string, string>();
+  for (const u of ius) {
+    const f = u.output_files[0];
+    const full = f ? join(projectRoot, f) : '';
+    if (full && existsSync(full)) iuSourceById.set(u.iu_id, readFileSync(full, 'utf8'));
+  }
+  const valueEntity = new Map<string, string>();
+  for (const c of constraints) {
+    if (c.assertion.kind === 'membership') for (const v of c.assertion.values) valueEntity.set(v.toLowerCase(), c.binding.entity);
+  }
+
+  /**
+   * Check an Expr invariant across every module that writes the governed state. The
+   * governed entity is the one owning a value-word in the statement (e.g. "debit" →
+   * transaction); a write path is any IU that INSERT/UPDATEs that entity's table. The
+   * invariant holds only if EVERY write path enforces it — one unguarded path
+   * violates it (and is named as the culprit). Abstains when no write path is found.
+   */
+  const checkExprWritePaths = (c: StructuredConstraint): { result: CheckResult; detail: string; culprit?: ImplementationUnit } => {
+    if (c.assertion.kind !== 'expr') return { result: 'indeterminate', detail: '' };
+    const statement = c.assertion.statement;
+    const words = statement.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+    const writeEntities = new Set<string>();
+    for (const w of words) { const e = valueEntity.get(w); if (e) writeEntities.add(e); }
+    const paths = ius.filter(u => {
+      const src = iuSourceById.get(u.iu_id); if (!src) return false;
+      const s = src.toLowerCase();
+      const writesGoverned = [...writeEntities].some(e => new RegExp(`(?:insert into|update|delete from)\\s+${e}s?\\b`, 'i').test(s));
+      return writesGoverned || writeEntities.has(u.name.toLowerCase().replace(/s$/, ''));
+    });
+    if (paths.length === 0) return { result: 'indeterminate', detail: 'no write path to the governed state found' };
+    let anyPass = false;
+    for (const u of paths) {
+      const r = checkProperty(statement, iuSourceById.get(u.iu_id)!);
+      if (r.status === 'fail') return { result: 'violates', detail: `write path "${u.name}" does not enforce this invariant (${r.reason})`, culprit: u };
+      if (r.status === 'pass') anyPass = true;
+    }
+    return anyPass
+      ? { result: 'conforms', detail: `every write path to the governed state enforces the invariant` }
+      : { result: 'indeterminate', detail: 'invariant not statically reducible on the write paths' };
+  };
+
+  for (const c of constraints) {
+    const iu = iuByEntity.get(c.binding.entity) ?? ius.find(u => u.name.toLowerCase().includes(c.binding.entity));
+    let source: string | null = null;
+    if (iu) {
+      const file = iu.output_files[0];
+      const full = file ? join(projectRoot, file) : '';
+      if (full && existsSync(full)) source = readFileSync(full, 'utf8');
+    }
+    const exprWPRaw = c.assertion.kind === 'expr' ? checkExprWritePaths(c) : null;
+    // A write-path abstention isn't the last word — fall through to the checker,
+    // whose executable runner may still decide a recognized aggregate shape.
+    const exprWP = exprWPRaw && exprWPRaw.result !== 'indeterminate' ? exprWPRaw : null;
+    // AST-first (proven equivalent-or-better by the differential harness); the AST path
+    // itself delegates to the regex checker for non-Zod / non-TS sources, so regex stays
+    // reachable as the fallback it was always meant to be.
+    const check = exprWP ?? checkConstraintAst(c, source);
+    const culpritIU = exprWP?.culprit ?? iu;
+    const a = c.assertion;
+    const shape = a.kind === 'bound'
+      ? `${a.op} ${a.value}${a.unit ? ' ' + a.unit : ''}`
+      : a.kind === 'membership'
+        ? `∈ {${a.values.join(', ')}}`
+        : a.kind === 'pattern'
+          ? `format: ${a.format}`
+          : a.kind === 'reference'
+            ? `→ existing ${a.target}`
+            : a.kind === 'cardinality'
+              ? `count ${a.min !== undefined ? `≥${a.min}` : ''}${a.max !== undefined ? ` ≤${a.max}` : ''} ${a.relation}`.trim()
+              : a.kind === 'expr'
+                ? `invariant: ${a.statement.slice(0, 48)}${a.statement.length > 48 ? '…' : ''}`
+                : a.kind === 'temporal'
+                  ? `${a.mode.replace('-', ' ')}`
+                  : a.kind === 'presence'
+                    ? 'required (non-optional)'
+                    : 'must be unique';
+    const enforce = a.kind === 'bound'
+      ? `.${a.op === '<=' ? 'max' : 'min'}(${a.value})`
+      : a.kind === 'membership'
+        ? `z.enum([${a.values.map(v => `'${v}'`).join(', ')}])`
+        : a.kind === 'pattern'
+          ? `.${a.format}()`
+          : a.kind === 'reference'
+            ? `a foreign key or existence guard against ${a.target}`
+            : a.kind === 'cardinality'
+              ? `a non-empty / count guard on ${a.relation}`
+              : a.kind === 'expr'
+                ? `an executable guard for this invariant`
+                : a.kind === 'temporal'
+                  ? `a ${a.mode} validator (e.g. .refine(isNotFuture, …))`
+                  : a.kind === 'presence'
+                    ? `a required (non-optional) field in the input schema`
+                    : 'a UNIQUE constraint';
+    // For an Expr invariant, the subject is the specific write path that fails to
+    // enforce it (the culprit module), not the nominal binding entity.
+    const label = a.kind === 'expr' && exprWP?.culprit ? `${exprWP.culprit.name}.invariant` : `${c.binding.entity}.${c.binding.attribute}`;
+    const result: ValidationResult = {
+      focus: { label, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: culpritIU?.iu_id },
+      path: c.binding.attribute,
+      source_component: a.kind,
+      result: check.result,
+      method: ('method' in check ? check.method : undefined) ?? 'static',
+      message: a.kind === 'expr'
+        ? `${label} — ${shape}: ${check.detail}`
+        : `${c.binding.entity}.${c.binding.attribute} ${shape}: ${check.detail}`,
+      recommended_actions: [],
+      provenance: { source_doc: c.source.doc, line: c.source.line },
+    };
+    const verdict = verdictOf(result.method, result.result);
+    const sev = verdictSeverity(verdict);
+    if (!sev) continue; // conforms → OK → no diagnostic
+    result.recommended_actions = a.kind === 'expr'
+      ? [`Add ${enforce} in ${exprWP?.culprit?.name ?? c.binding.entity} so no write path can reach a state the invariant forbids, then regenerate`]
+      : check.result === 'absent'
+        ? [`Enforce ${c.binding.entity}.${c.binding.attribute} with ${enforce} in the generated code, then regenerate`]
+        : check.result === 'violates'
+          ? [`Generated code enforces the wrong ${a.kind}; regenerate to match the spec (${shape})`]
+          : [`Generate ${c.binding.entity} to reason about this constraint`];
+    diagnostics.push({
+      severity: sev,
+      category: 'constraint',
+      subject: result.focus.label,
+      iu_id: culpritIU?.iu_id,
+      message: result.message,
+      source_file: culpritIU?.output_files[0] ?? result.provenance?.source_doc,
+      source_line: result.provenance?.line,
+      recommended_actions: result.recommended_actions,
+    });
+  }
+
+  // ── Obligation ledger: no normative sentence may be SILENTLY unverified ──
+  // A spec sentence carrying a normative marker ("must", "never", "only", "unique"…)
+  // is an obligation. It is TRACKED when it produced a structured constraint (any of
+  // the 7 kinds), a binding defect (already a diagnostic), or a derived evaluation
+  // that actually ran (pass/fail — not an abstain). An obligation that produced NONE
+  // of these is silent coverage loss — the promise the extractor dropped on the floor
+  // — and must be surfaced. This closes the system-level false green: the spec made a
+  // promise `status` did not even know existed.
+  diagnostics.push(...computeObligationDiagnostics(canonNodes, ius, allClauses, constraints, defects, iuSourceById));
+  return diagnostics;
+}
+
+/**
+ * The obligation ledger (see the tail of computeConstraintDiagnostics). Reports one
+ * `warning · obligation` per normative sentence that produced nothing checkable, so
+ * silent coverage loss is impossible. The accounting core (computeObligations) is a
+ * pure function in src/constraints/obligations.ts and exhaustively unit-tested; here
+ * we only compute the eval-derived tracking set (which needs the IU sources) and map
+ * the unverified obligations to diagnostics.
+ */
+function computeObligationDiagnostics(
+  canonNodes: CanonicalNode[],
+  ius: ImplementationUnit[],
+  allClauses: Clause[],
+  constraints: StructuredConstraint[],
+  defects: import('./constraints/model.js').BindingDefect[],
+  iuSourceById: Map<string, string>,
+): Diagnostic[] {
+  const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+
+  // A derived evaluation that ran to a verdict (pass/fail) tracks its node. Only
+  // single-node evals count: the coarse contract-output eval spans every source node
+  // and would over-credit them, so it is excluded here.
+  const trackedByEval = new Set<string>();
+  for (const iu of ius) {
+    const src = iuSourceById.get(iu.iu_id);
+    if (!src) continue;
+    for (const e of deriveEvaluations(iu, canonNodes)) {
+      if (e.canon_ids.length !== 1) continue;
+      const r = checkEvaluation(e, src, canonById);
+      if (r.status === 'pass' || r.status === 'fail') trackedByEval.add(e.canon_ids[0]);
+    }
+  }
+
+  const obligations = computeObligations(canonNodes, allClauses, constraints, defects, trackedByEval);
+  return obligations.filter(o => o.state === 'unverified').map(o => {
+    const snippet = o.statement.length > 90 ? o.statement.slice(0, 88).trimEnd() + '…' : o.statement;
+    return {
+      severity: 'warning' as const,
+      category: 'obligation' as const,
+      subject: `"${snippet}"`,
+      message: `normative ("${o.marker}") but produced no checkable constraint (unverified)`,
+      source_file: o.doc,
+      source_line: o.line,
+      recommended_actions: [
+        'Reword the spec so the rule is machine-checkable, add a constraint kind that captures it, or attach a durable eval — do not leave it silently unverified',
+      ],
+    };
+  });
+}
+
 /** Current artifact hash per IU — the identity of the generation on disk now. */
 function currentArtifactHashes(
   ius: ImplementationUnit[],
@@ -363,7 +613,9 @@ function generateCheckAndRecordEvals(
 
     // Check each eval against the generated module; stamp status; persist.
     const results = derived.map(e => checkEvaluation(e, source, canonById));
-    const statusById = new Map(results.map(r => [r.eval_id, r.status]));
+    // 'indeterminate' (the oracle honestly abstained) maps to 'untested' on the
+    // durable eval — it is NOT a pass.
+    const statusById = new Map(results.map(r => [r.eval_id, r.status === 'indeterminate' ? 'untested' as const : r.status]));
     for (const e of derived) {
       e.last_status = statusById.get(e.eval_id) ?? 'untested';
       e.last_verified_at = timestamp;
@@ -376,20 +628,27 @@ function generateCheckAndRecordEvals(
     const artifactHash = iuArtifactHash(iu, manifest, projectRoot);
     const required = new Set(iu.evidence_policy.required);
 
+    // Tri-state evidence: any fail ⇒ FAIL; else any unverified (indeterminate/
+    // untested) ⇒ PENDING (honest — not a pass); else PASS. A property the oracle
+    // could not verify must never satisfy the policy on its own.
+    const evStatus = (subset: typeof derived): EvidenceStatus => {
+      if (subset.some(e => e.last_status === 'fail')) return EvidenceStatus.FAIL;
+      if (subset.some(e => e.last_status !== 'pass')) return EvidenceStatus.PENDING;
+      return EvidenceStatus.PASS;
+    };
+
     // unit_tests ← boundary_contract + domain_rule + failure_mode evals.
     if (required.has('unit_tests')) {
       const behavioral = derived.filter(e => e.binding !== 'invariant');
-      const anyFail = behavioral.some(e => e.last_status === 'fail');
       if (behavioral.length > 0) {
-        evidence.push(makeEvalEvidence('unit_tests', iu, artifactHash, !anyFail, behavioral.length, timestamp));
+        evidence.push(makeEvalEvidence('unit_tests', iu, artifactHash, evStatus(behavioral), behavioral.length, timestamp));
       }
     }
     // property_tests ← invariant evals (the properties that must always hold).
     if (required.has('property_tests')) {
       const invariants = derived.filter(e => e.binding === 'invariant');
-      const anyFail = invariants.some(e => e.last_status === 'fail');
       if (invariants.length > 0) {
-        evidence.push(makeEvalEvidence('property_tests', iu, artifactHash, !anyFail, invariants.length, timestamp));
+        evidence.push(makeEvalEvidence('property_tests', iu, artifactHash, evStatus(invariants), invariants.length, timestamp));
       }
     }
   }
@@ -402,18 +661,19 @@ function makeEvalEvidence(
   kind: 'unit_tests' | 'property_tests',
   iu: ImplementationUnit,
   artifactHash: string,
-  pass: boolean,
+  status: EvidenceStatus,
   count: number,
   timestamp: string,
 ): import('./models/evidence.js').EvidenceRecord {
+  const verb = status === EvidenceStatus.PASS ? 'passed' : status === EvidenceStatus.FAIL ? 'failed' : 'could not be verified by';
   return {
     evidence_id: createHash('sha256').update(`${kind}\x00${iu.iu_id}\x00${timestamp}`).digest('hex').slice(0, 16),
     kind: kind as import('./models/evidence.js').EvidenceKind,
-    status: (pass ? 'PASS' : 'FAIL') as import('./models/evidence.js').EvidenceStatus,
+    status,
     iu_id: iu.iu_id,
     canon_ids: iu.source_canon_ids,
     artifact_hash: artifactHash,
-    message: `${count} durable ${kind === 'unit_tests' ? 'behavioral' : 'invariant'} eval(s) ${pass ? 'passed' : 'failed'} structural check`,
+    message: `${count} durable ${kind === 'unit_tests' ? 'behavioral' : 'invariant'} eval(s) ${verb} the static oracle`,
     timestamp,
   };
 }
@@ -1261,6 +1521,10 @@ function printTrustDashboard(
   // Boundary validation — includes IU-level coupling (allowed_ius/forbidden_ius).
   diagnostics.push(...computeBoundaryDiagnostics(projectRoot, ius));
 
+  // Structured-constraint validation (SHACL spine, `Bound` shape family): a spec
+  // constraint the generated code does not enforce is an ERROR, not a false green.
+  diagnostics.push(...computeConstraintDiagnostics(projectRoot, ius, canonNodes, allClauses));
+
   // Policy evaluation — bind to current artifact hashes so stale evidence (for a
   // superseded generation) does not satisfy the policy.
   const evidenceStore = new EvidenceStore(phoenixDir);
@@ -1862,7 +2126,39 @@ async function cmdRegen(args: string[]): Promise<void> {
 
   const manifestManager = new ManifestManager(phoenixDir);
   const previousMasses = loadPreviousMasses(manifestManager);
+
+  // Snapshot the target IUs' OLD contracts from disk (pre-write) so we can detect a
+  // contract change after regeneration and pull in dependents that would break.
+  const oldContracts = loadExistingContracts(projectRoot, targetIUs, regenArch);
+
   const results = await generateAll(targetIUs, regenCtx);
+
+  // Contract-aware dependent regeneration: if a regenerated IU's contract CHANGED,
+  // regenerate its transitive dependents against the new contract — otherwise a
+  // downstream consumer (e.g. the dashboard) breaks until a manual `regen --all`.
+  // Skipped for --all (everything already regenerates).
+  if (!forceAll && regenArch) {
+    const changed = new Set<string>();
+    for (const r of results) {
+      const iu = targetIUs.find(i => i.iu_id === r.iu_id);
+      if (!iu) continue;
+      const primary = r.files.get(iu.output_files[0]) ?? [...r.files.values()][0];
+      const newContract = primary ? regenArch.runtime.extractContract(primary) : undefined;
+      const old = oldContracts.get(r.iu_id);
+      if (newContract && old !== undefined && newContract !== old) changed.add(r.iu_id);
+    }
+    if (changed.size > 0) {
+      const already = new Set(results.map(r => r.iu_id));
+      const depIds = dependentsToRegenerate(changed, ius);
+      const depIUs = ius.filter(iu => depIds.has(iu.iu_id) && !already.has(iu.iu_id));
+      if (depIUs.length > 0) {
+        console.log(`  ${yellow('▸')} ${dim(`${depIUs.length} dependent(s) regenerated (upstream contract changed): ${depIUs.map(d => d.name).join(', ')}`)}`);
+        const depResults = await generateAll(depIUs, regenCtx);
+        results.push(...depResults);
+        targetIUs = [...targetIUs, ...depIUs]; // so downstream (writes, manifest, clearKeys) include them
+      }
+    }
+  }
 
   // Shared aggregate (migrations): this may be a PARTIAL regen, so preserve regions
   // owned by IUs not in this batch and merge the freshly-generated ones over them.
@@ -2883,6 +3179,35 @@ function cmdJournal(args: string[]): void {
   }
 }
 
+/**
+ * `phoenix selftest [--json] [--strict]` — run Phoenix's own capability eval and
+ * print the Red/Green scorecard. This is the project's trust surface for itself: green
+ * capabilities are locked against regression; red ones are the honest, documented
+ * backlog. Exit non-zero on any regression (a proven capability that broke), and —
+ * under --strict — also on any promotion (a red that now passes and should be
+ * flipped to green). Unlike a normal command this does not require a Phoenix project.
+ */
+async function cmdEval(args: string[]): Promise<void> {
+  const asJson = args.includes('--json');
+  const strict = args.includes('--strict');
+  const sc = await runSuite(CAPABILITY_SUITE, () => new Date().toISOString());
+
+  if (asJson) {
+    console.log(JSON.stringify(scorecardArtifact(sc), null, 2));
+  } else {
+    console.log(renderScorecard(sc, { color: process.stdout.isTTY ?? false }));
+  }
+
+  if (sc.regressions.length > 0) {
+    console.error(red(`✖ ${sc.regressions.length} regression(s) — a proven capability broke.`));
+    process.exit(1);
+  }
+  if (strict && sc.promotions.length > 0) {
+    console.error(yellow(`⚠ ${sc.promotions.length} promotion(s) — flip these reds to green (--strict).`));
+    process.exit(2);
+  }
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -2936,6 +3261,8 @@ ${bold('Inspection:')}
   ${cyan('bot')} "<command>"       Route a bot command (e.g., "SpecBot: help")
 
 ${bold('Meta:')}
+  ${cyan('selftest')} [--json]     Phoenix's own capability eval — the Red/Green scorecard
+                         ${dim('--strict also fails on promotions (reds that now pass)')}
   ${cyan('version')}               Show version
   ${cyan('help')}                  Show this help
 
@@ -3002,6 +3329,10 @@ async function main(): Promise<void> {
     case 'evals':
     case 'eval-gen':
       cmdEvals(commandArgs);
+      break;
+    case 'selftest':
+    case 'capabilities':
+      await cmdEval(commandArgs);
       break;
     case 'attest':
       cmdAttest(commandArgs);

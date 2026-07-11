@@ -59,9 +59,37 @@ export function resolveRelativeImport(
   return null;
 }
 
+/** The HTTP route slug an IU is mounted at — the output dir segment (matches the scaffold). */
+export function iuRouteSlug(iu: ImplementationUnit): string | null {
+  const f = iu.output_files[0];
+  if (!f) return null;
+  const parts = normalizeSlashes(f).split('/');
+  return parts.length >= 2 ? parts[parts.length - 2] : null;
+}
+
+/**
+ * Extract the first path segment of every HTTP call target in a source file —
+ * `fetch('/habit')`, `fetch(\`/habit/${id}\`)`, `axios.post('/check-in', …)`. Handles
+ * single/double quotes and template literals (taking the static prefix before `${`).
+ * These are how the generated web UIs consume sibling modules; without this the
+ * dependency is invisible (only relative imports would be seen).
+ */
+export function extractFetchRoutes(source: string): string[] {
+  const routes = new Set<string>();
+  const re = /(?:fetch|axios(?:\.\w+)?|request)\s*\(\s*[`'"]([^`'"$)]*)/g;
+  for (const m of source.matchAll(re)) {
+    const target = m[1].trim();
+    if (!target.startsWith('/')) continue;             // only same-origin absolute routes
+    const seg = target.replace(/^\/+/, '').split(/[/?#]/)[0];
+    if (seg) routes.add(seg.toLowerCase());
+  }
+  return [...routes];
+}
+
 /**
  * Derive the IU dependency graph from generated code on disk.
- * Returns iu_id → sorted unique list of iu_ids it imports from.
+ * Returns iu_id → sorted unique list of iu_ids it depends on — via relative imports
+ * AND via HTTP calls to a sibling module's mounted route (the web-UI case).
  * IUs whose files are missing simply contribute no edges (regen not run yet).
  */
 export function deriveIUDependencies(
@@ -70,6 +98,12 @@ export function deriveIUDependencies(
 ): Map<string, string[]> {
   const fileToIU = buildFileToIUMap(ius);
   const knownFiles = new Set(fileToIU.keys());
+  // Route slug → IU, for HTTP-call dependency detection.
+  const routeToIU = new Map<string, string>();
+  for (const iu of ius) {
+    const slug = iuRouteSlug(iu);
+    if (slug) routeToIU.set(slug.toLowerCase(), iu.iu_id);
+  }
   const deps = new Map<string, Set<string>>();
   for (const iu of ius) deps.set(iu.iu_id, new Set());
 
@@ -83,12 +117,18 @@ export function deriveIUDependencies(
       } catch {
         continue;
       }
+      // (1) relative imports
       const graph = extractDependencies(source, file);
       for (const imp of graph.imports) {
         if (!imp.is_relative) continue;
         const resolved = resolveRelativeImport(normalizeSlashes(file), imp.source, knownFiles);
         if (!resolved) continue;
         const targetIU = fileToIU.get(resolved);
+        if (targetIU && targetIU !== iu.iu_id) deps.get(iu.iu_id)!.add(targetIU);
+      }
+      // (2) HTTP calls to a sibling module's route
+      for (const route of extractFetchRoutes(source)) {
+        const targetIU = routeToIU.get(route);
         if (targetIU && targetIU !== iu.iu_id) deps.get(iu.iu_id)!.add(targetIU);
       }
     }

@@ -69,6 +69,37 @@ export function iuKey(iu: ImplementationUnit): string {
   return iu.name || iu.output_files[0] || iu.iu_id;
 }
 
+/**
+ * The transitive dependents that must be REGENERATED because an upstream IU's
+ * contract changed. Selective invalidation flags dependents for re-validation, but
+ * a *contract* change (an entity's schema/API shape) can break a consumer — so a
+ * consumer of a contract-changed IU is regenerated against the new contract, not
+ * merely flagged. Returns dependent iu_ids (excludes the changed roots themselves).
+ * This is what keeps a downstream module (e.g. the dashboard) consistent after an
+ * upstream selective regen, instead of breaking until a manual `regen --all`.
+ */
+export function dependentsToRegenerate(changedIds: Set<string>, ius: ImplementationUnit[]): Set<string> {
+  const dependents = new Map<string, ImplementationUnit[]>();
+  for (const iu of ius) {
+    for (const depId of iu.dependencies) {
+      (dependents.get(depId) ?? dependents.set(depId, []).get(depId)!).push(iu);
+    }
+  }
+  const result = new Set<string>();
+  const queue = [...changedIds];
+  const seen = new Set<string>(changedIds);
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    for (const d of dependents.get(id) ?? []) {
+      if (seen.has(d.iu_id)) continue;
+      seen.add(d.iu_id);
+      result.add(d.iu_id);
+      queue.push(d.iu_id);
+    }
+  }
+  return result;
+}
+
 export interface InvalidationInput {
   /** Clause diffs paired with their classification (same order/length). */
   changes: Array<{ diff: ClauseDiff; classification: ChangeClassification }>;

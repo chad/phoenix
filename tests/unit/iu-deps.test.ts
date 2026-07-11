@@ -56,6 +56,17 @@ describe('deriveIUDependencies', () => {
     expect(derived.get('iu-tasks')).toEqual([]);
   });
 
+  it('derives IU->IU edges from HTTP calls to a sibling route (the web-UI case)', () => {
+    const dashboard = iu('iu-dashboard', 'src/generated/dashboard/dashboard.ts');
+    const habit = iu('iu-habit', 'src/generated/habit/habit.ts');
+    // Dashboard consumes the habit module over HTTP — no import, only a fetch.
+    write('src/generated/dashboard/dashboard.ts', `export async function load(){ const r = await fetch('/habit'); return r.json(); }`);
+    write('src/generated/habit/habit.ts', `export const habit = 1;`);
+    const derived = deriveIUDependencies(root, [dashboard, habit]);
+    expect(derived.get('iu-dashboard')).toEqual(['iu-habit']);
+    expect(derived.get('iu-habit')).toEqual([]);
+  });
+
   it('applyDerivedDependencies reports only changed IUs', () => {
     const tasks = iu('iu-tasks', 'src/generated/tasks.ts', []);
     const changed = applyDerivedDependencies([tasks], new Map([['iu-tasks', ['iu-projects']]]));

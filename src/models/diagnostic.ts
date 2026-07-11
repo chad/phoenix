@@ -11,6 +11,8 @@ export type DiagnosticCategory =
   | 'boundary'
   | 'd-rate'
   | 'canon'
+  | 'constraint'
+  | 'obligation'
   | 'evidence'
   | 'regen'
   | 'build';
