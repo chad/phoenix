@@ -58,11 +58,12 @@ import { computeInvalidation, iuKey, dependentsToRegenerate } from './invalidati
 import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
-import { deriveEvaluations, checkEvaluation } from './evals.js';
+import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
 import { checkConstraint } from './constraints/check.js';
+import type { StructuredConstraint } from './constraints/model.js';
 import { verdictOf, verdictSeverity } from './models/validation.js';
-import type { ValidationResult } from './models/validation.js';
+import type { ValidationResult, CheckResult } from './models/validation.js';
 import { runSuite } from './eval/harness.js';
 import { CAPABILITY_SUITE } from './eval/suite.js';
 import { renderScorecard, scorecardArtifact } from './eval/report.js';
@@ -363,6 +364,53 @@ function computeConstraintDiagnostics(
   const iuByEntity = new Map<string, ImplementationUnit>();
   for (const iu of ius) iuByEntity.set(iu.name.toLowerCase().replace(/s$/, ''), iu);
 
+  // Pre-index every IU's source, and a value→entity map from Membership constraints
+  // ("debit" → transaction.type). These power write-path-aware Expr checking: a state
+  // invariant can be violated by ANY module that writes the governed rows, not just
+  // the module it nominally binds to. balance.ts may guard the overdraft while a
+  // second write path (transaction.ts) does not — the invariant still fails.
+  const iuSourceById = new Map<string, string>();
+  for (const u of ius) {
+    const f = u.output_files[0];
+    const full = f ? join(projectRoot, f) : '';
+    if (full && existsSync(full)) iuSourceById.set(u.iu_id, readFileSync(full, 'utf8'));
+  }
+  const valueEntity = new Map<string, string>();
+  for (const c of constraints) {
+    if (c.assertion.kind === 'membership') for (const v of c.assertion.values) valueEntity.set(v.toLowerCase(), c.binding.entity);
+  }
+
+  /**
+   * Check an Expr invariant across every module that writes the governed state. The
+   * governed entity is the one owning a value-word in the statement (e.g. "debit" →
+   * transaction); a write path is any IU that INSERT/UPDATEs that entity's table. The
+   * invariant holds only if EVERY write path enforces it — one unguarded path
+   * violates it (and is named as the culprit). Abstains when no write path is found.
+   */
+  const checkExprWritePaths = (c: StructuredConstraint): { result: CheckResult; detail: string; culprit?: ImplementationUnit } => {
+    if (c.assertion.kind !== 'expr') return { result: 'indeterminate', detail: '' };
+    const statement = c.assertion.statement;
+    const words = statement.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+    const writeEntities = new Set<string>();
+    for (const w of words) { const e = valueEntity.get(w); if (e) writeEntities.add(e); }
+    const paths = ius.filter(u => {
+      const src = iuSourceById.get(u.iu_id); if (!src) return false;
+      const s = src.toLowerCase();
+      const writesGoverned = [...writeEntities].some(e => new RegExp(`(?:insert into|update|delete from)\\s+${e}s?\\b`, 'i').test(s));
+      return writesGoverned || writeEntities.has(u.name.toLowerCase().replace(/s$/, ''));
+    });
+    if (paths.length === 0) return { result: 'indeterminate', detail: 'no write path to the governed state found' };
+    let anyPass = false;
+    for (const u of paths) {
+      const r = checkProperty(statement, iuSourceById.get(u.iu_id)!);
+      if (r.status === 'fail') return { result: 'violates', detail: `write path "${u.name}" does not enforce this invariant (${r.reason})`, culprit: u };
+      if (r.status === 'pass') anyPass = true;
+    }
+    return anyPass
+      ? { result: 'conforms', detail: `every write path to the governed state enforces the invariant` }
+      : { result: 'indeterminate', detail: 'invariant not statically reducible on the write paths' };
+  };
+
   for (const c of constraints) {
     const iu = iuByEntity.get(c.binding.entity) ?? ius.find(u => u.name.toLowerCase().includes(c.binding.entity));
     let source: string | null = null;
@@ -371,7 +419,9 @@ function computeConstraintDiagnostics(
       const full = file ? join(projectRoot, file) : '';
       if (full && existsSync(full)) source = readFileSync(full, 'utf8');
     }
-    const check = checkConstraint(c, source);
+    const exprWP = c.assertion.kind === 'expr' ? checkExprWritePaths(c) : null;
+    const check = exprWP ?? checkConstraint(c, source);
+    const culpritIU = exprWP?.culprit ?? iu;
     const a = c.assertion;
     const shape = a.kind === 'bound'
       ? `${a.op} ${a.value}${a.unit ? ' ' + a.unit : ''}`
@@ -399,13 +449,18 @@ function computeConstraintDiagnostics(
               : a.kind === 'expr'
                 ? `an executable guard for this invariant`
                 : 'a UNIQUE constraint';
+    // For an Expr invariant, the subject is the specific write path that fails to
+    // enforce it (the culprit module), not the nominal binding entity.
+    const label = a.kind === 'expr' && exprWP?.culprit ? `${exprWP.culprit.name}.invariant` : `${c.binding.entity}.${c.binding.attribute}`;
     const result: ValidationResult = {
-      focus: { label: `${c.binding.entity}.${c.binding.attribute}`, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: iu?.iu_id },
+      focus: { label, entity: c.binding.entity, attribute: c.binding.attribute, iu_id: culpritIU?.iu_id },
       path: c.binding.attribute,
       source_component: a.kind,
       result: check.result,
       method: 'static',
-      message: `${c.binding.entity}.${c.binding.attribute} ${shape}: ${check.detail}`,
+      message: a.kind === 'expr'
+        ? `${label} — ${shape}: ${check.detail}`
+        : `${c.binding.entity}.${c.binding.attribute} ${shape}: ${check.detail}`,
       recommended_actions: [],
       provenance: { source_doc: c.source.doc, line: c.source.line },
     };
@@ -413,7 +468,7 @@ function computeConstraintDiagnostics(
     const sev = verdictSeverity(verdict);
     if (!sev) continue; // conforms → OK → no diagnostic
     result.recommended_actions = a.kind === 'expr'
-      ? [`Add ${enforce} in ${c.binding.entity} so the code cannot reach a state the invariant forbids, then regenerate`]
+      ? [`Add ${enforce} in ${exprWP?.culprit?.name ?? c.binding.entity} so no write path can reach a state the invariant forbids, then regenerate`]
       : check.result === 'absent'
         ? [`Enforce ${c.binding.entity}.${c.binding.attribute} with ${enforce} in the generated code, then regenerate`]
         : check.result === 'violates'
@@ -423,9 +478,9 @@ function computeConstraintDiagnostics(
       severity: sev,
       category: 'constraint',
       subject: result.focus.label,
-      iu_id: iu?.iu_id,
+      iu_id: culpritIU?.iu_id,
       message: result.message,
-      source_file: result.provenance?.source_doc,
+      source_file: culpritIU?.output_files[0] ?? result.provenance?.source_doc,
       source_line: result.provenance?.line,
       recommended_actions: result.recommended_actions,
     });

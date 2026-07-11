@@ -155,10 +155,31 @@ export function checkProperty(statement: string, source: string): { status: 'pas
     /\bgo(?:es)?\s+negative\b/.test(s);
   if (nonNeg) {
     if (!refsField) return { status: 'fail', reason: 'invariant field not referenced (enforcement dropped)' };
-    const enforced = /\.min\(\s*0\s*\)|\.nonnegative\(|\.gte\(\s*0\s*\)|[<>]=?\s*0\b|>=\s*0/.test(source);
+    // The 0-floor guard must be about the CONSTRAINED quantity — not any unrelated
+    // numeric comparison in the module (a stray `conditions.length > 0` must NOT read
+    // as a balance guard, or the surface false-greens). Identify the guarded noun (the
+    // word before the negativity cue) and require a 0-comparison or field floor
+    // co-located with it. Fall back to a strict field floor when the noun is unknown.
+    const cueIdx = s.search(/below\s+(?:zero|0)|negative/);
+    const subject = cueIdx >= 0
+      ? [...s.slice(0, cueIdx).split(/[^a-z]+/).filter(Boolean)].reverse().find(w => w.length > 2 && !GENERIC.has(w))
+      : undefined;
+    const src = source.toLowerCase();
+    const near = (needle: RegExp): boolean => {
+      if (!subject) return false;
+      for (const m of src.matchAll(needle)) {
+        const at = m.index ?? 0;
+        if (src.slice(Math.max(0, at - 80), at + 6).includes(subject)) return true;
+      }
+      return false;
+    };
+    const floor = /\.min\(\s*0\s*\)|\.nonnegative\(|\.gte\(\s*0\s*\)/g;
+    const enforced = subject
+      ? (near(/[<>]=?\s*0\b/g) || near(floor))
+      : /\.min\(\s*0\s*\)|\.nonnegative\(|\.gte\(\s*0\s*\)/.test(source);
     return enforced
-      ? { status: 'pass', reason: 'non-negativity enforced (a 0-bound guard is present)' }
-      : { status: 'fail', reason: 'references the field but does not reject values below 0' };
+      ? { status: 'pass', reason: `non-negativity of "${subject ?? 'value'}" enforced (a 0-floor guard is co-located)` }
+      : { status: 'fail', reason: `no 0-floor guard protects "${subject ?? 'the value'}" against going below 0 on this path` };
   }
 
   // ── non-empty: "must not be empty" ──
