@@ -1137,13 +1137,14 @@ async function runRepairPhase(
     return fixed;
   };
 
-  const manifest0 = opts.manifestManager.load();
   const artifactHash = (t: RepairTarget): string => {
     if (t.iu) return iuArtifactHash(t.iu, opts.manifestManager.load(), projectRoot);
     const full = join(projectRoot, t.file);
     return existsSync(full) ? sha256Hex(readFileSync(full, 'utf8')) : 'absent';
   };
-  void manifest0;
+
+  // Snapshot the findings BEFORE any repair — the "before" column of the cold-start matrix.
+  const initialFindings = collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target);
 
   const result = await runRepairLoop({
     targets,
@@ -1178,17 +1179,33 @@ async function runRepairPhase(
   });
 
   // Final honest line either way.
-  const schemaResidual = result.residual.filter(f => f.category === 'schema').length;
-  const constraintResidual = result.residual.filter(f => f.category === 'constraint').length;
-  const buildResidual = result.residual.filter(f => f.category === 'build').length;
+  const breakdown = (fs: RepairFinding[]) => ({
+    schema: fs.filter(f => f.category === 'schema').length,
+    constraint: fs.filter(f => f.category === 'constraint').length,
+    build: fs.filter(f => f.category === 'build').length,
+  });
+  const before = result.rounds.length > 0 ? initialFindings : result.residual;
+  const residual = breakdown(result.residual);
   if (result.green) {
     console.log(`${indent}  ${green('✔')} repair loop reached zero verifier errors in ${result.rounds.length} round(s)`);
   } else {
-    console.log(`${indent}  ${red('✖')} ${result.residual.length} finding(s) remain after ${result.rounds.length} round(s) ${dim(`(stop: ${result.stop})`)} — schema ${schemaResidual}, constraint ${constraintResidual}, build ${buildResidual}`);
+    console.log(`${indent}  ${red('✖')} ${result.residual.length} finding(s) remain after ${result.rounds.length} round(s) ${dim(`(stop: ${result.stop})`)} — schema ${residual.schema}, constraint ${residual.constraint}, build ${residual.build}`);
     for (const f of result.residual.slice(0, 6)) {
       console.log(`${indent}    ${red('●')} ${dim(f.category)} ${f.subject} — ${f.message}`);
     }
   }
+
+  // Machine-readable repair status — the exact before/after the cold-start matrix quotes.
+  writeFileSync(join(phoenixDir, 'repair-status.json'), JSON.stringify({
+    before: breakdown(before),
+    after: residual,
+    rounds: result.rounds.length,
+    green: result.green,
+    stop: result.stop,
+    residual: result.residual.map(f => ({ category: f.category, subject: f.subject, message: f.message })),
+    checked_at: new Date().toISOString(),
+  }, null, 2), 'utf8');
+
   console.log();
   return result;
 }

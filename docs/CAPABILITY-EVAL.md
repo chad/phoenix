@@ -42,7 +42,7 @@ knowledge. It is, for the project, what `phoenix status` is for a generated app.
 must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 
 - **Green health: 100%** — every proven capability still holds (0 regressions).
-- **Overall pass rate: 97%** (29/30 cases) — the remaining 3% is the honest backlog.
+- **Overall pass rate: 97%** (32/33 cases) — the remaining 3% is the honest backlog.
 
 ### Closed by the Red→Green loop (red → green)
 
@@ -114,6 +114,24 @@ must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
   ("provide at least a name and an email") emits one constraint per field, checked
   as present-and-non-optional in the input schema. Together with temporal, this
   cleared both of ~/ledger's unverified obligations.
+- ✅ **Schema-first generation (`generation.schema-is-shared-before-modules`)** — the
+  shared database schema is now derived BEFORE any module is generated (a dedicated
+  LLM planning call, with a deterministic fallback) and injected into every module
+  prompt VERBATIM with a "use exactly these table/column names" gate. This prevents the
+  drift → runtime-500 class at the source (singular/plural tables, phantom columns,
+  broken FKs — the failure that shipped on all three real projects) rather than only
+  catching it after the fact. The pre-planned schema is authoritative over any stray
+  module `CREATE TABLE`. Ordering is proven end-to-end from the journal
+  (`schema-plan` precedes every `regen`).
+- ✅ **The repair loop (`repair.findings-route-to-targeted-regeneration`)** — the loop
+  closes: after codegen + the compile gate, verifier ERROR findings are routed to the
+  generated artifact that owns them and drive a TARGETED regeneration with the findings
+  (+ recommended actions) VERBATIM in the prompt; the project is re-verified and the
+  round repeats, bounded (default 3) and journaled. THE VERIFIER IS FROZEN TO THE LOOP:
+  repair changes generated code only — never a checker, a constraint, the spec, or an
+  eval. Not-green-after-N is an honest, reportable residual, never a silent success. The
+  mechanics (routing, re-verify, stop conditions, journaling) are locked with an
+  injectable scripted repairer, so the win holds without depending on any model.
 
 ### The known-red backlog (1)
 
@@ -127,5 +145,5 @@ must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
    with.*
 
 Each red is a concrete next piece of work with a known fix — the eval doubles as the
-roadmap. Thirteen capabilities have now been closed by the Red→Green loop; one honest
+roadmap. Fifteen capabilities have now been closed by the Red→Green loop; one honest
 red remains for the live-app execution tail.
