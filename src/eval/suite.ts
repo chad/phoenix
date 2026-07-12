@@ -12,7 +12,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -32,6 +32,8 @@ import { checkBound, checkConstraint } from '../constraints/check.js';
 import { extractBoundConstraints, extractConstraints, mineEntityAttributes } from '../constraints/extract.js';
 import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
+import { runAggregateProperty } from '../constraints/exec-runner.js';
+import { runGatedLiveEval, referenceApp, referencePlans } from '../live-harness.js';
 import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
 import type { CheckMethod, CheckResult } from '../models/validation.js';
@@ -328,18 +330,65 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'oracle.live-app-property-evals-not-yet-run', capability: 'oracle', tier: 'unit', expect: 'red',
-    redReason: 'The executable runner proves aggregate invariants for SELF-CONTAINED modules (pure functions over data), mutation-gated. A real generated module imports its dependencies (db, hono) — executing its properties requires standing those up (in-memory SQLite, an HTTP shim). Today the runner honestly REFUSES such modules (indeterminate: "needs the live app harness"). Fix: build the live harness — boot the generated app against in-memory deps and route aggregate/temporal invariants through the same mutation gate the pure-function path already earns its greens with.',
-    description: 'An aggregate invariant on a module WITH external dependencies (db import) is proven by the live harness, not refused.',
-    run: () => {
-      const attrs = mineEntityAttributes([iu('dashboard'), iu('account')], [canon(CanonicalType.DEFINITION, 'a dashboard has a total', 'd')]);
-      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'the dashboard total must equal the sum of all account balances', 'c', 'cl', ['dashboard', 'total', 'account'])], attrs);
-      const e = constraints.find(c => c.assertion.kind === 'expr');
-      // The real shape of a generated module: it imports its DB. The runner must
-      // refuse (indeterminate) today — proving it via a live harness flips this red.
+    id: 'oracle.live-app-property-evals-not-yet-run', capability: 'oracle', tier: 'unit', expect: 'green',
+    description: 'An aggregate invariant on a module WITH external dependencies (a real DB + HTTP surface) is PROVEN by the live harness — boot the app, drive it, earn behavioral-gated conforms through the mutation gate — not refused as the sandbox runner must.',
+    run: async () => {
+      // The honest flip: the sandbox runner REFUSES a module that imports its world
+      // (indeterminate: "needs the live app harness"). Here we prove the harness by
+      // running it for real against a genuine app — a node:http server backed by a
+      // genuine node:sqlite database (a module WITH external dependencies + state,
+      // exactly the shape exec-runner cannot touch). We assert BOTH halves of the
+      // contract: (a) the sandbox runner still refuses the dependency-carrying source,
+      // and (b) the live harness earns a mutation-gated conforms by execution.
       const withDeps = `import { db } from '../../db.js';\nexport function total(){ return db.prepare('SELECT SUM(balance) AS s FROM accounts').get().s ?? 0; }`;
-      const r = e ? checkConstraint(e, withDeps) : { result: 'indeterminate' as const };
-      return { passed: r.result === 'conforms', detail: `runner=${r.result} (want conforms via live harness; refuses today — no in-memory dep stand-up)` };
+      const refused = runAggregateProperty({ agg: 'sum', field: 'balance' }, withDeps);
+
+      const dir = mkdtempSync(join(tmpdir(), 'phx-eval-live-'));
+      writeFileSync(join(dir, 'app.mjs'), referenceApp(), 'utf8');
+      const { plan } = referencePlans().find(p => p.label === 'aggregate')!;
+      const live = await runGatedLiveEval({
+        bootSpec: { projectRoot: dir, command: ['node', 'app.mjs'], readyTimeoutMs: 12_000 },
+        plan, targetFile: 'app.mjs',
+      });
+      const ok = refused.status === 'indeterminate'
+        && live.status === 'pass' && live.gated && live.method === 'behavioral-gated' && live.mutantsApplicable > 0;
+      return { passed: ok, detail: `sandbox=${refused.status} (refuses deps); live=${live.status}/${live.method} gated=${live.gated} (killed ${live.mutantsKilled}/${live.mutantsApplicable})` };
+    },
+  },
+  {
+    id: 'oracle.live-harness-mutation-gate-is-honest', capability: 'oracle', tier: 'unit', expect: 'green',
+    description: 'The live harness NEVER certifies a broken app: a guard-stripped app fails the live eval (mutant killed by real execution) and a non-booting app abstains — behavioral-gated conforms is earned, never observed.',
+    run: async () => {
+      // Guard-stripped app: the overdraft guard is deleted → real execution must catch it.
+      const broken = referenceApp().replace(/if \(balance < 0\).*\n/, '');
+      const dirB = mkdtempSync(join(tmpdir(), 'phx-eval-live-b-'));
+      writeFileSync(join(dirB, 'app.mjs'), broken, 'utf8');
+      const state = referencePlans().find(p => p.label === 'state-nonneg')!;
+      const brokenRes = await runGatedLiveEval({
+        bootSpec: { projectRoot: dirB, command: ['node', 'app.mjs'], readyTimeoutMs: 12_000 },
+        plan: state.plan, targetFile: 'app.mjs',
+      });
+      // Non-booting app: honest indeterminate, not a green.
+      const dirN = mkdtempSync(join(tmpdir(), 'phx-eval-live-n-'));
+      writeFileSync(join(dirN, 'app.mjs'), 'throw new Error("boom");\n', 'utf8');
+      const noBoot = await runGatedLiveEval({
+        bootSpec: { projectRoot: dirN, command: ['node', 'app.mjs'], readyTimeoutMs: 4000 },
+        plan: referencePlans()[0].plan, targetFile: 'app.mjs',
+      });
+      const ok = brokenRes.status === 'fail' && !brokenRes.gated
+        && noBoot.status === 'indeterminate' && !noBoot.gated;
+      return { passed: ok, detail: `guardStripped=${brokenRes.status}(gated=${brokenRes.gated}), nonBoot=${noBoot.status}` };
+    },
+  },
+  {
+    id: 'oracle.temporal-relative-invariants-not-yet-proven', capability: 'oracle', tier: 'unit', expect: 'red',
+    redReason: 'The absolute-temporal kind ("a date must not be in the future") is captured and checked, and the live harness can drive it. A RELATIVE-temporal invariant that governs a state TRANSITION over elapsed time — "an account must be archived 90 days after its last transaction", "a record retires 90 days after…" — is neither captured as its own assertion kind nor provable: checkProperty abstains (indeterminate, "needs an executable/behavioral check"). Fix: add a relative-temporal assertion kind (offset + anchor event + target state) and a live-harness eval that seeds an aged record, advances a virtual clock (an injectable now/DB date), and asserts the app performs the transition exactly at the boundary — mutation-gated like the other live evals.',
+    description: 'A relative-temporal state invariant ("archived 90 days after the last transaction") is captured as a temporal-relative assertion and proven by advancing a clock in the live harness — not abstained on.',
+    run: () => {
+      const r = checkProperty('an account must be archived 90 days after its last transaction', 'function archive(a){ /* no clock-driven transition */ return a; }');
+      // Today the oracle abstains; the capability is proven when it yields a real verdict.
+      return { passed: r.status === 'pass' || r.status === 'fail',
+        detail: `oracle=${r.status} (abstains today; want a real verdict via a clock-advancing live eval)` };
     },
   },
 
@@ -438,6 +487,22 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const ok = !!ts && !!py && ts.runtime.language !== py.runtime.language &&
         ts.runtime.outputPathFor('order') !== py.runtime.outputPathFor('order');
       return { passed: ok, detail: ok ? `${ts!.runtime.language} vs ${py!.runtime.language}` : 'targets did not resolve distinctly' };
+    },
+  },
+  {
+    id: 'retarget.cross-runtime-verdict-parity-not-yet-reached', capability: 'retarget', tier: 'unit', expect: 'red',
+    redReason: 'The constraint checkers are coupled to the node-typescript (Zod) dialect: enforcement is read as `.max(60)`/`z.enum([...])`. The python-fastapi target resolves and generates, but the SAME bound expressed the Pydantic way (`name: str = Field(max_length=60)`) is not recognized, so a python module that DOES enforce the bound reads as `absent` — the verdict diverges from node for identical enforcement. python-fastapi is a retarget stub for the trust surface. Fix: a per-runtime constraint-checker hook (a Pydantic-aware reader, or lower each RuntimeTarget’s enforcement to a common shape the checkers consume) so the same constraint earns the same verdict on either runtime.',
+    description: 'The same bound constraint earns the same verdict on a python-fastapi (Pydantic) module as on a node-typescript (Zod) module — enforcement parity across runtimes.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('account')], [canon(CanonicalType.DEFINITION, 'an account has a name', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'an account name must not exceed 60 characters', 'c', 'cl', ['account', 'name'])], attrs);
+      const b = constraints.find(c => c.assertion.kind === 'bound')!;
+      // Node/Zod: the bound is enforced and recognized → conforms.
+      const nodeVerdict = checkConstraint(b, 'const S = z.object({ name: z.string().max(60) });').result;
+      // Python/Pydantic: the SAME bound, enforced the Pydantic way. Parity requires conforms too.
+      const pyVerdict = checkConstraint(b, 'class Account(BaseModel):\n    name: str = Field(max_length=60)').result;
+      return { passed: nodeVerdict === 'conforms' && pyVerdict === 'conforms',
+        detail: `node=${nodeVerdict}, python=${pyVerdict} (want both conforms; python enforcement unread today)` };
     },
   },
 
