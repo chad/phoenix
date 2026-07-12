@@ -41,6 +41,14 @@ interface Contribution { iu_id: string; key: string; body: string; }
 export interface SplitOptions {
   /** Regions carried forward from a previous shared file for IUs NOT in this batch. */
   preserve?: ParsedRegion[];
+  /**
+   * When true, `preserve` regions are AUTHORITATIVE: they are considered before fresh
+   * module contributions, so a preserved key wins the dedupe. Used by schema-first
+   * generation (P0), where the pre-planned schema owns the migrations and a stray
+   * module-emitted CREATE TABLE for the same table must not override it. Default false
+   * (partial-regen semantics — a freshly-regenerated key wins).
+   */
+  preserveWins?: boolean;
 }
 
 /**
@@ -59,6 +67,14 @@ export function splitSharedArtifacts(
 
   for (const role of roles) {
     const contributions: Contribution[] = [];
+
+    // Authoritative preserve (schema-first): pre-planned regions come FIRST so their
+    // keys win the dedupe over any stray module contribution for the same table.
+    if (opts?.preserveWins) {
+      for (const r of opts.preserve ?? []) {
+        if (r.role === role.role) contributions.push({ iu_id: r.iu_id, key: r.key ?? r.body, body: r.body });
+      }
+    }
 
     for (const result of results) {
       for (const [path, content] of result.files) {
@@ -84,8 +100,11 @@ export function splitSharedArtifacts(
 
     // Carry forward regions for IUs not regenerated this batch (partial regen). These
     // come AFTER fresh contributions, so a freshly-regenerated key wins the dedupe.
-    for (const r of opts?.preserve ?? []) {
-      if (r.role === role.role) contributions.push({ iu_id: r.iu_id, key: r.key ?? r.body, body: r.body });
+    // (Skipped when preserveWins already added them authoritatively above.)
+    if (!opts?.preserveWins) {
+      for (const r of opts?.preserve ?? []) {
+        if (r.role === role.role) contributions.push({ iu_id: r.iu_id, key: r.key ?? r.body, body: r.body });
+      }
     }
 
     if (contributions.length === 0) continue;
