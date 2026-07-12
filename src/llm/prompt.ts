@@ -10,6 +10,22 @@ import type { ImplementationUnit } from '../models/iu.js';
 import type { CanonicalNode } from '../models/canonical.js';
 import type { ResolvedTarget } from '../models/architecture.js';
 import type { NegativeKnowledge } from '../models/negative-knowledge.js';
+import type { RepairFinding } from '../models/repair.js';
+
+/**
+ * Extra prompt inputs that shape schema-first generation (P0) and repair (P1).
+ * Kept in one bag so the long buildPrompt signature stays additive.
+ */
+export interface PromptExtras {
+  /** The shared, already-migrated schema DDL, injected VERBATIM so every module uses
+   *  exactly these table/column names (prevention of the drift → runtime-500 class). */
+  sharedSchema?: string;
+  /** Verifier findings this generation must repair (findings + recommended actions
+   *  VERBATIM). Present only on a repair round. */
+  repairFindings?: RepairFinding[];
+  /** The current on-disk source of the module being repaired, for reference. */
+  currentSource?: string;
+}
 
 /**
  * The TRUE promptpack hash (PRD §8 reproducibility). The old hash was
@@ -199,6 +215,7 @@ export function buildPrompt(
   target?: ResolvedTarget | null,
   negativeKnowledge?: NegativeKnowledge[],
   siblingContracts?: SiblingContract[],
+  extras?: PromptExtras,
 ): string {
   const lines: string[] = [];
   const labels = provenanceLabels(iu, canonNodes);
@@ -208,6 +225,41 @@ export function buildPrompt(
 
   lines.push(`Generate a TypeScript module implementing "${iu.name}".`);
   lines.push('');
+
+  // ── Repair round (P1): the verifier flagged these defects. They lead the prompt so
+  // the model fixes EXACTLY what the oracle found and nothing else. ──
+  if (extras?.repairFindings && extras.repairFindings.length > 0) {
+    lines.push('## Repairs required (fix ONLY these — keep all other behavior identical)');
+    lines.push('A previous generation of this module has the following VERIFIED defects. Regenerate the');
+    lines.push('complete corrected module. Change exactly what these findings require; do not otherwise');
+    lines.push('alter routes, schemas, or logic:');
+    for (const f of extras.repairFindings) {
+      lines.push(`- ${f.message}`);
+      if (f.action) lines.push(`  → ${f.action}`);
+    }
+    lines.push('');
+    if (extras.currentSource) {
+      lines.push('### Current source of this module (for reference — correct and re-emit it)');
+      lines.push('```ts');
+      lines.push(extras.currentSource.length > 8000 ? extras.currentSource.slice(0, 8000) + '\n// …(truncated)' : extras.currentSource);
+      lines.push('```');
+      lines.push('');
+    }
+  }
+
+  // ── Shared schema (P0): the FROZEN, already-migrated DDL. Every module gets it
+  // verbatim and is told to use these exact names — the drift-prevention gate. ──
+  if (extras?.sharedSchema && extras.sharedSchema.trim().length > 0) {
+    lines.push('## Shared database schema (FROZEN — use these EXACT table and column names)');
+    lines.push('The database below is already defined and migrated in a shared file. Every SQL statement');
+    lines.push('in this module MUST reference exactly these table names and column names — do not rename,');
+    lines.push('singularize, pluralize, or invent columns. Do NOT emit CREATE TABLE or registerMigration(...)');
+    lines.push('— the migrations already exist. If a column you need is missing, use the closest existing one.');
+    lines.push('```sql');
+    lines.push(extras.sharedSchema.trim());
+    lines.push('```');
+    lines.push('');
+  }
 
   // Fixed vocabularies — the exact enum tokens, shared across every IU so producers
   // and consumers never drift on spelling (e.g. 'in_progress' vs 'inprogress').

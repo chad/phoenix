@@ -64,6 +64,12 @@ import { checkConstraintAst } from './constraints/check-ast.js';
 import { computeObligations } from './constraints/obligations.js';
 import type { StructuredConstraint } from './constraints/model.js';
 import { parseSchema, checkModuleSchema } from './schema-contract.js';
+import { planSchema, SCHEMA_PLAN_IU, planFromMigrations } from './schema-plan.js';
+import type { SchemaPlan } from './schema-plan.js';
+import { runRepairLoop } from './repair.js';
+import type { RepairTarget, RepairLoopResult } from './repair.js';
+import type { RepairFinding } from './models/repair.js';
+import { MIGRATIONS_TARGET } from './models/repair.js';
 import { verdictOf, verdictSeverity } from './models/validation.js';
 import type { ValidationResult, CheckResult } from './models/validation.js';
 import { runSuite } from './eval/harness.js';
@@ -976,6 +982,277 @@ async function runCompileGateAndReport(
   return result;
 }
 
+// ─── The repair loop (P1) — verifier findings feed regeneration ───────────────
+
+/**
+ * Turn the current verifier ERRORS into machine-routable RepairFindings. The verifiers
+ * (schema contract + constraint diagnostics + build) are the ORACLE and are only READ
+ * here — never modified. Schema findings on the migrations file route to the synthetic
+ * migrations target; everything else carries its owning IU. Binding-defect constraint
+ * errors (a spec subject the graph lacks) carry no IU and are honestly left unroutable.
+ */
+function collectRepairFindings(
+  projectRoot: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  allClauses: Clause[],
+  target: ResolvedTarget | null,
+): RepairFinding[] {
+  const findings: RepairFinding[] = [];
+
+  for (const d of computeSchemaDiagnostics(projectRoot, ius)) {
+    if (d.severity !== 'error') continue;
+    const isMig = (d.source_file ?? '').endsWith('_migrations.ts');
+    findings.push({
+      category: 'schema',
+      iu_id: isMig ? MIGRATIONS_TARGET : d.iu_id,
+      file: d.source_file,
+      subject: d.subject,
+      message: d.message,
+      action: d.recommended_actions[0] ?? '',
+    });
+  }
+
+  for (const d of computeConstraintDiagnostics(projectRoot, ius, canonNodes, allClauses)) {
+    if (d.severity !== 'error' || d.category !== 'constraint') continue;
+    findings.push({
+      category: 'constraint',
+      iu_id: d.iu_id,
+      file: d.source_file,
+      subject: d.subject,
+      message: d.message,
+      action: d.recommended_actions[0] ?? '',
+    });
+  }
+
+  // Build errors (usually already resolved by the compile gate, but a repair round can
+  // re-introduce one). One finding per offending file — enough to route a regeneration.
+  const seenFiles = new Set<string>();
+  for (const e of target?.runtime.compile(projectRoot) ?? []) {
+    if (seenFiles.has(e.file)) continue;
+    seenFiles.add(e.file);
+    const isMig = e.file.endsWith('_migrations.ts');
+    const owner = ius.find(u => u.output_files.some(f => e.file === f || e.file.endsWith(f)));
+    findings.push({
+      category: 'build',
+      iu_id: isMig ? MIGRATIONS_TARGET : owner?.iu_id,
+      file: e.file,
+      subject: `${e.file}:${e.line ?? '?'}`,
+      message: `Build error: ${e.code} ${e.message}`,
+      action: 'Fix the type error so the project compiles.',
+    });
+  }
+
+  return findings;
+}
+
+/** The repair targets: one per IU module, plus the shared migrations artifact. */
+function buildRepairTargets(ius: ImplementationUnit[], migrationsFile: string): RepairTarget[] {
+  const targets: RepairTarget[] = ius
+    .filter(iu => iu.output_files[0])
+    .map(iu => ({ id: iu.iu_id, file: iu.output_files[0], iu }));
+  targets.push({ id: MIGRATIONS_TARGET, file: migrationsFile });
+  return targets;
+}
+
+/**
+ * Run the bounded repair loop over an assembled project. Regenerates offending IUs with
+ * the findings (VERBATIM) in the prompt, re-verifies, journals each round, and returns
+ * the honest result. Shared by `bootstrap` (after the compile gate) and `phoenix repair`.
+ */
+async function runRepairPhase(
+  projectRoot: string,
+  phoenixDir: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  allClauses: Clause[],
+  opts: {
+    llm: LLMProvider | null;
+    target: ResolvedTarget | null;
+    manifestManager: ManifestManager;
+    sharedSchema?: string;
+    negativeKnowledge?: Map<string, NegativeKnowledge[]>;
+    onGenerationFailure?: RegenContext['onGenerationFailure'];
+    maxRounds?: number;
+    indent?: string;
+  },
+): Promise<RepairLoopResult> {
+  const indent = opts.indent ?? '  ';
+  const migrationsFile = 'src/generated/_migrations.ts';
+  const targets = buildRepairTargets(ius, migrationsFile);
+  const journal = new Journal(phoenixDir);
+
+  console.log(`${indent}${bold('🩹 Repair Loop')} ${dim('(verifier findings → targeted regeneration; the verifier is frozen)')}`);
+
+  if (!opts.llm) {
+    // Without a generator the loop can only verify; report and stop honestly.
+    const findings = collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target);
+    if (findings.length === 0) {
+      console.log(`${indent}  ${green('✔')} no verifier findings to repair`);
+    } else {
+      console.log(`${indent}  ${yellow('⚠')} ${findings.length} finding(s) but no LLM — cannot repair (run with an API key).`);
+    }
+    console.log();
+    return { rounds: [], residual: findings, green: findings.length === 0, stop: findings.length === 0 ? 'green' : 'unroutable' };
+  }
+
+  // The LLM repairer reuses the existing generation path: an IU regenerates with its
+  // findings + the shared schema in the prompt; the migrations artifact gets a focused
+  // DDL-fix call. Provenance (promptpack hash, journal) rides the normal path.
+  const regenCtx: RegenContext = {
+    llm: opts.llm,
+    canonNodes,
+    allIUs: ius,
+    projectRoot,
+    target: opts.target,
+    negativeKnowledge: opts.negativeKnowledge,
+    siblingContracts: loadExistingContracts(projectRoot, ius, opts.target),
+    sharedSchema: opts.sharedSchema,
+    onGenerationFailure: opts.onGenerationFailure,
+  };
+
+  const repairer = async (t: RepairTarget, findings: RepairFinding[], source: string): Promise<string> => {
+    if (t.iu) {
+      regenCtx.repairFindings = new Map([[t.iu.iu_id, findings]]);
+      regenCtx.repairSources = new Map([[t.iu.iu_id, source]]);
+      try {
+        const result = await generateIU(t.iu, regenCtx);
+        for (const [filePath, content] of result.files) {
+          const full = join(projectRoot, filePath);
+          mkdirSync(dirname(full), { recursive: true });
+          writeFileSync(full, content, 'utf8');
+        }
+        opts.manifestManager.recordIU(result.manifest);
+        return result.files.get(t.file) ?? source;
+      } finally {
+        regenCtx.repairFindings = undefined;
+        regenCtx.repairSources = undefined;
+      }
+    }
+    // Migrations artifact: fix the DDL directly (keep every table; correct only the flaw).
+    const fixed = await repairMigrations(source, findings, opts.llm!);
+    const full = join(projectRoot, t.file);
+    writeFileSync(full, fixed, 'utf8');
+    opts.manifestManager.recordSharedFiles([{ path: t.file, content_hash: sha256Hex(fixed), regions: parseRegions(fixed).map(r => ({ iu_id: r.iu_id, role: r.role, key: r.key, content_hash: r.content_hash, start_line: r.start_line, end_line: r.end_line })) }]);
+    return fixed;
+  };
+
+  const artifactHash = (t: RepairTarget): string => {
+    if (t.iu) return iuArtifactHash(t.iu, opts.manifestManager.load(), projectRoot);
+    const full = join(projectRoot, t.file);
+    return existsSync(full) ? sha256Hex(readFileSync(full, 'utf8')) : 'absent';
+  };
+
+  // Snapshot the findings BEFORE any repair — the "before" column of the cold-start matrix.
+  const initialFindings = collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target);
+
+  const result = await runRepairLoop({
+    targets,
+    maxRounds: opts.maxRounds ?? 3,
+    verify: () => collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target),
+    readSource: (t) => {
+      const full = join(projectRoot, t.file);
+      return existsSync(full) ? readFileSync(full, 'utf8') : '';
+    },
+    // The repairer already persisted the file + manifest; keep writeSource a no-op so a
+    // second write can't clobber the provenance-carrying content it wrote.
+    writeSource: () => {},
+    repairer,
+    artifactHash,
+    onRound: (round) => {
+      journal.append({
+        type: 'repair',
+        inputs: round.changes.map(c => c.before).filter(Boolean),
+        outputs: round.changes.map(c => c.after).filter(Boolean),
+        meta: {
+          round: round.round,
+          findings_before: round.findingsBefore,
+          findings_after: round.findingsAfter,
+          regenerated: round.regenerated,
+          changes: round.changes.map(c => ({ id: c.id, file: c.file, findings: c.findings, hash_before: c.before, hash_after: c.after })),
+        },
+      });
+      const names = round.changes.map(c => (c.id === MIGRATIONS_TARGET ? '_migrations' : ius.find(u => u.iu_id === c.id)?.name ?? c.id)).join(', ');
+      const remaining = round.findingsAfter === 0 ? green('0 remain') : yellow(`${round.findingsAfter} remain`);
+      console.log(`${indent}  ${cyan(`Repair round ${round.round}`)}: ${round.findingsBefore} finding(s) → ${round.changes.length} regenerated (${dim(names)}) → ${remaining}`);
+    },
+  });
+
+  // Final honest line either way.
+  const breakdown = (fs: RepairFinding[]) => ({
+    schema: fs.filter(f => f.category === 'schema').length,
+    constraint: fs.filter(f => f.category === 'constraint').length,
+    build: fs.filter(f => f.category === 'build').length,
+  });
+  const before = result.rounds.length > 0 ? initialFindings : result.residual;
+  const residual = breakdown(result.residual);
+  if (result.green) {
+    console.log(`${indent}  ${green('✔')} repair loop reached zero verifier errors in ${result.rounds.length} round(s)`);
+  } else {
+    console.log(`${indent}  ${red('✖')} ${result.residual.length} finding(s) remain after ${result.rounds.length} round(s) ${dim(`(stop: ${result.stop})`)} — schema ${residual.schema}, constraint ${residual.constraint}, build ${residual.build}`);
+    for (const f of result.residual.slice(0, 6)) {
+      console.log(`${indent}    ${red('●')} ${dim(f.category)} ${f.subject} — ${f.message}`);
+    }
+  }
+
+  // Machine-readable repair status — the exact before/after the cold-start matrix quotes.
+  writeFileSync(join(phoenixDir, 'repair-status.json'), JSON.stringify({
+    before: breakdown(before),
+    after: residual,
+    rounds: result.rounds.length,
+    green: result.green,
+    stop: result.stop,
+    residual: result.residual.map(f => ({ category: f.category, subject: f.subject, message: f.message })),
+    checked_at: new Date().toISOString(),
+  }, null, 2), 'utf8');
+
+  console.log();
+  return result;
+}
+
+/** Focused DDL repair for the shared migrations artifact (rare — schema-first prevents most). */
+async function repairMigrations(source: string, findings: RepairFinding[], llm: LLMProvider): Promise<string> {
+  const lines = [
+    'The shared database migrations file below has verified defects. Fix ONLY these and keep',
+    'every table and every other column exactly as-is. Output ONLY the corrected registerMigration(...) statements.',
+    '',
+    '## Defects',
+    ...findings.map(f => `- ${f.message}${f.action ? `\n  → ${f.action}` : ''}`),
+    '',
+    '## Current migrations',
+    source,
+    '',
+    'Output the corrected registerMigration statements now (no prose, no fences).',
+  ].join('\n');
+  const raw = await llm.generate(lines, {
+    system: 'You are a senior database engineer. Output ONLY registerMigration(...) statements — no prose, no markdown fences.',
+    temperature: 0.1,
+    maxTokens: 4096,
+  });
+  const plan = planFromMigrations(raw, 'llm');
+  if (!plan) return source; // could not parse a fix — leave it for the honest residual
+  // Re-assemble the shared file with the corrected regions, preserving the header.
+  const header = source.split('\n').slice(0, source.indexOf('registerMigration') > -1 ? source.slice(0, source.indexOf('registerMigration')).split('\n').length - 1 : 4).join('\n');
+  const body = plan.regions.map(r => `// <<phx:region iu=${r.iu_id} role=migration key=${r.key}>>\n${r.body}\n// <</phx:region>>\n`).join('\n');
+  return `${header}\n${body}`;
+}
+
+function sha256Hex(s: string): string {
+  return createHash('sha256').update(s).digest('hex');
+}
+
+/** Recompile and persist build-status.json so the trust dashboard reflects post-repair state. */
+function refreshBuildStatus(projectRoot: string, phoenixDir: string, target: ResolvedTarget): void {
+  const errors = target.runtime.compile(projectRoot);
+  writeFileSync(join(phoenixDir, 'build-status.json'), JSON.stringify({
+    ok: errors.length === 0,
+    rounds: 0,
+    repaired: [],
+    unresolved: errors,
+    checked_at: new Date().toISOString(),
+  }, null, 2), 'utf8');
+}
+
 /** Load each IU's conceptual mass from the previous manifest cycle. */
 function loadPreviousMasses(manifestManager: ManifestManager): Map<string, number> {
   const manifest = manifestManager.load();
@@ -1188,6 +1465,23 @@ async function cmdBootstrap(): Promise<void> {
     arch.runtime.prepareProject?.(projectRoot);
   }
 
+  // Step 3.5: Schema-first planning (P0). Derive the shared schema BEFORE any module is
+  // generated, so every module prompt carries the SAME table/column names verbatim — the
+  // drift → runtime-500 class is prevented, not merely caught. Skipped for non-SQL targets.
+  let schemaPlan: SchemaPlan | null = null;
+  if (arch) {
+    schemaPlan = await planSchema(ius, canonNodes, allClauses, llm, arch);
+    if (schemaPlan) {
+      console.log(`  ${dim('Schema-first:')} ${cyan(`${schemaPlan.tableCount} table(s)`)} planned ${dim(`(${schemaPlan.source}) — injected into every module prompt`)}`);
+      new Journal(phoenixDir).append({
+        type: 'schema-plan',
+        inputs: ius.map(iu => iu.iu_id),
+        outputs: schemaPlan.regions.map(r => r.content_hash),
+        meta: { tables: schemaPlan.regions.map(r => r.key), source: schemaPlan.source, ddl_hash: sha256Hex(schemaPlan.ddl) },
+      });
+    }
+  }
+
   const { nkByIU, onGenerationFailure } = buildNKRouting(phoenixDir, ius);
 
   const regenCtx: RegenContext = {
@@ -1198,6 +1492,7 @@ async function cmdBootstrap(): Promise<void> {
     target: arch,
     negativeKnowledge: nkByIU,
     siblingContracts: loadExistingContracts(projectRoot, ius, arch),
+    sharedSchema: schemaPlan?.ddl,
     onGenerationFailure,
     onProgress: (iu, status, msg) => {
       if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
@@ -1210,9 +1505,13 @@ async function cmdBootstrap(): Promise<void> {
   const previousMasses = loadPreviousMasses(manifestManager);
   const regenResults = await generateAll(ius, regenCtx);
 
-  // Lift shared aggregate artifacts (migrations) out of the modules into one file
-  // with per-IU regions. Mutates regenResults (module content + remapped provenance).
-  const split = splitSharedArtifacts(regenResults, arch);
+  // Lift shared aggregate artifacts (migrations) out of the modules into one file with
+  // per-IU regions. In schema-first mode the pre-planned schema is AUTHORITATIVE: its
+  // regions seed the file and win the dedupe, so even a module that strays and emits a
+  // CREATE TABLE cannot override the frozen schema every prompt was handed.
+  const split = schemaPlan
+    ? splitSharedArtifacts(regenResults, arch, { preserve: schemaPlan.regions, preserveWins: true })
+    : splitSharedArtifacts(regenResults, arch);
   reportArtifactSplit(split, '    ');
 
   // Gate: stamp readiness + conceptual mass into manifests before recording.
@@ -1268,6 +1567,14 @@ async function cmdBootstrap(): Promise<void> {
   await runCompileGateAndReport(projectRoot, phoenixDir, ius, {
     llm, target: arch, manifestManager, onGenerationFailure, canonNodes,
   });
+
+  // Repair loop (P1): feed the verifier findings back into targeted regeneration, so the
+  // fix that used to sit in the diagnostics is applied automatically. Bounded + journaled;
+  // the verifier is frozen. Refresh the build-status the dashboard reads afterward.
+  await runRepairPhase(projectRoot, phoenixDir, ius, canonNodes, allClauses, {
+    llm, target: arch, manifestManager, sharedSchema: schemaPlan?.ddl, negativeKnowledge: nkByIU, onGenerationFailure,
+  });
+  if (arch) refreshBuildStatus(projectRoot, phoenixDir, arch);
 
   // A full bootstrap regenerates everything, so any prior staleness is resolved.
   new InvalidationStore(phoenixDir).clearAll();
@@ -2296,6 +2603,67 @@ async function cmdRegen(args: string[]): Promise<void> {
   });
 }
 
+/**
+ * `phoenix repair` — run the repair loop (P1) on an existing project: verify → route
+ * findings → regenerate offending IUs with the findings verbatim → re-verify, bounded.
+ * The same loop bootstrap runs; exposed standalone so it can be re-run and iterated.
+ * `--rounds=N` overrides the round budget (default 3).
+ */
+async function cmdRepair(args: string[]): Promise<void> {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  if (ius.length === 0) {
+    console.log(yellow('⚠ No IUs planned. Run `phoenix bootstrap` first.'));
+    return;
+  }
+  const roundsArg = args.find(a => a.startsWith('--rounds='))?.split('=')[1];
+  const maxRounds = roundsArg ? Math.max(1, parseInt(roundsArg, 10) || 3) : 3;
+
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const specStore = new SpecStore(phoenixDir);
+  const allClauses: Clause[] = [];
+  for (const specFile of findSpecFiles(projectRoot)) {
+    allClauses.push(...specStore.getClauses(relative(projectRoot, specFile)));
+  }
+
+  let arch: ResolvedTarget | null = null;
+  const configPath = join(phoenixDir, 'config.json');
+  if (existsSync(configPath)) {
+    try {
+      const cfg = JSON.parse(readFileSync(configPath, 'utf8'));
+      if (cfg.architecture) arch = resolveTarget(cfg.architecture);
+    } catch { /* ignore */ }
+  }
+
+  const llm = resolveProvider(phoenixDir);
+  console.log(bold('🩹 Phoenix Repair'));
+  if (llm) console.log(`  ${dim(`Provider: ${llm.name}/${llm.model}`)}`); else console.log(`  ${dim('Mode: verify-only (no LLM — set an API key to repair)')}`);
+  console.log(`  ${dim(`Round budget: ${maxRounds}`)}`);
+  console.log();
+
+  // Reconstruct the shared schema DDL from the migrations file so repair prompts carry it.
+  const migFull = join(projectRoot, 'src', 'generated', '_migrations.ts');
+  let sharedSchema: string | undefined;
+  if (existsSync(migFull)) {
+    const plan = planFromMigrations(readFileSync(migFull, 'utf8'), 'derived');
+    sharedSchema = plan?.ddl;
+  }
+
+  const manifestManager = new ManifestManager(phoenixDir);
+  const { nkByIU, onGenerationFailure } = buildNKRouting(phoenixDir, ius);
+  const result = await runRepairPhase(projectRoot, phoenixDir, ius, canonNodes, allClauses, {
+    llm, target: arch, manifestManager, sharedSchema, negativeKnowledge: nkByIU, onGenerationFailure, maxRounds, indent: '  ',
+  });
+  if (arch) refreshBuildStatus(projectRoot, phoenixDir, arch);
+
+  if (result.green) {
+    console.log(green('  ✔ Repair complete — zero verifier errors.'));
+  } else {
+    console.log(yellow(`  ⚠ ${result.residual.length} finding(s) remain (honest residual). Run \`phoenix status\` for detail.`));
+  }
+  process.exitCode = result.green ? 0 : 0; // repair itself succeeds; residuals surface in status
+}
+
 function cmdDrift(): void {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const manifestManager = new ManifestManager(phoenixDir);
@@ -3315,6 +3683,8 @@ ${bold('Implementation:')}
                          ${dim('Uses LLM if ANTHROPIC_API_KEY or OPENAI_API_KEY is set')}
                          ${dim('--all    Regenerate every IU (ignore the invalidation set)')}
                          ${dim('--stubs  Force stub generation (skip LLM)')}
+  ${cyan('repair')} [--rounds=N]   Repair loop: feed verifier findings into targeted regeneration
+                         ${dim('Bounded (default 3 rounds); the verifier is frozen — code changes only')}
 
 ${bold('Verification:')}
   ${cyan('status')}                Trust dashboard — the primary UX
@@ -3388,6 +3758,9 @@ async function main(): Promise<void> {
     case 'regen':
     case 'regenerate':
       await cmdRegen(commandArgs);
+      break;
+    case 'repair':
+      await cmdRepair(commandArgs);
       break;
     case 'drift':
       cmdDrift();

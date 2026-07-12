@@ -24,6 +24,8 @@ export type JournalEventType =
   | 'canonicalize'  // clauses extracted into canonical nodes
   | 'plan'          // canonical nodes clustered into IUs
   | 'regen'         // an IU regenerated into files
+  | 'schema-plan'   // the shared schema derived BEFORE module generation (P0)
+  | 'repair'        // a bounded repair round fed verifier findings into regeneration (P1)
   | 'evidence'      // evidence recorded for an IU
   | 'invalidate'    // a spec change marked IUs stale
   | 'label'         // a manual edit labeled (waiver/promotion)

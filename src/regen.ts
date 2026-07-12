@@ -18,7 +18,8 @@ import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { IUManifest, RegenMetadata, FileManifestEntry } from './models/manifest.js';
 import type { LLMProvider } from './llm/provider.js';
 import { buildPrompt, getSystemPrompt, provenanceLabels, extractLineProvenance, promptpackHash } from './llm/prompt.js';
-import type { SiblingContract } from './llm/prompt.js';
+import type { SiblingContract, PromptExtras } from './llm/prompt.js';
+import type { RepairFinding } from './models/repair.js';
 import type { ResolvedTarget } from './models/architecture.js';
 import { cleanCodeResponse, buildFixPrompt } from './codegen-util.js';
 import { sha256 } from './semhash.js';
@@ -62,8 +63,33 @@ export interface RegenContext {
    * UI) are generated against the actual API contract instead of guessing.
    */
   siblingContracts?: Map<string, string>;
+  /**
+   * The shared, already-migrated schema DDL (P0). Injected VERBATIM into every module
+   * prompt so all SQL uses exactly these table/column names — drift prevention.
+   */
+  sharedSchema?: string;
+  /**
+   * Per-IU verifier findings to repair (P1). When an IU's id is present, its generation
+   * is a REPAIR round: the findings (+ recommended actions, verbatim) lead the prompt.
+   */
+  repairFindings?: Map<string, RepairFinding[]>;
+  /** Per-IU current on-disk source, handed to the model on a repair round for reference. */
+  repairSources?: Map<string, string>;
   /** Callback for progress reporting. */
   onProgress?: (iu: ImplementationUnit, status: 'start' | 'done' | 'error', message?: string) => void;
+}
+
+/** Assemble the per-IU prompt extras (shared schema + repair context) from the context. */
+function promptExtrasFor(iu: ImplementationUnit, ctx?: RegenContext): PromptExtras | undefined {
+  if (!ctx) return undefined;
+  const repairFindings = ctx.repairFindings?.get(iu.iu_id);
+  const extras: PromptExtras = {
+    sharedSchema: ctx.sharedSchema,
+    repairFindings: repairFindings && repairFindings.length > 0 ? repairFindings : undefined,
+    currentSource: repairFindings && repairFindings.length > 0 ? ctx.repairSources?.get(iu.iu_id) : undefined,
+  };
+  if (extras.sharedSchema === undefined && !extras.repairFindings) return undefined;
+  return extras;
 }
 
 /**
@@ -79,7 +105,7 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
   // generation, plus model + toolchain — so the record can reproduce the run
   // (PRD §8). Computed from the same builders generateWithLLM uses.
   const ppSystem = getSystemPrompt(ctx?.target);
-  const ppUser = buildPrompt(iu, ctx?.canonNodes ?? [], undefined, ctx?.target, iuNegativeKnowledge);
+  const ppUser = buildPrompt(iu, ctx?.canonNodes ?? [], undefined, ctx?.target, iuNegativeKnowledge, undefined, promptExtrasFor(iu, ctx));
   const ppHash = promptpackHash({ systemPrompt: ppSystem, userPrompt: ppUser, modelId, toolchainVersion: TOOLCHAIN_VERSION });
 
   for (const outputPath of iu.output_files) {
@@ -90,7 +116,7 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
       try {
         const gen = await generateWithLLM(
           iu, ctx.llm, ctx.canonNodes, ctx.allIUs, ctx.projectRoot, ctx.target, iuNegativeKnowledge,
-          ctx.siblingContracts,
+          ctx.siblingContracts, promptExtrasFor(iu, ctx),
         );
         content = gen.code;
         if (gen.lineProvenance && Object.keys(gen.lineProvenance).length) {
@@ -230,6 +256,7 @@ async function generateWithLLM(
   target?: ResolvedTarget | null,
   negativeKnowledge?: NegativeKnowledge[],
   siblingContracts?: Map<string, string>,
+  extras?: PromptExtras,
 ): Promise<LLMGenerationResult> {
   // Find sibling modules in the same service (for soft "do not import" context)
   const iuDir = iu.output_files[0]?.split('/').slice(0, -1).join('/');
@@ -247,7 +274,7 @@ async function generateWithLLM(
     }));
 
   const systemPrompt = getSystemPrompt(target);
-  const prompt = buildPrompt(iu, canonNodes, siblings, target, negativeKnowledge, knownContracts);
+  const prompt = buildPrompt(iu, canonNodes, siblings, target, negativeKnowledge, knownContracts, extras);
   const rt = target?.runtime ?? null;
   const filePath = iu.output_files[0];
 
