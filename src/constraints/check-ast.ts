@@ -64,14 +64,15 @@ function parse(source: string): ts.SourceFile | null {
   return sf;
 }
 
-/** Match a generated field/column name to a spec attribute, allowing a qualified
- *  prefix (`owner_email` for `email`) and, when `plural`, a trailing `s` (`items` for
- *  `item`). Mirrors the regex checkers' name matching so the two paths agree. */
+/** Match a generated field/column name to a spec attribute, allowing a qualifier on
+ *  EITHER side — a prefix (`owner_email` for `email`) or a suffixed compound
+ *  (`musician_player_ids` for `musician`) — plus a plural `s`. Mirrors the regex
+ *  checkers' name matching so the two paths agree. */
 function nameMatches(fieldName: string, attr: string, plural = false): boolean {
   const a = attr.toLowerCase();
   const f = fieldName.toLowerCase();
-  const re = new RegExp(`^(?:[a-z0-9]+_)?${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${plural ? 's?' : ''}$`);
-  return re.test(f);
+  const re = new RegExp(`^(?:[a-z0-9]+_)?${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${plural ? 's?' : ''}(?:_[a-z0-9]+)*$`);
+  return re.test(f); // suffix rule mirrors findFieldDecl; plural stays cardinality-only
 }
 
 /** Walk a Zod call chain from its outermost CallExpression to methods root→leaf.

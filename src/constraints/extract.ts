@@ -251,7 +251,8 @@ export function parseTemporal(text: string): TemporalAssertion | null {
 // The quantifier-free required-fields form: "provide at least a name and an email".
 // "at least" followed by an ARTICLE (not a number — numeric counts are cardinality)
 // names fields that must be present. Stop at an infinitive/purpose clause.
-const PRESENCE_RE = /\b(?:provide|providing|include|including|supply|specify|specifying|give|enter|with)\s+at least\s+((?:an?|the)\s+.+)/i;
+// Inflected forms included — the canonicalizer writes "the user provides at least…".
+const PRESENCE_RE = /\b(?:provide[sd]?|providing|include[sd]?|including|supply|supplies|supplied|specif(?:y|ies|ied)|specifying|give[sn]?|enter(?:s|ed)?|with)\s+at least\s+((?:an?|the)\s+.+)/i;
 
 /** Parse a presence (required-fields) assertion, or null. `fields` carries the
  *  named field nouns; extraction emits one constraint per resolved field. */

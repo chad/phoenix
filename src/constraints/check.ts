@@ -30,7 +30,9 @@ function findFieldDecl(source: string, attr: string): string | null {
   // line) and containing bracketed enums — by consuming until the field-terminating
   // comma at paren/bracket depth 0, or the start of the next field. Depth tracking
   // keeps an enum array's internal commas and continuation lines inside the field.
-  const re = new RegExp(`\\b(?:[a-z0-9]+_)?${escapeRe(attr)}\\s*:\\s*z\\.`, 'i');
+  // Name matching allows a qualifier on EITHER side: `owner_email` for `email`
+  // (prefix) and `musician_player_ids` for `musician` (suffixed compound).
+  const re = new RegExp(`\\b(?:[a-z0-9]+_)?${escapeRe(attr)}(?:_[a-z0-9]+)*\\s*:\\s*z\\.`, 'i');
   const m = re.exec(source);
   if (!m) return null;
   let depth = 0;
@@ -245,8 +247,10 @@ export function checkCardinality(c: StructuredConstraint, source: string | null)
   if (source == null) return { result: 'indeterminate', detail: 'module not generated yet' };
   if (c.assertion.kind !== 'cardinality') return { result: 'indeterminate', detail: 'not a cardinality assertion' };
   const rel = c.assertion.relation;
-  const r = `(?:[a-z0-9]+_)?${escapeRe(rel)}`;
-  if (!new RegExp(`\\b${r}s?\\b`, 'i').test(source)) {
+  // Allow a qualifier on either side: `line_items` (prefix) and
+  // `musician_player_ids` (suffixed compound) both carry the relation.
+  const r = `(?:[a-z0-9]+_)?${escapeRe(rel)}s?(?:_[a-z0-9]+)*`;
+  if (!new RegExp(`\\b${r}\\b`, 'i').test(source)) {
     return { result: 'indeterminate', detail: `relation "${rel}" not found in module` };
   }
   const { min, max } = c.assertion;
@@ -255,12 +259,12 @@ export function checkCardinality(c: StructuredConstraint, source: string | null)
   // mention): a `.min(1)` on an unrelated scalar field ("name must not be empty")
   // must not read as a count guard on the collection — that is a false green.
   const minGuard = min !== undefined && (
-    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?(?:\\.min\\(\\s*${min}\\b|\\.nonempty\\()`, 'i').test(source) ||
-    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.length\\s*(?:>=?\\s*${min}\\b|>\\s*${Math.max(0, min - 1)}\\b|===?\\s*0\\b|!==?\\s*0\\b)`, 'i').test(source)
+    new RegExp(`\\b${r}\\b[\\s\\S]{0,80}?(?:\\.min\\(\\s*${min}\\b|\\.nonempty\\()`, 'i').test(source) ||
+    new RegExp(`\\b${r}\\b[\\s\\S]{0,80}?\\.length\\s*(?:>=?\\s*${min}\\b|>\\s*${Math.max(0, min - 1)}\\b|===?\\s*0\\b|!==?\\s*0\\b)`, 'i').test(source)
   );
   const maxGuard = max !== undefined && (
-    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.max\\(\\s*${max}\\b`, 'i').test(source) ||
-    new RegExp(`\\b${r}s?\\b[\\s\\S]{0,80}?\\.length\\s*(?:<=?\\s*${max}\\b|>\\s*${max}\\b)`, 'i').test(source)
+    new RegExp(`\\b${r}\\b[\\s\\S]{0,80}?\\.max\\(\\s*${max}\\b`, 'i').test(source) ||
+    new RegExp(`\\b${r}\\b[\\s\\S]{0,80}?\\.length\\s*(?:<=?\\s*${max}\\b|>\\s*${max}\\b)`, 'i').test(source)
   );
   const want = (min !== undefined ? 'min' : '') + (max !== undefined ? 'max' : '');
   const ok = (min === undefined || minGuard) && (max === undefined || maxGuard);

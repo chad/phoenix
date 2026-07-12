@@ -179,6 +179,16 @@ const CORPUS: Case[] = [
     falseGreen: `const S = z.object({ amount: z.number(), date: z.string() }).refine(data => data.amount > 0, { message: 'amount must be positive', path: ['amount'] });`,
   },
   {
+    kind: 'cardinality', label: 'cardinality-suffixed-compound-field',
+    entities: [iu('ensemble')],
+    defs: [canon(CanonicalType.DEFINITION, 'an ensemble has a name and musicians')],
+    rule: canon(CanonicalType.CONSTRAINT, 'an ensemble must have at least two musicians', ['ensemble', 'musician']),
+    // Real-world naming (afterimage): the relation is a PREFIX of a compound field.
+    conforming: `const S = z.object({ name: z.string(), musician_player_ids: z.array(z.number().int()).min(2) });`,
+    faulted: `const S = z.object({ name: z.string(), musician_player_ids: z.array(z.number().int()) });`,
+    falseGreen: `const S = z.object({ name: z.string().min(2), musician_player_ids: z.array(z.number().int()) });`,
+  },
+  {
     kind: 'expr', label: 'expr-canonicalizer-inflection',
     entities: [iu('balance'), iu('gold')],
     defs: [canon(CanonicalType.DEFINITION, 'a balance has an amount')],
