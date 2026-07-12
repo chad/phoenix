@@ -38,6 +38,11 @@ import type { CheckMethod, CheckResult } from '../models/validation.js';
 import { resolveTarget } from '../architectures/index.js';
 import { extractFetchRoutes } from '../iu-deps.js';
 import { parseSchema, checkModuleSchema } from '../schema-contract.js';
+import { deriveSchema } from '../schema-plan.js';
+import { buildPrompt } from '../llm/prompt.js';
+import { runRepairLoop, routeFindings } from '../repair.js';
+import type { RepairTarget } from '../repair.js';
+import type { RepairFinding } from '../models/repair.js';
 
 // ─── test-data helpers ───────────────────────────────────────────────────────
 
@@ -433,6 +438,62 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const ok = !!ts && !!py && ts.runtime.language !== py.runtime.language &&
         ts.runtime.outputPathFor('order') !== py.runtime.outputPathFor('order');
       return { passed: ok, detail: ok ? `${ts!.runtime.language} vs ${py!.runtime.language}` : 'targets did not resolve distinctly' };
+    },
+  },
+
+  // ── schema-first generation (prevention) ──
+  {
+    id: 'generation.schema-is-shared-before-modules', capability: 'generation', tier: 'unit', expect: 'green',
+    description: 'The shared schema is derived from entities/constraints (independent of any module) and injected VERBATIM into a module prompt — the drift → runtime-500 class is prevented at the source, not merely caught.',
+    run: () => {
+      const nodes = [
+        canon(CanonicalType.DEFINITION, 'an account has a name and an email', 'd1'),
+        canon(CanonicalType.CONSTRAINT, 'a transaction must reference an existing account', 'c1', 'cl', ['transaction', 'account']),
+      ];
+      const plan = deriveSchema([iu('account', ['d1']), iu('transaction', ['c1'])], nodes, []);
+      if (!plan) return { passed: false, detail: 'no schema plan derived' };
+      const prompt = buildPrompt(iu('transaction', ['c1']), nodes, undefined, undefined, undefined, undefined, { sharedSchema: plan.ddl });
+      const ok = plan.model.tables.has('accounts')
+        && plan.model.tables.get('transactions')?.has('account_id') === true
+        && plan.regions.every(r => r.iu_id === 'schema-plan')   // owned by the pre-plan, not a module
+        && /Shared database schema \(FROZEN/.test(prompt)
+        && prompt.includes('CREATE TABLE') && prompt.includes('accounts');
+      return { passed: ok, detail: `tables=[${[...plan.model.tables.keys()]}], promptHasFrozenDDL=${/FROZEN/.test(prompt)}` };
+    },
+  },
+
+  // ── the repair loop (findings feed regeneration) ──
+  {
+    id: 'repair.findings-route-to-targeted-regeneration', capability: 'repair', tier: 'unit', expect: 'green',
+    description: 'A verifier finding routes to its owning IU and drives a targeted regeneration that reaches green; the loop is bounded, journaled, and never edits the frozen verifier (proven with a scripted repairer).',
+    run: async () => {
+      const schema = parseSchema('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, name TEXT)');
+      let source = "export function q(id){ return db.prepare('SELECT * FROM account WHERE id = ?').get(id); }";
+      const target: RepairTarget = { id: 'iu-txn', file: 'txn.ts', iu: iu('txn') };
+      const verify = (): RepairFinding[] =>
+        checkModuleSchema('txn.ts', source, schema).map(f => ({
+          category: 'schema', iu_id: 'iu-txn', file: 'txn.ts', subject: f.ref,
+          message: f.detail, action: f.suggestion ? `use "${f.suggestion}"` : 'align',
+        }));
+      const routed = routeFindings(verify(), [target]);
+      const hash = (s: string) => createHash('sha256').update(s).digest('hex');
+      const result = await runRepairLoop({
+        targets: [target], verify,
+        readSource: () => source,
+        writeSource: (_t, s) => { source = s; },
+        artifactHash: () => hash(source),
+        // Scripted repairer: applies the finding's suggested name to MODULE source only.
+        repairer: (_t, findings, src) => {
+          let out = src;
+          for (const f of findings) { const m = f.action.match(/use "([a-z_]+)"/); if (m) out = out.replace(/\baccount\b/g, m[1]); }
+          return out;
+        },
+      });
+      const ok = routed.byTarget.has('iu-txn') && routed.unroutable.length === 0
+        && result.green && result.stop === 'green' && result.rounds.length === 1
+        && result.rounds[0].regenerated.includes('iu-txn')
+        && verify().length === 0;
+      return { passed: ok, detail: `routed=${routed.byTarget.has('iu-txn')}, green=${result.green}, rounds=${result.rounds.length}, residual=${result.residual.length}` };
     },
   },
 
