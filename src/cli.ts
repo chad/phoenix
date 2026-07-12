@@ -412,6 +412,35 @@ function computeConstraintDiagnostics(
     });
   }
 
+  // Conflicting bounds — two different values for the same entity.attribute+op —
+  // are UNSATISFIABLE: no repair can converge on them, and at least one is a wrong
+  // binding. Surface ONE binding-conflict error for the group instead of feeding
+  // both findings to the repair loop (observed: a mis-bound "intensity ≤ 5"
+  // colliding with "name ≤ 60" drove three fruitless repair rounds).
+  const conflicted = new Set<string>();
+  {
+    const byKey = new Map<string, StructuredConstraint[]>();
+    for (const c of constraints) {
+      if (c.assertion.kind !== 'bound') continue;
+      const k = `${c.binding.entity}.${c.binding.attribute}|${c.assertion.op}`;
+      byKey.set(k, [...(byKey.get(k) ?? []), c]);
+    }
+    for (const [k, group] of byKey) {
+      const values = new Set(group.map(g => (g.assertion as { value: number }).value));
+      if (values.size <= 1) continue;
+      for (const g of group) conflicted.add(g.constraint_id);
+      diagnostics.push({
+        severity: 'error',
+        category: 'constraint',
+        subject: k.split('|')[0],
+        message: `Conflicting bounds on ${k.split('|')[0]}: {${[...values].join(', ')}} — at least one constraint is mis-bound (unsatisfiable; repair suspended for this field)`,
+        recommended_actions: [
+          'Check the spec sentences these bounds come from — one likely names a different subject that failed to resolve',
+        ],
+      });
+    }
+  }
+
   // Resolved constraints: statically check enforcement in the generated code.
   const iuByEntity = new Map<string, ImplementationUnit>();
   for (const iu of ius) iuByEntity.set(iu.name.toLowerCase().replace(/s$/, ''), iu);
@@ -467,6 +496,7 @@ function computeConstraintDiagnostics(
   };
 
   for (const c of constraints) {
+    if (conflicted.has(c.constraint_id)) continue; // covered by the binding-conflict error
     const iu = iuByEntity.get(c.binding.entity) ?? ius.find(u => u.name.toLowerCase().includes(c.binding.entity));
     let source: string | null = null;
     if (iu) {

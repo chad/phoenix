@@ -32,16 +32,36 @@ function findFieldDecl(source: string, attr: string): string | null {
   // keeps an enum array's internal commas and continuation lines inside the field.
   // Name matching allows a qualifier on EITHER side: `owner_email` for `email`
   // (prefix) and `musician_player_ids` for `musician` (suffixed compound).
-  const re = new RegExp(`\\b(?:[a-z0-9]+_)?${escapeRe(attr)}(?:_[a-z0-9]+)*\\s*:\\s*z\\.`, 'i');
+  const nameRe = `\\b(?:[a-z0-9]+_)?${escapeRe(attr)}(?:_[a-z0-9]+)*`;
+  const re = new RegExp(`${nameRe}\\s*:\\s*z\\.`, 'i');
   const m = re.exec(source);
-  if (!m) return null;
+  if (m) return captureChain(source, m.index);
+
+  // NAMED-CONSTANT indirection — the idiom LLMs reach for under repair pressure:
+  //   const EmailSchema = z.string().email();   …   email: EmailSchema.optional()
+  // Resolve one level: the constant's z-chain plus any chain applied at the use
+  // site (`.optional()` on the property must still count against presence).
+  const useRe = new RegExp(`${nameRe}\\s*:\\s*([A-Za-z_$][\\w$]*)((?:\\s*\\.[\\w$]+\\([^)]*\\))*)`, 'i');
+  const use = useRe.exec(source);
+  if (!use) return null;
+  const constRe = new RegExp(`(?:const|let|var)\\s+${escapeRe(use[1])}\\s*=\\s*z\\.`, 'i');
+  const cm = constRe.exec(source);
+  if (!cm) return null;
+  const chainStart = cm.index + cm[0].length - 2; // at the `z.`
+  const resolved = captureChain(source, chainStart);
+  return resolved === null ? null : resolved + (use[2] ?? '');
+}
+
+/** Consume a z-chain from `start` until the terminating comma/semicolon/next field
+ *  at depth 0 (continuation lines beginning with `.` stay inside the chain). */
+function captureChain(source: string, start: number): string {
   let depth = 0;
   let out = '';
-  for (let i = m.index; i < source.length; i++) {
+  for (let i = start; i < source.length; i++) {
     const ch = source[i];
     if ('([{'.includes(ch)) depth++;
     else if (')]}'.includes(ch)) { if (depth === 0) break; depth--; }
-    else if (ch === ',' && depth <= 0) break; // field terminator
+    else if ((ch === ',' || ch === ';') && depth <= 0) break; // terminator
     else if (ch === '\n' && depth <= 0) {
       const after = source.slice(i + 1);
       if (!/^\s*\./.test(after) && /^\s*(?:[\w$]+\s*:|\}|\))/.test(after)) break; // next field / end

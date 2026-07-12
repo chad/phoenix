@@ -60,7 +60,10 @@ export function mineEntityAttributes(
     }
   }
 
-  const HAS_RE = /\b(?:an?|each|every)?\s*([a-z][a-z-]+)\s+(?:has|have|contains?|includes?)\s+(.+)/i;
+  // Definition verbs include the bookkeeping forms ("a deck RECORDS an ensemble's
+  // cards, WITH a card name, a type, and an intensity") — missing them starves an
+  // entity of attributes and orphans every constraint that names them.
+  const HAS_RE = /\b(?:an?|each|every)?\s*([a-z][a-z-]+)\s+(?:has|have|contains?|includes?|records?|stores?|tracks?|keeps?)\s+(.+)/i;
   const texts: string[] = [
     ...canonNodes.filter(n => n.type === CanonicalType.DEFINITION || n.type === CanonicalType.CONTEXT || n.type === CanonicalType.REQUIREMENT).map(n => n.statement),
     ...clauses.map(c => c.normalized_text),
@@ -352,8 +355,17 @@ function resolveBinding(
   const fromStatement = attempt(new Set(stmtTokens));
   if (fromStatement) return { ref: fromStatement };
 
-  const fromContext = attempt(new Set([...stmtTokens, ...toks(contextText)]));
-  if (fromContext) return { ref: fromContext };
+  // Context recovery exists for SUBJECTLESS fragments (a compound sentence split
+  // dropped its subject: "must not exceed 40 characters"). A statement that NAMES
+  // its subject ("a card intensity must not exceed 5") but fails to resolve must
+  // become a DEFECT — recovering a different noun from the surrounding section
+  // ("ensemble… name") manufactures a WRONG binding, the exact §1 failure, and
+  // feeds the repair loop unsatisfiable findings it can never converge on.
+  const namesItsSubject = stmtTokens.some(t => !/^\d+$/.test(t));
+  if (!namesItsSubject) {
+    const fromContext = attempt(new Set([...stmtTokens, ...toks(contextText)]));
+    if (fromContext) return { ref: fromContext };
+  }
 
   const subject = stmtTokens.find(t => !/^\d+$/.test(t)) ?? statement.slice(0, 40);
   return { subject };

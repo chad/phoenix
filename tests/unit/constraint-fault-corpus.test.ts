@@ -179,6 +179,27 @@ const CORPUS: Case[] = [
     falseGreen: `const S = z.object({ amount: z.number(), date: z.string() }).refine(data => data.amount > 0, { message: 'amount must be positive', path: ['amount'] });`,
   },
   {
+    kind: 'pattern', label: 'pattern-named-constant',
+    entities: [iu('player')],
+    defs: [canon(CanonicalType.DEFINITION, 'a player has a handle and an email')],
+    rule: canon(CanonicalType.CONSTRAINT, 'a player email must be a valid email address', ['email']),
+    // The idiom LLMs reach for under repair pressure: the validator behind a const.
+    conforming: `const EmailSchema = z.string().email();\nconst S = z.object({ handle: z.string(), email: EmailSchema });`,
+    faulted: `const EmailSchema = z.string();\nconst S = z.object({ handle: z.string(), email: EmailSchema });`,
+    // A validating const on the WRONG field must not certify this one.
+    falseGreen: `const HandleSchema = z.string().email();\nconst S = z.object({ handle: HandleSchema, email: z.string() });`,
+  },
+  {
+    kind: 'presence', label: 'presence-named-constant',
+    entities: [iu('player')],
+    defs: [canon(CanonicalType.DEFINITION, 'a player has a handle and an email')],
+    rule: canon(CanonicalType.REQUIREMENT, 'the system requires a user to provide at least an email to create a player', ['player', 'email']),
+    conforming: `const EmailSchema = z.string().email();\nconst S = z.object({ email: EmailSchema });`,
+    faulted: `const EmailSchema = z.string().email();\nconst S = z.object({ handle: z.string() }); // email dropped`,
+    // `.optional()` applied AT THE USE SITE must still count against presence.
+    falseGreen: `const EmailSchema = z.string().email();\nconst S = z.object({ email: EmailSchema.optional() });`,
+  },
+  {
     kind: 'cardinality', label: 'cardinality-suffixed-compound-field',
     entities: [iu('ensemble')],
     defs: [canon(CanonicalType.DEFINITION, 'an ensemble has a name and musicians')],
