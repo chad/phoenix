@@ -61,6 +61,7 @@ import { Journal } from './journal.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
 import { deriveProjectLivePlans, runLiveVerification } from './live-verify.js';
+import { synthesizeGuard, isMechanical } from './repair-template.js';
 import { checkConstraintAst } from './constraints/check-ast.js';
 import { computeObligations } from './constraints/obligations.js';
 import type { StructuredConstraint } from './constraints/model.js';
@@ -1061,6 +1062,86 @@ function buildRepairTargets(ius: ImplementationUnit[], migrationsFile: string): 
  * the findings (VERBATIM) in the prompt, re-verifies, journals each round, and returns
  * the honest result. Shared by `bootstrap` (after the compile gate) and `phoenix repair`.
  */
+interface TemplateEditRecord { subject: string; kind: string; file: string; before: string; after: string; }
+interface TemplateStageResult { closed: number; edits: TemplateEditRecord[]; }
+
+/**
+ * The deterministic guard-synthesis stage (P1). After the LLM repair rounds, any MECHANICAL
+ * constraint (bound / membership / presence / cardinality / temporal) still flagged by the
+ * FROZEN checker is closed by synthesizing its guard directly — the checker's inverse. Each
+ * edit is kept ONLY if (a) re-checking with the frozen checker now says conforms and (b) the
+ * project still compiles; otherwise it is reverted (honest residual). Journaled `repair:template`.
+ */
+async function runTemplateRepairStage(
+  projectRoot: string,
+  phoenixDir: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  allClauses: Clause[],
+  target: ResolvedTarget | null,
+  manifestManager: ManifestManager,
+  indent: string,
+): Promise<TemplateStageResult> {
+  const entityAttrs = mineEntityAttributes(ius, canonNodes, allClauses);
+  const { constraints } = extractConstraints(canonNodes, entityAttrs);
+  const iuByEntity = new Map<string, ImplementationUnit>();
+  for (const iu of ius) iuByEntity.set(iu.name.toLowerCase().replace(/s$/, ''), iu);
+
+  const edits: TemplateEditRecord[] = [];
+  const touched = new Map<string, { iu: ImplementationUnit; original: string }>();
+
+  for (const c of constraints) {
+    if (!isMechanical(c)) continue;
+    const iu = iuByEntity.get(c.binding.entity) ?? ius.find(u => u.name.toLowerCase().includes(c.binding.entity));
+    const file = iu?.output_files[0];
+    if (!iu || !file) continue;
+    const full = join(projectRoot, file);
+    if (!existsSync(full)) continue;
+    const current = readFileSync(full, 'utf8');
+    // Only act on a constraint the FROZEN checker currently flags as an ERROR.
+    const pre = checkConstraintAst(c, current);
+    if (pre.result !== 'absent' && pre.result !== 'violates') continue;
+    const synthesized = synthesizeGuard(c, current);
+    if (!synthesized || synthesized === current) continue;
+    // Keep the edit only if it actually satisfies the finding (frozen checker re-run).
+    if (checkConstraintAst(c, synthesized).result !== 'conforms') continue;
+    if (!touched.has(full)) touched.set(full, { iu, original: current });
+    writeFileSync(full, synthesized, 'utf8');
+    edits.push({ subject: `${c.binding.entity}.${c.binding.attribute}`, kind: c.assertion.kind, file, before: sha256Hex(current), after: sha256Hex(synthesized) });
+  }
+
+  if (edits.length === 0) return { closed: 0, edits: [] };
+
+  // Compile gate: a synthesized guard MUST keep the project compiling. Revert any file
+  // that introduced a build error (that constraint stays an honest residual).
+  const buildErrors = target?.runtime.compile(projectRoot) ?? [];
+  const brokenFiles = new Set(buildErrors.map(e => e.file.replace(/^.*\/(src\/generated\/)/, '$1')));
+  const kept: TemplateEditRecord[] = [];
+  for (const e of edits) {
+    const broke = [...brokenFiles].some(bf => bf.endsWith(e.file) || e.file.endsWith(bf));
+    if (broke) {
+      const t = touched.get(join(projectRoot, e.file));
+      if (t) { writeFileSync(join(projectRoot, e.file), t.original, 'utf8'); }
+    } else kept.push(e);
+  }
+  // Re-record the manifest for kept files (their content changed).
+  const journal = new Journal(phoenixDir);
+  for (const [full, { iu }] of touched) {
+    const rel = relative(projectRoot, full);
+    if (!kept.some(e => e.file === rel)) continue;
+    manifestManager.recordIU({ iu_id: iu.iu_id, files: { [rel]: { content_hash: sha256Hex(readFileSync(full, 'utf8')) } } } as never);
+  }
+  if (kept.length > 0) {
+    journal.append({
+      type: 'repair:template',
+      outputs: kept.map(e => e.after),
+      meta: { closed: kept.length, edits: kept.map(e => ({ subject: e.subject, kind: e.kind, file: e.file, hash_before: e.before, hash_after: e.after })) },
+    });
+    console.log(`${indent}  ${cyan('Template repair')}: synthesized ${kept.length} mechanical guard(s) deterministically (${dim(kept.map(e => `${e.subject}:${e.kind}`).join(', '))})`);
+  }
+  return { closed: kept.length, edits: kept };
+}
+
 async function runRepairPhase(
   projectRoot: string,
   phoenixDir: string,
@@ -1086,14 +1167,25 @@ async function runRepairPhase(
   console.log(`${indent}${bold('🩹 Repair Loop')} ${dim('(verifier findings → targeted regeneration; the verifier is frozen)')}`);
 
   if (!opts.llm) {
-    // Without a generator the loop can only verify; report and stop honestly.
+    // No LLM: the creative loop can't run, but deterministic guard synthesis still can —
+    // mechanical findings are closed by template repair with no model at all.
+    const template = await runTemplateRepairStage(projectRoot, phoenixDir, ius, canonNodes, allClauses, opts.target, opts.manifestManager, indent);
     const findings = collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target);
     if (findings.length === 0) {
-      console.log(`${indent}  ${green('✔')} no verifier findings to repair`);
+      console.log(`${indent}  ${green('✔')} no verifier findings to repair${template.closed > 0 ? ` (${template.closed} closed by template repair)` : ''}`);
     } else {
-      console.log(`${indent}  ${yellow('⚠')} ${findings.length} finding(s) but no LLM — cannot repair (run with an API key).`);
+      console.log(`${indent}  ${yellow('⚠')} ${findings.length} finding(s) remain${template.closed > 0 ? ` after ${template.closed} template repair(s)` : ''} — the rest need an LLM round (run with an API key).`);
     }
     console.log();
+    const bd = (fs: RepairFinding[]) => ({ schema: fs.filter(f => f.category === 'schema').length, constraint: fs.filter(f => f.category === 'constraint').length, build: fs.filter(f => f.category === 'build').length });
+    writeFileSync(join(phoenixDir, 'repair-status.json'), JSON.stringify({
+      before: bd(findings), after: bd(findings), rounds: 0,
+      template_repairs: template.closed,
+      template_closed: template.edits.map(e => ({ subject: e.subject, kind: e.kind, file: e.file })),
+      green: findings.length === 0, stop: findings.length === 0 ? 'green' : 'unroutable',
+      residual: findings.map(f => ({ category: f.category, subject: f.subject, message: f.message })),
+      checked_at: new Date().toISOString(),
+    }, null, 2), 'utf8');
     return { rounds: [], residual: findings, green: findings.length === 0, stop: findings.length === 0 ? 'green' : 'unroutable' };
   }
 
@@ -1147,7 +1239,7 @@ async function runRepairPhase(
   // Snapshot the findings BEFORE any repair — the "before" column of the cold-start matrix.
   const initialFindings = collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target);
 
-  const result = await runRepairLoop({
+  let result = await runRepairLoop({
     targets,
     maxRounds: opts.maxRounds ?? 3,
     verify: () => collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target),
@@ -1179,13 +1271,26 @@ async function runRepairPhase(
     },
   });
 
+  // Template-repair stage (P1): for any MECHANICAL constraint finding the LLM rounds
+  // left behind, synthesize the guard deterministically (the checker's inverse). A stage,
+  // not a loop — it runs once on the residual. The verifier stays frozen: each edit is
+  // kept only if the FROZEN checker then says conforms and the project still compiles.
+  const templateResult = await runTemplateRepairStage(
+    projectRoot, phoenixDir, ius, canonNodes, allClauses, opts.target, opts.manifestManager, indent,
+  );
+  // The residual after the deterministic stage is the honest final residual.
+  const finalResidual = templateResult.closed > 0
+    ? collectRepairFindings(projectRoot, ius, canonNodes, allClauses, opts.target)
+    : result.residual;
+  result = { ...result, residual: finalResidual, green: finalResidual.length === 0, rounds: result.rounds };
+
   // Final honest line either way.
   const breakdown = (fs: RepairFinding[]) => ({
     schema: fs.filter(f => f.category === 'schema').length,
     constraint: fs.filter(f => f.category === 'constraint').length,
     build: fs.filter(f => f.category === 'build').length,
   });
-  const before = result.rounds.length > 0 ? initialFindings : result.residual;
+  const before = result.rounds.length > 0 || templateResult.closed > 0 ? initialFindings : result.residual;
   const residual = breakdown(result.residual);
   if (result.green) {
     console.log(`${indent}  ${green('✔')} repair loop reached zero verifier errors in ${result.rounds.length} round(s)`);
@@ -1201,6 +1306,8 @@ async function runRepairPhase(
     before: breakdown(before),
     after: residual,
     rounds: result.rounds.length,
+    template_repairs: templateResult.closed,
+    template_closed: templateResult.edits.map(e => ({ subject: e.subject, kind: e.kind, file: e.file })),
     green: result.green,
     stop: result.stop,
     residual: result.residual.map(f => ({ category: f.category, subject: f.subject, message: f.message })),

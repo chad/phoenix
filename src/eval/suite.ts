@@ -34,6 +34,7 @@ import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { runAggregateProperty } from '../constraints/exec-runner.js';
 import { runGatedLiveEval, referenceApp, referencePlans } from '../live-harness.js';
+import { synthesizeGuard, isMechanical } from '../repair-template.js';
 import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
 import type { CheckMethod, CheckResult } from '../models/validation.js';
@@ -559,6 +560,29 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
         && result.rounds[0].regenerated.includes('iu-txn')
         && verify().length === 0;
       return { passed: ok, detail: `routed=${routed.byTarget.has('iu-txn')}, green=${result.green}, rounds=${result.rounds.length}, residual=${result.residual.length}` };
+    },
+  },
+
+  // ── deterministic guard synthesis (repair's last mile) ──
+  {
+    id: 'repair.template-synthesis-closes-mechanical-findings', capability: 'repair', tier: 'unit', expect: 'green',
+    description: 'A mechanical constraint the LLM left unenforced is closed DETERMINISTICALLY: the synthesized guard is the frozen checker\'s exact inverse, so absent/violates flips to conforms — no model, and the verifier is untouched (only the generated code changes).',
+    run: () => {
+      // Cardinality — the exact NIGHT-REPORT-3 residual (afterimage's "deck ≥ 30 cards").
+      const attrs = mineEntityAttributes([iu('deck')], [canon(CanonicalType.DEFINITION, 'a deck has cards', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'a deck must have at least 30 cards', 'c', 'cl', ['deck', 'card'])], attrs);
+      const card = constraints.find(c => c.assertion.kind === 'cardinality');
+      if (!card) return { passed: false, detail: 'cardinality constraint not captured' };
+      const before = 'const S = z.object({ cards: z.array(Card) });';
+      const beforeVerdict = checkConstraint(card, before).result;   // absent (frozen checker)
+      const after = synthesizeGuard(card, before);                  // deterministic guard synthesis
+      const afterVerdict = after ? checkConstraint(card, after).result : 'indeterminate';
+      // Bound too: absent .max flips to conforms; and a NON-mechanical kind is refused.
+      const boundC = boundConstraint();
+      const boundAfter = synthesizeGuard(boundC, 'const S = z.object({ name: z.string().min(1) });');
+      const boundOk = !!boundAfter && checkConstraint(boundC, boundAfter).result === 'conforms';
+      return { passed: beforeVerdict === 'absent' && afterVerdict === 'conforms' && boundOk && isMechanical(card),
+        detail: `cardinality ${beforeVerdict}→${afterVerdict}; bound→${boundOk ? 'conforms' : 'unfixed'}` };
     },
   },
 
