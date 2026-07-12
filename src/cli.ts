@@ -60,6 +60,7 @@ import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
+import { deriveProjectLivePlans, runLiveVerification } from './live-verify.js';
 import { checkConstraintAst } from './constraints/check-ast.js';
 import { computeObligations } from './constraints/obligations.js';
 import type { StructuredConstraint } from './constraints/model.js';
@@ -2664,6 +2665,72 @@ async function cmdRepair(args: string[]): Promise<void> {
   process.exitCode = result.green ? 0 : 0; // repair itself succeeds; residuals surface in status
 }
 
+/**
+ * `phoenix verify --live` — the live oracle. Boot the real generated app and drive the
+ * aggregate/state/temporal invariants the static path can only abstain on, through the
+ * mutation-gated harness. Records behavioral-gated verdicts and reports which static
+ * abstentions the live oracle upgraded to an earned conforms. The verifier is frozen:
+ * this reads constraints only and changes no checker.
+ */
+async function cmdVerify(args: string[]): Promise<void> {
+  const live = args.includes('--live');
+  if (!live) {
+    console.log(yellow('Usage: phoenix verify --live'));
+    console.log(dim('  Boots the generated app and runs the mutation-gated live invariant evals.'));
+    return;
+  }
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  if (ius.length === 0) { console.log(yellow('⚠ No IUs planned. Run `phoenix bootstrap` first.')); return; }
+
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const specStore = new SpecStore(phoenixDir);
+  const allClauses: Clause[] = [];
+  for (const specFile of findSpecFiles(projectRoot)) allClauses.push(...specStore.getClauses(relative(projectRoot, specFile)));
+
+  const entityAttrs = mineEntityAttributes(ius, canonNodes, allClauses);
+  const { constraints } = extractConstraints(canonNodes, entityAttrs);
+  const evals = deriveProjectLivePlans(constraints, ius);
+
+  console.log(bold('🔬 Phoenix Live Verification') + '  ' + dim('(boot the real app; mutation-gated invariant evals)'));
+  console.log();
+  if (evals.length === 0) {
+    console.log(yellow('  ⚠ No live-drivable invariants derived from the spec (aggregate/state/temporal).'));
+    console.log(dim('    Static verification already covers this project; nothing to execute live.'));
+    return;
+  }
+  console.log(`  ${dim(`Derived ${evals.length} live eval(s): ${evals.map(e => e.label).join('; ')}`)}`);
+  console.log(`  ${dim('Booting: npx tsx src/server.ts (isolated DB per boot)')}`);
+  console.log();
+
+  const report = await runLiveVerification(projectRoot, evals);
+  if (!report.booted) {
+    console.log(`  ${red('✖')} the generated app did not boot — every live eval is indeterminate (honest abstain).`);
+    console.log(`    ${dim(report.bootReason ?? '')}`);
+  }
+  for (const r of report.results) {
+    const icon = r.result.status === 'pass' && r.result.gated ? green('✔')
+      : r.result.status === 'fail' ? red('✖') : yellow('○');
+    const verdict = r.result.status === 'pass' && r.result.gated ? green('behavioral-gated conforms')
+      : r.result.status === 'fail' ? red('violates (live)') : yellow('indeterminate');
+    console.log(`  ${icon} ${r.label}: ${verdict} ${dim(`— ${r.result.reason}`)}`);
+  }
+  console.log();
+  if (report.upgraded.length > 0) {
+    console.log(`  ${green('✔')} live oracle upgraded ${report.upgraded.length} static abstention(s) to a mutation-gated conforms.`);
+  } else {
+    console.log(`  ${dim('No abstention upgraded to a gated conforms this run (see reasons above).')}`);
+  }
+  writeFileSync(join(phoenixDir, 'live-status.json'), JSON.stringify({
+    booted: report.booted,
+    boot_reason: report.bootReason,
+    evals: report.results.map(r => ({ label: r.label, constraint_id: r.constraintId, status: r.result.status, gated: r.result.gated, method: r.result.method, mutants_applicable: r.result.mutantsApplicable, mutants_killed: r.result.mutantsKilled, reason: r.result.reason })),
+    upgraded: report.upgraded,
+    checked_at: report.checkedAt,
+  }, null, 2), 'utf8');
+  console.log(dim(`  Wrote .phoenix/live-status.json`));
+}
+
 function cmdDrift(): void {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const manifestManager = new ManifestManager(phoenixDir);
@@ -3685,6 +3752,8 @@ ${bold('Implementation:')}
                          ${dim('--stubs  Force stub generation (skip LLM)')}
   ${cyan('repair')} [--rounds=N]   Repair loop: feed verifier findings into targeted regeneration
                          ${dim('Bounded (default 3 rounds); the verifier is frozen — code changes only')}
+  ${cyan('verify')} --live       Live oracle: boot the real app, run mutation-gated invariant evals
+                         ${dim('Aggregate/state/temporal invariants the static path can only abstain on')}
 
 ${bold('Verification:')}
   ${cyan('status')}                Trust dashboard — the primary UX
@@ -3761,6 +3830,9 @@ async function main(): Promise<void> {
       break;
     case 'repair':
       await cmdRepair(commandArgs);
+      break;
+    case 'verify':
+      await cmdVerify(commandArgs);
       break;
     case 'drift':
       cmdDrift();
