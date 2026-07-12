@@ -2410,7 +2410,11 @@ function cmdLabel(args: string[]): void {
   const key = relative(projectRoot, resolve(file)) || file;
 
   if (removeMode) {
-    const removed = waiverStore.remove(key);
+    let removed = waiverStore.remove(key);
+    // Also remove any region-scoped labels expanded from this file (shared artifacts).
+    for (const w of waiverStore.getAll()) {
+      if (w.key.startsWith(`${key}#`)) removed = waiverStore.remove(w.key) || removed;
+    }
     console.log(removed ? green(`✔ Removed label on ${key}`) : yellow(`⚠ No label found for ${key}`));
     return;
   }
@@ -2456,7 +2460,28 @@ function cmdLabel(args: string[]): void {
     created_at: new Date().toISOString(),
     labeled_hash: labeledHash,
   };
-  waiverStore.add(waiver);
+
+  // A SHARED aggregate file's drift is per-REGION (a bare-path waiver must not
+  // blanket other IUs' regions — that granularity is deliberate). Labeling a shared
+  // file therefore expands to region-keyed waivers for exactly the regions that are
+  // drifted RIGHT NOW; drift appearing later in another region still errors.
+  const manifestForLabel = new ManifestManager(phoenixDir).load();
+  const sharedFile = Object.values(manifestForLabel.shared_files ?? {}).find(s => s.path === key);
+  if (sharedFile) {
+    const report = detectDrift(manifestForLabel, projectRoot, waiverStore.asMap());
+    const drifted = report.entries.filter(e => e.file_path === key && e.status === DriftStatus.DRIFTED);
+    if (drifted.length === 0) {
+      console.log(yellow(`⚠ ${key} is a shared artifact with no drifted regions — nothing to label.`));
+      return;
+    }
+    for (const e of drifted) {
+      const regionKey = `${key}#${e.iu_id}|${e.role ?? ''}|${e.key ?? ''}`;
+      waiverStore.add({ ...waiver, key: regionKey });
+    }
+    console.log(dim(`  shared artifact: labeled ${drifted.length} drifted region(s), attributed per IU`));
+  } else {
+    waiverStore.add(waiver);
+  }
 
   if (kind === 'promote_to_requirement') {
     // Also record a pending promotion so status surfaces the harvest until it
