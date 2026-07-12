@@ -225,6 +225,13 @@ async function driveAggregate(app: AppHandle, plan: AggregatePlan): Promise<Live
 }
 
 async function driveStateNonNeg(app: AppHandle, plan: StateNonNegPlan): Promise<LiveProbe> {
+  // Control first: a VALID positive write must be ACCEPTED, so that a rejection of the
+  // attack is attributable to the governed field — not to a missing/invalid other field.
+  // If the app won't accept a clean control, we cannot isolate the signal → abstain.
+  const control = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.field]: 5 });
+  if (!(control.status >= 200 && control.status < 300)) {
+    return { status: 'indeterminate', reason: `no valid control accepted on ${plan.writeRoute} (${control.status}) — cannot isolate the ${plan.field} guard` };
+  }
   // The attack: write a value that would take the governed field below zero.
   const res = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.field]: -999 });
   const rejected = res.status >= 400 && res.status < 500;
@@ -240,10 +247,17 @@ async function driveStateNonNeg(app: AppHandle, plan: StateNonNegPlan): Promise<
 }
 
 async function driveTemporal(app: AppHandle, plan: TemporalPlan): Promise<LiveProbe> {
+  // Control first: today's date (a valid body) must be ACCEPTED — otherwise a 400 on the
+  // future date could be a missing-field rejection, not the temporal guard. Abstain then.
+  const today = new Date().toISOString().slice(0, 10);
+  const control = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.dateField]: today });
+  if (!(control.status >= 200 && control.status < 300)) {
+    return { status: 'indeterminate', reason: `no valid control accepted on ${plan.writeRoute} (${control.status}) — cannot isolate the ${plan.dateField} temporal guard` };
+  }
   const future = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
   const res = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.dateField]: future });
   return res.status === 400
-    ? { status: 'pass', reason: `future ${plan.dateField} (${future}) rejected with 400` }
+    ? { status: 'pass', reason: `future ${plan.dateField} (${future}) rejected with 400 (valid control accepted)` }
     : { status: 'fail', reason: `future ${plan.dateField} (${future}) accepted with ${res.status} (expected 400)` };
 }
 

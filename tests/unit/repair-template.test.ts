@@ -86,6 +86,29 @@ describe('repair-template: deterministic guard synthesis', () => {
     expect(after).toMatch(/const isNotFuture/);
   });
 
+  it('follows named-const indirection and inlines the guard where the frozen checker reads it', () => {
+    // The generators factor validators into a shared const: `const dateSchema = z.string()
+    // .date(); … date: dateSchema`. The frozen checker reads only the inline `date: z.…`
+    // chain, so synthesis must inline the const chain onto the property + add the guard.
+    const c = con('date', { kind: 'temporal', mode: 'not-future' });
+    const before = "import { z } from 'zod';\nconst dateSchema = z.string().date('Invalid date');\nconst S = z.object({ date: dateSchema });";
+    expect(checkConstraintAst(c, before).result).toBe('absent'); // checker can't see the const
+    const after = synthesizeGuard(c, before)!;
+    expect(after).toMatch(/date: z\.string\(\)\.date\([^)]*\)\.refine\(isNotFuture/);
+    expect(checkConstraintAst(c, after).result).toBe('conforms');
+  });
+
+  it('temporal helper accepts the nullable/optional field shape (compiles either way)', () => {
+    const after = synthesizeGuard(
+      con('date', { kind: 'temporal', mode: 'not-future' }),
+      "import { z } from 'zod';\nconst S = z.object({ date: z.string().nullable().optional() });",
+    )!;
+    // The helper must tolerate string | null | undefined so the refine typechecks on the
+    // generators' `.nullable().optional()` date fields (a missing date is not in the future).
+    expect(after).toContain('s: string | null | undefined');
+    expect(after).toContain('s == null ||');
+  });
+
   it('honest refusal: a non-Zod (relational) shape yields null (left as residual)', () => {
     const r = synthesizeGuard(
       con('cards', { kind: 'cardinality', min: 30, relation: 'card' }, 'deck'),

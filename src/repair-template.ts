@@ -46,21 +46,40 @@ function nameMatches(fieldName: string, attr: string, plural = false): boolean {
   return re.test(fieldName.toLowerCase());
 }
 
-/** The first (source-order) `attr: <initializer>` property assignment whose initializer
- *  is a `z.…` chain, or null. Returns the property node so callers can splice precisely. */
-function findField(sf: ts.SourceFile, attr: string, plural = false): ts.PropertyAssignment | null {
-  const matches: ts.PropertyAssignment[] = [];
+/**
+ * The Zod-chain expression node for `attr` — the thing whose end/args we splice. Handles
+ * the NAMED-CONST indirection the generators commonly emit (`const dateSchema = z.string()
+ * .date(); … date: dateSchema`): when the property initializer is an identifier bound to a
+ * top-level `z.…` const, we return the CONST's initializer so the guard is appended there.
+ * Mirrors checkMembership's one-level follow so synthesis targets the same declaration the
+ * checker reads. `field` is the wrapper for reporting/absent-detection. Returns null when
+ * no editable Zod chain is found (→ honest residual, no forced edit).
+ */
+interface FieldTarget { field: ts.PropertyAssignment; expr: ts.Expression; }
+function findField(sf: ts.SourceFile, attr: string, plural = false): FieldTarget | null {
+  const props: ts.PropertyAssignment[] = [];
+  const constInit = new Map<string, ts.Expression>();
   const visit = (n: ts.Node) => {
     if (ts.isPropertyAssignment(n)) {
       const key = ts.isIdentifier(n.name) ? n.name.text : ts.isStringLiteral(n.name) ? n.name.text : undefined;
-      if (key && nameMatches(key, attr, plural) && isZodChain(n.initializer)) matches.push(n);
+      if (key && nameMatches(key, attr, plural)) props.push(n);
+    }
+    if (ts.isVariableStatement(n)) {
+      for (const d of n.declarationList.declarations) {
+        if (ts.isIdentifier(d.name) && d.initializer && isZodChain(d.initializer)) constInit.set(d.name.text, d.initializer);
+      }
     }
     ts.forEachChild(n, visit);
   };
   visit(sf);
-  if (matches.length === 0) return null;
-  matches.sort((a, b) => a.pos - b.pos);
-  return matches[0];
+  props.sort((a, b) => a.pos - b.pos);
+  for (const p of props) {
+    if (isZodChain(p.initializer)) return { field: p, expr: p.initializer };
+    if (ts.isIdentifier(p.initializer) && constInit.has(p.initializer.text)) {
+      return { field: p, expr: constInit.get(p.initializer.text)! };
+    }
+  }
+  return null;
 }
 
 /** Whether an expression is a `z.…()` call chain (base identifier `z`). */
@@ -109,91 +128,58 @@ export function synthesizeGuard(c: StructuredConstraint, source: string): string
   if (!sf) return null;
   const a = c.assertion;
 
+  // Locate the field's Zod chain (following one level of named-const indirection). We then
+  // transform the chain's TEXT and write it back onto the PROPERTY initializer — inlining
+  // the const when needed so the guard lands exactly where the FROZEN checker reads it (the
+  // checkers read an inline `attr: z.…` chain, not a `attr: someConst` reference). AST pins
+  // the node; the edit is a small transform of that isolated substring.
+  const tgt = a.kind === 'cardinality'
+    ? (findField(sf, c.binding.attribute, true) ?? findField(sf, a.relation, true))
+    : findField(sf, c.binding.attribute);
+  if (!tgt) return null;
+  const base = tgt.expr.getText(sf);
+  let chain: string | null = null;
+  let prelude = ''; // a module-level helper to add once (temporal)
+
   if (a.kind === 'bound') {
-    const field = findField(sf, c.binding.attribute);
-    if (!field) return null;
     const method = a.op === '<=' ? 'max' : 'min';
-    // Wrong bound present → replace its numeric argument in place.
-    const existing = chainCalls(field.initializer, new Set([method]))[0];
-    if (existing && existing.arguments.length === 1) {
-      const arg = existing.arguments[0];
-      return splice(source, arg.getStart(sf), arg.getEnd(), String(a.value));
-    }
-    // Absent → append `.method(N)` at the end of the field's chain.
-    return splice(source, field.initializer.getEnd(), field.initializer.getEnd(), `.${method}(${a.value})`);
-  }
-
-  if (a.kind === 'membership') {
-    const field = findField(sf, c.binding.attribute);
-    if (!field) return null;
+    const re = new RegExp(`\\.${method}\\(\\s*\\d+\\s*\\)`);
+    chain = re.test(base) ? base.replace(re, `.${method}(${a.value})`) : `${base}.${method}(${a.value})`;
+  } else if (a.kind === 'membership') {
     const enumExpr = `z.enum([${a.values.map(v => `'${v}'`).join(', ')}])`;
-    // Replace the `z.string()`/`z.number()` head call with `z.enum([...])`, preserving
-    // any trailing chain (.optional() etc.). If the enum is already the head, no-op-guard.
-    const head = headCall(field.initializer);
-    if (!head) return null;
-    if (ts.isPropertyAccessExpression(head.expression) && head.expression.name.text === 'enum') {
-      // An enum is already present but the value-set differs → replace its array arg.
-      const arg = head.arguments[0];
-      if (arg) return splice(source, arg.getStart(sf), arg.getEnd(), `[${a.values.map(v => `'${v}'`).join(', ')}]`);
-      return null;
-    }
-    return splice(source, head.getStart(sf), head.getEnd(), enumExpr);
-  }
-
-  if (a.kind === 'presence') {
-    const field = findField(sf, c.binding.attribute);
-    if (!field) return null;
-    // Drop `.optional()` / `.nullish()` (and a paired `.nullable()`) from the chain.
-    const drops = chainCalls(field.initializer, new Set(['optional', 'nullish', 'nullable']));
-    if (drops.length === 0) return null;
-    // Remove from the property-access dot through the call's `)`; do the rightmost first
-    // so earlier ranges stay valid.
-    let out = source;
-    const ranges = drops
-      .map(call => {
-        const pae = call.expression as ts.PropertyAccessExpression;
-        return { start: pae.name.getStart(sf) - 1 /* the dot */, end: call.getEnd() };
-      })
-      .sort((x, y) => y.start - x.start);
-    for (const r of ranges) out = splice(out, r.start, r.end, '');
-    return out === source ? null : out;
-  }
-
-  if (a.kind === 'cardinality') {
-    const field = findField(sf, c.binding.attribute, /*plural*/ true) ?? findField(sf, a.relation, true);
-    if (!field) return null;
-    // Only the `z.array(...)` collection shape is templated here; a relational count
-    // guard (a COUNT(*) query in a route) is left to the LLM / honest residual.
-    if (!chainCalls(field.initializer, new Set(['array'])).length) return null;
-    let insert = '';
-    if (a.min !== undefined && !chainCalls(field.initializer, new Set(['min', 'nonempty'])).some(cc => cc.arguments.length && ts.isNumericLiteral(cc.arguments[0]) && +cc.arguments[0].text === a.min)) {
-      insert += `.min(${a.min})`;
-    }
-    if (a.max !== undefined && !chainCalls(field.initializer, new Set(['max'])).some(cc => cc.arguments.length && ts.isNumericLiteral(cc.arguments[0]) && +cc.arguments[0].text === a.max)) {
-      insert += `.max(${a.max})`;
-    }
-    if (!insert) return null;
-    return splice(source, field.initializer.getEnd(), field.initializer.getEnd(), insert);
-  }
-
-  if (a.kind === 'temporal') {
-    const field = findField(sf, c.binding.attribute);
-    if (!field) return null;
+    if (/z\.enum\(\s*\[[^\]]*\]/.test(base)) chain = base.replace(/z\.enum\(\s*\[[^\]]*\]\s*\)/, enumExpr);
+    else if (/z\.(string|number|any|unknown)\(\)/.test(base)) chain = base.replace(/z\.(string|number|any|unknown)\(\)/, enumExpr);
+    else return null;
+  } else if (a.kind === 'presence') {
+    if (!/\.(optional|nullish|nullable)\(\)/.test(base)) return null;
+    chain = base.replace(/\.(optional|nullish|nullable)\(\)/g, '');
+  } else if (a.kind === 'cardinality') {
+    if (!/\.array\(/.test(base)) return null; // only the z.array collection shape is templated
+    let add = '';
+    if (a.min !== undefined && !new RegExp(`\\.(min\\(\\s*${a.min}\\b|nonempty\\()`).test(base)) add += `.min(${a.min})`;
+    if (a.max !== undefined && !new RegExp(`\\.max\\(\\s*${a.max}\\b`).test(base)) add += `.max(${a.max})`;
+    if (!add) return null;
+    chain = base + add;
+  } else if (a.kind === 'temporal') {
     const cue = a.mode === 'not-future' ? 'future' : 'past';
     const cmp = a.mode === 'not-future' ? '<=' : '>=';
     const helper = a.mode === 'not-future' ? 'isNotFuture' : 'isNotPast';
-    // Append the refine to the date field's chain.
-    let out = splice(source, field.initializer.getEnd(), field.initializer.getEnd(),
-      `.refine(${helper}, 'Date must not be in the ${cue}')`);
-    // Ensure the helper exists (idempotent): define it once, after the imports.
-    if (!new RegExp(`\\b(?:function|const)\\s+${helper}\\b`).test(out)) {
-      const helperSrc = `\nconst ${helper} = (s: string): boolean => new Date(s).getTime() ${cmp} Date.now();\n`;
-      const lastImport = [...out.matchAll(/^import .*$/gm)].pop();
-      const at = lastImport ? lastImport.index! + lastImport[0].length : 0;
-      out = splice(out, at, at, helperSrc);
+    chain = `${base}.refine(${helper}, 'Date must not be in the ${cue}')`;
+    if (!new RegExp(`\\b(?:function|const)\\s+${helper}\\b`).test(source)) {
+      // Accept the nullable/optional shape the generators use (`z.string().nullable()
+      // .optional()`), so the refine typechecks whether the field is string or
+      // string|null|undefined; a missing date is trivially not in the ${cue}.
+      prelude = `\nconst ${helper} = (s: string | null | undefined): boolean => s == null || new Date(s).getTime() ${cmp} Date.now();\n`;
     }
-    return out;
   }
+  if (!chain || chain === base) return null;
 
-  return null;
+  // Write the transformed chain onto the property initializer (inlining a const-ref).
+  let out = splice(source, tgt.field.initializer.getStart(sf), tgt.field.initializer.getEnd(), chain);
+  if (prelude) {
+    const lastImport = [...out.matchAll(/^import .*$/gm)].pop();
+    const at = lastImport ? lastImport.index! + lastImport[0].length : 0;
+    out = splice(out, at, at, prelude);
+  }
+  return out;
 }

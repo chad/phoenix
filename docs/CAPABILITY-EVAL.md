@@ -42,7 +42,8 @@ knowledge. It is, for the project, what `phoenix status` is for a generated app.
 must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
 
 - **Green health: 100%** — every proven capability still holds (0 regressions).
-- **Overall pass rate: 97%** (32/33 cases) — the remaining 3% is the honest backlog.
+- **Overall pass rate: 95%** (35/37 cases) — the remaining 5% is the honest backlog
+  (two re-seeded reds; the live-app red flipped green on a real, mutation-gated pass).
 
 ### Closed by the Red→Green loop (red → green)
 
@@ -132,18 +133,55 @@ must be 100%. The overall pass rate climbs as reds are fixed and flipped.)*
   eval. Not-green-after-N is an honest, reportable residual, never a silent success. The
   mechanics (routing, re-verify, stop conditions, journaling) are locked with an
   injectable scripted repairer, so the win holds without depending on any model.
+- ✅ **The live application harness (`oracle.live-app-property-evals-not-yet-run` flipped
+  red→green)** — the executable oracle now runs modules that import their world. The
+  harness (`src/live-harness.ts`) BOOTS the actual generated app as a child process
+  against an isolated DB (the `DB_PATH` override the scaffold already honors), drives its
+  HTTP surface with deterministic seeded inputs — seed via POST routes, read the
+  aggregate route, attack the write routes with an overdraft, POST a future date — and
+  EARNS `behavioral-gated` conforms through the same mutation gate as the pure-function
+  path: plant a bug in the governing module (strip the guard, flip the comparison, break
+  the aggregate), re-boot, re-drive; every applicable mutant must be killed or the verdict
+  degrades to `indeterminate`. There is no stubbed execution path — the boot is always a
+  real child process; only the boot command varies (`npx tsx src/server.ts` for a
+  generated project, `node app.mjs` for the harness's own `node:http`+`node:sqlite`
+  self-verification fixture). Honest abstain when the app won't boot or a clean seed can't
+  be produced. Wired as `phoenix verify --live`.
+- ✅ **The live harness never certifies a broken app
+  (`oracle.live-harness-mutation-gate-is-honest`)** — a guard-stripped app fails the live
+  eval (the mutant is killed by real execution, not by pattern-matching), and a
+  non-booting app abstains. `behavioral-gated` conforms is earned, never observed.
+- ✅ **Deterministic guard synthesis
+  (`repair.template-synthesis-closes-mechanical-findings`)** — for the MECHANICAL
+  constraint kinds (bound / membership / presence / cardinality / temporal) the fix is
+  not creative: each checker's inverse is a template. A repair STAGE
+  (`src/repair-template.ts`) synthesizes the guard directly via the TS compiler API
+  (AST-locate, minimal splice), closing findings the LLM leaves behind — including
+  NIGHT-REPORT-3's exact residual (afterimage's "deck ≥ 30 cards"). Gate 5 holds: an edit
+  is kept only if the FROZEN checker then says conforms AND the project still compiles;
+  the verifier is never touched. Deterministic, so it runs even with no API key. Journaled
+  `repair:template`.
 
-### The known-red backlog (1)
+### The known-red backlog (2)
 
-1. **`oracle.live-app-property-evals-not-yet-run`** — the executable runner proves
-   invariants for SELF-CONTAINED modules only. A real generated module imports its
-   dependencies (db, hono); executing its properties requires standing those up
-   (in-memory SQLite, an HTTP shim). Today the runner honestly REFUSES such modules
-   (`indeterminate: needs the live app harness`). *Fix: build the live harness — boot
-   the generated app against in-memory deps and route aggregate/temporal invariants
-   through the same mutation gate the pure-function path already earns its greens
-   with.*
+1. **`oracle.temporal-relative-invariants-not-yet-proven`** — the absolute-temporal kind
+   ("a date must not be in the future") is captured, checked, and now live-drivable. A
+   RELATIVE-temporal invariant governing a state transition over elapsed time ("archived
+   90 days after the last transaction") is neither captured as its own assertion kind nor
+   provable — `checkProperty` abstains. *Fix: add a relative-temporal assertion kind
+   (offset + anchor event + target state) and a live-harness eval that seeds an aged
+   record, advances a virtual clock, and asserts the app performs the transition exactly
+   at the boundary — mutation-gated like the other live evals.*
+2. **`retarget.cross-runtime-verdict-parity-not-yet-reached`** — the constraint checkers
+   are coupled to the node-typescript (Zod) dialect. The python-fastapi target resolves
+   and generates, but the same bound expressed the Pydantic way
+   (`name: str = Field(max_length=60)`) is unread, so a python module that DOES enforce
+   the bound reads as `absent` — the verdict diverges from node for identical enforcement.
+   *Fix: a per-runtime constraint-checker hook (a Pydantic-aware reader, or lower each
+   RuntimeTarget's enforcement to a common shape the checkers consume) so the same
+   constraint earns the same verdict on either runtime.*
 
 Each red is a concrete next piece of work with a known fix — the eval doubles as the
-roadmap. Fifteen capabilities have now been closed by the Red→Green loop; one honest
-red remains for the live-app execution tail.
+roadmap. Eighteen capabilities have now been closed by the Red→Green loop; the live-app
+execution tail is closed, and the backlog was re-seeded (never left empty) with two
+honest reds from the genuinely-open frontier.
