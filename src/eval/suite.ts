@@ -37,6 +37,7 @@ import { verdictOf } from '../models/validation.js';
 import type { CheckMethod, CheckResult } from '../models/validation.js';
 import { resolveTarget } from '../architectures/index.js';
 import { extractFetchRoutes } from '../iu-deps.js';
+import { parseSchema, checkModuleSchema } from '../schema-contract.js';
 
 // ─── test-data helpers ───────────────────────────────────────────────────────
 
@@ -432,6 +433,26 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const ok = !!ts && !!py && ts.runtime.language !== py.runtime.language &&
         ts.runtime.outputPathFor('order') !== py.runtime.outputPathFor('order');
       return { passed: ok, detail: ok ? `${ts!.runtime.language} vs ${py!.runtime.language}` : 'targets did not resolve distinctly' };
+    },
+  },
+
+  // ── schema contract (cross-module coherence) ──
+  {
+    id: 'schema.cross-module-contract-mismatches-are-caught', capability: 'schema-contract', tier: 'unit', expect: 'green',
+    description: 'A module whose SQL disagrees with the migration schema (singular/plural table, phantom column, broken FK) is caught statically — the compile-green runtime-500 class.',
+    run: () => {
+      const ddl = `CREATE TABLE IF NOT EXISTS adventurers (id INTEGER PRIMARY KEY, name TEXT); CREATE TABLE IF NOT EXISTS entries (id INTEGER PRIMARY KEY, adventurer_id INTEGER REFERENCES adventurer(id), cleared INTEGER);`;
+      const schema = parseSchema(ddl);
+      const badTable = checkModuleSchema('m.ts', `db.prepare('SELECT * FROM adventurer WHERE id = ?').get(id);`, schema);
+      const badColumn = checkModuleSchema('m.ts', `const sql = "SELECT 1 FROM entries WHERE entries.status = 'cleared'";`, schema);
+      const brokenFk = checkModuleSchema('_migrations.ts', ddl, schema);
+      const healthy = checkModuleSchema('m.ts', `db.prepare('SELECT entries.cleared FROM entries JOIN adventurers ON entries.adventurer_id = adventurers.id').all();`, schema);
+      const jsSafe = checkModuleSchema('m.ts', `const entries = await res.json(); const n = entries.map(e => e.id).length;`, schema);
+      const ok = badTable.length === 1 && badTable[0].suggestion === 'adventurers'
+        && badColumn.length === 1 && badColumn[0].ref === 'entries.status'
+        && brokenFk.some(f => f.kind === 'broken-fk')
+        && healthy.length === 0 && jsSafe.length === 0;
+      return { passed: ok, detail: `table=${badTable.length}, column=${badColumn.length}, fk=${brokenFk.length}, falsePositives=${healthy.length + jsSafe.length}` };
     },
   },
 

@@ -63,6 +63,7 @@ import { mineEntityAttributes, extractConstraints } from './constraints/extract.
 import { checkConstraintAst } from './constraints/check-ast.js';
 import { computeObligations } from './constraints/obligations.js';
 import type { StructuredConstraint } from './constraints/model.js';
+import { parseSchema, checkModuleSchema } from './schema-contract.js';
 import { verdictOf, verdictSeverity } from './models/validation.js';
 import type { ValidationResult, CheckResult } from './models/validation.js';
 import { runSuite } from './eval/harness.js';
@@ -330,6 +331,48 @@ function journalRegen(phoenixDir: string, results: RegenResult[], ius: Implement
  * spec constraint that the code does not enforce is a hard ERROR — not a false
  * green (the §1 failure). Unresolvable bindings are ERRORs before codegen.
  */
+/**
+ * Cross-module schema-contract diagnostics. Parses the shared migration DDL into
+ * a schema model, then holds every module's SQL (and the DDL's own FKs) against
+ * it. Findings are guaranteed runtime failures → errors. Silent when there is no
+ * migration artifact or nothing provably inconsistent.
+ */
+function computeSchemaDiagnostics(projectRoot: string, ius: ImplementationUnit[]): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const migPath = join(projectRoot, 'src', 'generated', '_migrations.ts');
+  if (!existsSync(migPath)) return diagnostics;
+  const ddl = readFileSync(migPath, 'utf8');
+  const schema = parseSchema(ddl);
+  if (schema.tables.size === 0) return diagnostics;
+
+  const targets: Array<{ file: string; source: string; iu_id?: string }> = [
+    { file: 'src/generated/_migrations.ts', source: ddl },
+  ];
+  for (const iu of ius) {
+    const f = iu.output_files[0];
+    const full = f ? join(projectRoot, f) : '';
+    if (full && existsSync(full)) targets.push({ file: f, source: readFileSync(full, 'utf8'), iu_id: iu.iu_id });
+  }
+  for (const t of targets) {
+    for (const f of checkModuleSchema(t.file, t.source, schema)) {
+      diagnostics.push({
+        severity: 'error',
+        category: 'schema',
+        subject: f.ref,
+        iu_id: t.iu_id,
+        message: `Schema contract: ${f.detail}`,
+        source_file: t.file,
+        recommended_actions: [
+          f.suggestion
+            ? `Align on one name: use "${f.suggestion}" (regenerate the module, or fix the migration if the module is right)`
+            : 'Align the module SQL with the migration schema, then regenerate',
+        ],
+      });
+    }
+  }
+  return diagnostics;
+}
+
 function computeConstraintDiagnostics(
   projectRoot: string,
   ius: ImplementationUnit[],
@@ -1527,6 +1570,11 @@ function printTrustDashboard(
   // Structured-constraint validation (SHACL spine, `Bound` shape family): a spec
   // constraint the generated code does not enforce is an ERROR, not a false green.
   diagnostics.push(...computeConstraintDiagnostics(projectRoot, ius, canonNodes, allClauses));
+
+  // Schema-contract validation: the shared DB schema is a contract every module's
+  // SQL must honor. A mismatch (a module querying `adventurer` when the migration
+  // created `adventurers`) is a guaranteed runtime 500 the compiler cannot see.
+  diagnostics.push(...computeSchemaDiagnostics(projectRoot, ius));
 
   // Policy evaluation — bind to current artifact hashes so stale evidence (for a
   // superseded generation) does not satisfy the policy.
