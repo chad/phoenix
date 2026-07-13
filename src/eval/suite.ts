@@ -35,6 +35,7 @@ import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { runAggregateProperty } from '../constraints/exec-runner.js';
 import { runGatedLiveEval, referenceApp, referencePlans, referenceFkApp, referenceFkSchema, referenceFkPlans, runGatedRelativeTemporal, referenceClockApp, type AppHandle, type PrepareResult, type RelativeTemporalSeed } from '../live-harness.js';
 import { parseTableSchemas, seedForTarget, type SeedPlanInput } from '../live-seed.js';
+import { acceptProposal } from '../constraints/extract-llm.js';
 import { synthesizeGuard, isMechanical } from '../repair-template.js';
 import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
@@ -329,6 +330,23 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const bad = checkConstraint(ps[0], `const S = z.object({ name: z.string().optional(), owner_email: z.string() });`);
       return { passed: good.result === 'conforms' && bad.result === 'absent',
         detail: `fields=[${ps.map(p => p.binding.attribute).join(',')}], good=${good.result}, optional=${bad.result}` };
+    },
+  },
+  {
+    id: 'intake.verified-llm-extraction-is-gated', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'The verified-LLM second pass lifts paraphrase recall ONLY through a deterministic acceptance gate: a proposal grounded in the sentence (kind typechecks, binding resolves, literals present) is accepted; a hallucinated value, a binding to a non-existent attribute, and an unknown kind are all REJECTED — so wrong-capture stays 0 while recall rises.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('habit')], [canon(CanonicalType.DEFINITION, 'a habit has a name and a cadence', 'd')]);
+      const good = acceptProposal({ kind: 'bound', entity: 'habit', attribute: 'name', params: { op: '<=', value: 80, unit: 'chars' } },
+        'a habit name may be no more than 80 characters', attrs);
+      const smuggled = acceptProposal({ kind: 'bound', entity: 'habit', attribute: 'name', params: { op: '<=', value: 100 } },
+        'a habit name may be no more than 80 characters', attrs);           // value not in sentence
+      const unbound = acceptProposal({ kind: 'membership', entity: 'habit', attribute: 'colour', params: { values: ['a', 'b'] } },
+        'a habit colour is one of a, b', attrs);                            // colour is not a mined attribute
+      const unknownKind = acceptProposal({ kind: 'wat', entity: 'habit', attribute: 'name' }, 'x', attrs);
+      const ok = good.accepted && (good.accepted && good.constraint.assertion.kind === 'bound')
+        && !smuggled.accepted && !unbound.accepted && !unknownKind.accepted;
+      return { passed: ok, detail: `grounded=${good.accepted}, smuggledValue=${smuggled.accepted}, unboundAttr=${unbound.accepted}, unknownKind=${unknownKind.accepted}` };
     },
   },
   {
