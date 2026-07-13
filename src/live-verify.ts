@@ -16,12 +16,12 @@
  * stays frozen: this consumes constraints read-only and changes no checker.
  */
 
-import { join } from 'node:path';
 import type { StructuredConstraint } from './constraints/model.js';
 import type { ImplementationUnit } from './models/iu.js';
 import {
-  runGatedLiveEval, bootApp, type BootSpec, type LivePlan, type GatedLiveResult,
+  runGatedLiveEval, bootApp, type AppHandle, type BootSpec, type LivePlan, type GatedLiveResult, type PrepareResult,
 } from './live-harness.js';
+import { parseTableSchemas, seedForTarget, singularize, type SeedPlanInput, type TableSchema } from './live-seed.js';
 
 /** Slugify an entity/IU name to its mounted route prefix (mirrors scaffold's rule). */
 export function routeSlug(name: string): string {
@@ -36,6 +36,10 @@ export interface DerivedLiveEval {
   targetFile: string;
   /** The constraint this eval proves (for cross-referencing the static abstention). */
   constraintId: string;
+  /** The entity whose create route this eval drives (for FK-aware seeding). */
+  entity: string;
+  /** The body field the driver sets itself — the seeder must NOT synthesize it. */
+  governedField: string;
 }
 
 /**
@@ -65,7 +69,7 @@ export function deriveProjectLivePlans(
       out.push({
         label: `${c.binding.entity}.${c.binding.attribute} not-future`,
         plan: { kind: 'temporal', writeRoute: route, dateField: c.binding.attribute },
-        targetFile, constraintId: c.constraint_id,
+        targetFile, constraintId: c.constraint_id, entity: c.binding.entity, governedField: c.binding.attribute,
       });
     }
 
@@ -75,7 +79,7 @@ export function deriveProjectLivePlans(
       out.push({
         label: `${c.binding.entity}.${c.binding.attribute} non-negative`,
         plan: { kind: 'state-nonneg', writeRoute: route, field: c.binding.attribute, readRoute: route, readField: c.binding.attribute },
-        targetFile, constraintId: c.constraint_id,
+        targetFile, constraintId: c.constraint_id, entity: c.binding.entity, governedField: c.binding.attribute,
       });
     }
 
@@ -89,7 +93,7 @@ export function deriveProjectLivePlans(
         out.push({
           label: `${c.binding.entity} aggregate = sum of ${field}`,
           plan: { kind: 'aggregate', seedRoute: route, seedField: field, aggregateRoute: route, aggregateField: 'total' },
-          targetFile, constraintId: c.constraint_id,
+          targetFile, constraintId: c.constraint_id, entity: c.binding.entity, governedField: field,
         });
       }
     }
@@ -107,15 +111,50 @@ export interface LiveVerifyReport {
 }
 
 /**
+ * Build a per-eval `prepare` closure from the schema plan: it seeds the target entity's FK
+ * parents on the fresh app and returns the synthesized body (minus the governed field). The
+ * SAME closure runs on every boot (baseline + each mutant re-boot). Returns undefined when
+ * no schema is available or the entity maps to no table, in which case the harness drives
+ * the naive body (and abstains if it's rejected) — never a false green.
+ */
+export function buildSeedPrepare(
+  schemaDdl: string | undefined,
+  constraints: StructuredConstraint[],
+  ius: ImplementationUnit[],
+  entity: string,
+  governedField: string,
+): ((app: AppHandle) => Promise<PrepareResult>) | undefined {
+  if (!schemaDdl) return undefined;
+  const tables: TableSchema[] = parseTableSchemas(schemaDdl);
+  const tableFor = (ent: string): string | undefined =>
+    tables.find(t => singularize(t.name) === singularize(ent))?.name;
+  const targetTable = tableFor(entity);
+  if (!targetTable) return undefined;
+  const routeFor = (table: string): string | null => {
+    const iu = ius.find(u => singularize(u.name) === singularize(table));
+    return iu ? routeSlug(iu.name) : null;
+  };
+  const input: SeedPlanInput = { tables, constraints, routeFor };
+  return async (app: AppHandle): Promise<PrepareResult> => {
+    const r = await seedForTarget(app, input, targetTable, governedField);
+    return r.ok ? { ok: true, seed: r.seed } : { ok: false, reason: r.reason };
+  };
+}
+
+/**
  * Boot the real generated project once for a health check, then run each derived eval
  * through the mutation-gated harness (each eval re-boots for isolation). Returns a
  * machine-readable report. A project that will not boot yields `booted:false` and every
  * eval indeterminate — the honest, never-a-false-green outcome.
+ *
+ * When `schemaDdl` (the schema plan) + `constraints` are supplied, each eval gets a
+ * spec-aware `prepare` that seeds its FK prerequisites — turning the multi-entity
+ * abstentions of NIGHT-REPORT-4 into real gated verdicts.
  */
 export async function runLiveVerification(
   projectRoot: string,
   evals: DerivedLiveEval[],
-  opts: { command?: readonly string[]; readyTimeoutMs?: number } = {},
+  opts: { command?: readonly string[]; readyTimeoutMs?: number; schemaDdl?: string; constraints?: StructuredConstraint[]; ius?: ImplementationUnit[] } = {},
 ): Promise<LiveVerifyReport> {
   const command = opts.command ?? ['npx', 'tsx', 'src/server.ts'];
   const readyTimeoutMs = opts.readyTimeoutMs ?? 20_000;
@@ -139,7 +178,8 @@ export async function runLiveVerification(
   const results: LiveVerifyReport['results'] = [];
   const upgraded: string[] = [];
   for (const ev of evals) {
-    const result = await runGatedLiveEval({ bootSpec: bootSpec(), plan: ev.plan, targetFile: ev.targetFile });
+    const prepare = buildSeedPrepare(opts.schemaDdl, opts.constraints ?? [], opts.ius ?? [], ev.entity, ev.governedField);
+    const result = await runGatedLiveEval({ bootSpec: bootSpec(), plan: ev.plan, targetFile: ev.targetFile, prepare });
     results.push({ label: ev.label, constraintId: ev.constraintId, result });
     if (result.status === 'pass' && result.gated) upgraded.push(ev.constraintId);
   }

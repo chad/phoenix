@@ -89,6 +89,23 @@ export interface TemporalAssertion {
 }
 
 /**
+ * A relative-temporal state invariant: a state TRANSITION that must happen a fixed
+ * offset of time after an anchor event — "an account must be archived 90 days after
+ * its last transaction", "a record retires 90 days after the last entry". Unlike the
+ * absolute TemporalAssertion (a field must not be in the future), this governs a
+ * derived state that flips at an elapsed-time boundary, so it can only be PROVEN by
+ * advancing a clock in the live harness (seed an aged record, set NOW past the
+ * boundary, assert the transition) — the static path abstains. `offsetDays` is the
+ * boundary, `anchorEvent` the verbatim anchor phrase, `targetState` the state word.
+ */
+export interface TemporalRelativeAssertion {
+  kind: 'temporal-relative';
+  offsetDays: number;
+  anchorEvent: string;
+  targetState: string;
+}
+
+/**
  * A required-field (presence) constraint, from the quantifier-free "at least"
  * form: "provide at least a name and an email". Each named field must exist in
  * the input schema and must NOT be optional/nullish. The parser returns the field
@@ -111,6 +128,7 @@ export type Assertion =
   | CardinalityAssertion
   | ExprAssertion
   | TemporalAssertion
+  | TemporalRelativeAssertion
   | PresenceAssertion;
 
 export interface ConstraintSource {

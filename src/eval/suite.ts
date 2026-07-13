@@ -33,7 +33,9 @@ import { extractBoundConstraints, extractConstraints, mineEntityAttributes } fro
 import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { runAggregateProperty } from '../constraints/exec-runner.js';
-import { runGatedLiveEval, referenceApp, referencePlans } from '../live-harness.js';
+import { runGatedLiveEval, referenceApp, referencePlans, referenceFkApp, referenceFkSchema, referenceFkPlans, runGatedRelativeTemporal, referenceClockApp, type AppHandle, type PrepareResult, type RelativeTemporalSeed } from '../live-harness.js';
+import { parseTableSchemas, seedForTarget, type SeedPlanInput } from '../live-seed.js';
+import { acceptProposal } from '../constraints/extract-llm.js';
 import { synthesizeGuard, isMechanical } from '../repair-template.js';
 import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
@@ -44,7 +46,8 @@ import { parseSchema, checkModuleSchema } from '../schema-contract.js';
 import { deriveSchema } from '../schema-plan.js';
 import { buildPrompt } from '../llm/prompt.js';
 import { runRepairLoop, routeFindings } from '../repair.js';
-import type { RepairTarget } from '../repair.js';
+import type { RepairTarget, Repairer } from '../repair.js';
+import { computeObligations, isObligation } from '../constraints/obligations.js';
 import type { RepairFinding } from '../models/repair.js';
 
 // ─── test-data helpers ───────────────────────────────────────────────────────
@@ -331,6 +334,23 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
+    id: 'intake.verified-llm-extraction-is-gated', capability: 'constraint-enforcement', tier: 'unit', expect: 'green',
+    description: 'The verified-LLM second pass lifts paraphrase recall ONLY through a deterministic acceptance gate: a proposal grounded in the sentence (kind typechecks, binding resolves, literals present) is accepted; a hallucinated value, a binding to a non-existent attribute, and an unknown kind are all REJECTED — so wrong-capture stays 0 while recall rises.',
+    run: () => {
+      const attrs = mineEntityAttributes([iu('habit')], [canon(CanonicalType.DEFINITION, 'a habit has a name and a cadence', 'd')]);
+      const good = acceptProposal({ kind: 'bound', entity: 'habit', attribute: 'name', params: { op: '<=', value: 80, unit: 'chars' } },
+        'a habit name may be no more than 80 characters', attrs);
+      const smuggled = acceptProposal({ kind: 'bound', entity: 'habit', attribute: 'name', params: { op: '<=', value: 100 } },
+        'a habit name may be no more than 80 characters', attrs);           // value not in sentence
+      const unbound = acceptProposal({ kind: 'membership', entity: 'habit', attribute: 'colour', params: { values: ['a', 'b'] } },
+        'a habit colour is one of a, b', attrs);                            // colour is not a mined attribute
+      const unknownKind = acceptProposal({ kind: 'wat', entity: 'habit', attribute: 'name' }, 'x', attrs);
+      const ok = good.accepted && (good.accepted && good.constraint.assertion.kind === 'bound')
+        && !smuggled.accepted && !unbound.accepted && !unknownKind.accepted;
+      return { passed: ok, detail: `grounded=${good.accepted}, smuggledValue=${smuggled.accepted}, unboundAttr=${unbound.accepted}, unknownKind=${unknownKind.accepted}` };
+    },
+  },
+  {
     id: 'oracle.live-app-property-evals-not-yet-run', capability: 'oracle', tier: 'unit', expect: 'green',
     description: 'An aggregate invariant on a module WITH external dependencies (a real DB + HTTP surface) is PROVEN by the live harness — boot the app, drive it, earn behavioral-gated conforms through the mutation gate — not refused as the sandbox runner must.',
     run: async () => {
@@ -382,14 +402,65 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'oracle.temporal-relative-invariants-not-yet-proven', capability: 'oracle', tier: 'unit', expect: 'red',
-    redReason: 'The absolute-temporal kind ("a date must not be in the future") is captured and checked, and the live harness can drive it. A RELATIVE-temporal invariant that governs a state TRANSITION over elapsed time — "an account must be archived 90 days after its last transaction", "a record retires 90 days after…" — is neither captured as its own assertion kind nor provable: checkProperty abstains (indeterminate, "needs an executable/behavioral check"). Fix: add a relative-temporal assertion kind (offset + anchor event + target state) and a live-harness eval that seeds an aged record, advances a virtual clock (an injectable now/DB date), and asserts the app performs the transition exactly at the boundary — mutation-gated like the other live evals.',
-    description: 'A relative-temporal state invariant ("archived 90 days after the last transaction") is captured as a temporal-relative assertion and proven by advancing a clock in the live harness — not abstained on.',
-    run: () => {
-      const r = checkProperty('an account must be archived 90 days after its last transaction', 'function archive(a){ /* no clock-driven transition */ return a; }');
-      // Today the oracle abstains; the capability is proven when it yields a real verdict.
-      return { passed: r.status === 'pass' || r.status === 'fail',
-        detail: `oracle=${r.status} (abstains today; want a real verdict via a clock-advancing live eval)` };
+    id: 'oracle.multi-entity-live-seeding-earns-gated-verdicts', capability: 'oracle', tier: 'unit', expect: 'green',
+    description: 'On a real MULTI-ENTITY app with a foreign key (transactions→accounts), the live oracle SEEDS the parent from the schema plan, threads its id into the child\'s create body, and earns behavioral-gated conforms — the exact multi-field/FK shape it abstained on before spec-aware seeding. Without the seeder the same eval honestly abstains, proving seeding is what closes the gap.',
+    run: async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'phx-eval-seed-'));
+      writeFileSync(join(dir, 'app.mjs'), referenceFkApp(), 'utf8');
+      const input: SeedPlanInput = {
+        tables: parseTableSchemas(referenceFkSchema()), constraints: [],
+        routeFor: (t) => t === 'accounts' ? '/account' : t === 'transactions' ? '/transaction' : null,
+      };
+      const { plan, targetTable, governedField } = referenceFkPlans().find(p => p.label === 'aggregate')!;
+      const prepare = async (app: AppHandle): Promise<PrepareResult> => {
+        const r = await seedForTarget(app, input, targetTable, governedField);
+        return r.ok ? { ok: true, seed: r.seed } : { ok: false, reason: r.reason };
+      };
+      const spec = { projectRoot: dir, command: ['node', 'app.mjs'] as const, readyTimeoutMs: 12_000 };
+      const seeded = await runGatedLiveEval({ bootSpec: spec, plan, targetFile: 'app.mjs', prepare });
+      const unseeded = await runGatedLiveEval({ bootSpec: spec, plan, targetFile: 'app.mjs' }); // no prepare → abstain
+      const ok = seeded.status === 'pass' && seeded.gated && seeded.method === 'behavioral-gated' && seeded.mutantsApplicable > 0
+        && unseeded.status === 'indeterminate' && !unseeded.gated;
+      return { passed: ok, detail: `seeded=${seeded.status}/${seeded.method} gated=${seeded.gated} (killed ${seeded.mutantsKilled}/${seeded.mutantsApplicable}); unseeded=${unseeded.status}` };
+    },
+  },
+  {
+    id: 'oracle.temporal-relative-invariants-not-yet-proven', capability: 'oracle', tier: 'unit', expect: 'green',
+    description: 'A relative-temporal state invariant ("archived 90 days after the last transaction") is CAPTURED as a temporal-relative assertion (offset + anchor + target state) and PROVEN by advancing an injectable clock in the live harness: seed an aged record and a recent one, boot with NOW past the boundary, assert the transition fired only for the aged record — mutation-gated (a boundary-stripped variant is killed). No longer abstained on.',
+    run: async () => {
+      // (a) The sentence is captured as its own assertion kind, bound to the state owner.
+      const attrs = mineEntityAttributes([iu('account'), iu('transaction')], [canon(CanonicalType.DEFINITION, 'an account has a name', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.INVARIANT, 'an account must be archived 90 days after its last transaction', 'c', 'cl', ['account', 'transaction'])], attrs);
+      const rel = constraints.find(c => c.assertion.kind === 'temporal-relative');
+      const capturedOk = !!rel && rel.assertion.kind === 'temporal-relative' && rel.assertion.offsetDays === 90 && rel.binding.entity === 'account';
+      // And statically it abstains (never a false green) — it needs the live clock eval.
+      const staticAbstains = checkConstraint(rel!, 'function archive(a){ return a; }').result === 'indeterminate';
+
+      // (b) PROVEN by advancing a clock: aged record archives past the 90d boundary, recent
+      // one does not; a boundary-stripped mutant is killed. Real boot, real HTTP.
+      const dir = mkdtempSync(join(tmpdir(), 'phx-eval-clock-'));
+      writeFileSync(join(dir, 'app.mjs'), referenceClockApp(), 'utf8');
+      const seed = async (app: AppHandle): Promise<RelativeTemporalSeed | null> => {
+        const mkAcct = async (): Promise<number | null> => {
+          const r = await app.fetch('/account', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"name":"a"}' });
+          return r.status === 201 ? (await r.json() as { id: number }).id : null;
+        };
+        const mkTxn = async (id: number, date: string): Promise<boolean> => {
+          const r = await app.fetch('/transaction', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: id, date }) });
+          return r.status === 201;
+        };
+        const agedId = await mkAcct(); const recentId = await mkAcct();
+        if (agedId == null || recentId == null) return null;
+        if (!(await mkTxn(agedId, '2020-01-01')) || !(await mkTxn(recentId, '2020-04-25'))) return null;
+        return { agedId, recentId };
+      };
+      const live = await runGatedRelativeTemporal({
+        bootSpec: { projectRoot: dir, command: ['node', 'app.mjs'], readyTimeoutMs: 12_000 },
+        plan: { seedRoute: '/transaction', dateField: 'date', readRoutePrefix: '/account/', stateField: 'archived', offsetDays: 90 },
+        targetFile: 'app.mjs', now: '2020-05-01', seed,
+      });
+      const ok = capturedOk && staticAbstains && live.status === 'pass' && live.gated && live.method === 'behavioral-gated' && live.mutantsApplicable > 0;
+      return { passed: ok, detail: `captured=${capturedOk}, staticAbstains=${staticAbstains}, live=${live.status}/${live.method} gated=${live.gated} (killed ${live.mutantsKilled}/${live.mutantsApplicable})` };
     },
   },
 
@@ -583,6 +654,51 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const boundOk = !!boundAfter && checkConstraint(boundC, boundAfter).result === 'conforms';
       return { passed: beforeVerdict === 'absent' && afterVerdict === 'conforms' && boundOk && isMechanical(card),
         detail: `cardinality ${beforeVerdict}→${afterVerdict}; bound→${boundOk ? 'conforms' : 'unfixed'}` };
+    },
+  },
+
+  {
+    id: 'repair.loop-convergence-invariants-hold', capability: 'repair', tier: 'unit', expect: 'green',
+    description: 'The repair loop is convergence-safe under an OSCILLATING repairer (fixes one finding, breaks another — the afterimage stall): it always TERMINATES within the budget and the finding count NEVER increases round over round (a worsening round is rolled back), so it can never thrash toward a false green.',
+    run: async () => {
+      const schema = parseSchema('CREATE TABLE accounts (id INTEGER PRIMARY KEY); CREATE TABLE entries (id INTEGER PRIMARY KEY)');
+      let src = "q(){ db.prepare('SELECT * FROM account').all(); db.prepare('SELECT * FROM entries').all(); }";
+      const target: RepairTarget = { id: 'iu-mod', file: 'mod.ts', iu: iu('mod') };
+      const verify = () => checkModuleSchema('mod.ts', src, schema).map(f => ({
+        category: 'schema' as const, iu_id: 'iu-mod', file: 'mod.ts', subject: f.ref, message: f.detail,
+        action: f.suggestion ? `use "${f.suggestion}"` : 'align',
+      }));
+      // Oscillate: apply the suggestion, then sabotage a currently-correct reference.
+      const oscillate: Repairer = (_t, findings, s) => {
+        let out = s;
+        for (const f of findings) { const m = f.action.match(/use "([a-z_]+)"/); if (m) out = out.replace(new RegExp(`\\b${m[1].replace(/s$/, '')}\\b`, 'g'), m[1]); }
+        return out.replace(/\bentries\b/, 'entrie');
+      };
+      const result = await runRepairLoop({
+        targets: [target], verify, readSource: () => src, writeSource: (_t, s) => { src = s; },
+        artifactHash: () => createHash('sha256').update(src).digest('hex'), repairer: oscillate, maxRounds: 5,
+      });
+      const nonIncreasing = result.rounds.every(r => r.findingsAfter <= r.findingsBefore);
+      const terminated = result.rounds.length <= 5 && ['stalled', 'green', 'budget'].includes(result.stop);
+      return { passed: nonIncreasing && terminated, detail: `stop=${result.stop}, rounds=${result.rounds.length}, nonIncreasing=${nonIncreasing}` };
+    },
+  },
+  {
+    id: 'intake.hostile-specs-never-crash-or-drop', capability: 'ingestion', tier: 'unit', expect: 'green',
+    description: 'Hostile spec input (unicode / RTL / emoji / non-ASCII digits, a homonym entity, contradictory bounds) never crashes the intake and never silently drops a normative sentence — every normative node is surfaced as a constraint, defect, or flagged obligation.',
+    run: () => {
+      let threw = false, silent = 0, constraints = 0;
+      try {
+        const clauses = parseSpec('# X ☕\n\n## Rules\n\n- A widget name must not exceed ٥ characters 🙃\n- A ‮weird‬ widget status must be one of 日本, français\n- A widget name must be at least 20 characters\n', 'h.md');
+        const nodes = extractCanonicalNodes(clauses);
+        const attrs = mineEntityAttributes([iu('widget')], nodes, clauses);
+        const ex = extractConstraints(nodes, attrs);
+        constraints = ex.constraints.length;
+        const obl = computeObligations(nodes, clauses.map(c => ({ clause_id: (c as { clause_id: string }).clause_id, normalized_text: (c as { normalized_text: string }).normalized_text })), ex.constraints, ex.defects, new Set());
+        const surfaced = new Set(obl.map(o => o.statement.trim().toLowerCase()));
+        for (const n of nodes) if (isObligation(n.statement) && !surfaced.has(n.statement.trim().toLowerCase())) silent++;
+      } catch { threw = true; }
+      return { passed: !threw && silent === 0, detail: `threw=${threw}, silentDrops=${silent}, constraints=${constraints}` };
     },
   },
 
