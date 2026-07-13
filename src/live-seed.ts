@@ -31,6 +31,16 @@
 
 import type { StructuredConstraint } from './constraints/model.js';
 
+/** Proper-ish singularization so an entity ("entry") matches its table ("entries",
+ *  ies→y) and the simple plurals ("accounts"→"account"). */
+export function singularize(s: string): string {
+  const w = s.toLowerCase().trim();
+  if (w.endsWith('ies')) return w.slice(0, -3) + 'y';
+  if (/(?:ses|xes|zes|ches|shes)$/.test(w)) return w.slice(0, -2);
+  if (w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  return w;
+}
+
 // ─── Schema parse (richer than SchemaModel: types + FKs + not-null + defaults) ──
 
 export interface ColumnSchema {
@@ -43,6 +53,8 @@ export interface ColumnSchema {
   isAutoincrement: boolean;
   /** The referenced table (plural, lowercased) when this column is a foreign key. */
   fkTable?: string;
+  /** Allowed values from a `CHECK (col IN ('a','b'))` — the DB's own membership constraint. */
+  checkEnum?: string[];
 }
 
 export interface TableSchema {
@@ -99,6 +111,12 @@ export function parseTableSchemas(ddl: string): TableSchema[] {
       const lower = t.toLowerCase();
       const typeMatch = lower.match(/^["'`]?[a-z_][\w]*["'`]?\s+([a-z]+)/);
       const inlineFk = lower.match(/references\s+["'`]?([a-z_][\w]*)/);
+      // A `CHECK (col IN ('a','b'))` is the DB's own membership constraint — read its
+      // members so the seeder synthesizes a value the column will actually accept.
+      const checkIn = t.match(/check\s*\(\s*[^)]*?\bin\s*\(([^)]*)\)/i);
+      const checkEnum = checkIn
+        ? [...checkIn[1].matchAll(/'([^']*)'|"([^"]*)"/g)].map(m => (m[1] ?? m[2]))
+        : undefined;
       columns.push({
         name: first,
         type: typeMatch ? typeMatch[1] : '',
@@ -107,6 +125,7 @@ export function parseTableSchemas(ddl: string): TableSchema[] {
         isPrimaryKey: /\bprimary\s+key\b/.test(lower),
         isAutoincrement: /\bautoincrement\b/.test(lower),
         fkTable: (inlineFk?.[1] ?? tableFks.get(first))?.toLowerCase(),
+        checkEnum: checkEnum && checkEnum.length > 0 ? checkEnum : undefined,
       });
     }
     tables.push({ name, columns });
@@ -177,6 +196,9 @@ export function synthesizeColumnValue(
   // Foreign key: the real parent id (or omit when the parent could not be seeded and
   // the column is nullable — a null FK is valid, an invented id is not).
   if (col.fkTable) return fkId ?? (col.notNull ? undefined : null);
+
+  // The column's own CHECK-IN enum is a membership constraint straight from the schema.
+  if (col.checkEnum && col.checkEnum.length > 0) return col.checkEnum[0];
 
   // Constraint-directed synthesis takes precedence over the raw column type.
   for (const c of constraints) {
@@ -273,8 +295,8 @@ export interface SeedContext {
 function constraintsByTable(input: SeedPlanInput): Map<string, Map<string, StructuredConstraint[]>> {
   const byTable = new Map<string, Map<string, StructuredConstraint[]>>();
   const tableOf = (entity: string): string | undefined => {
-    const e = entity.toLowerCase();
-    return input.tables.find(t => t.name === e || t.name === e + 's' || t.name.replace(/s$/, '') === e)?.name;
+    const e = singularize(entity);
+    return input.tables.find(t => singularize(t.name) === e)?.name;
   };
   for (const c of input.constraints) {
     const table = tableOf(c.binding.entity);

@@ -21,7 +21,7 @@ import type { ImplementationUnit } from './models/iu.js';
 import {
   runGatedLiveEval, bootApp, type AppHandle, type BootSpec, type LivePlan, type GatedLiveResult, type PrepareResult,
 } from './live-harness.js';
-import { parseTableSchemas, seedForTarget, type SeedPlanInput, type TableSchema } from './live-seed.js';
+import { parseTableSchemas, seedForTarget, singularize, type SeedPlanInput, type TableSchema } from './live-seed.js';
 
 /** Slugify an entity/IU name to its mounted route prefix (mirrors scaffold's rule). */
 export function routeSlug(name: string): string {
@@ -126,13 +126,12 @@ export function buildSeedPrepare(
 ): ((app: AppHandle) => Promise<PrepareResult>) | undefined {
   if (!schemaDdl) return undefined;
   const tables: TableSchema[] = parseTableSchemas(schemaDdl);
-  const norm = (s: string) => s.toLowerCase().replace(/s$/, '');
   const tableFor = (ent: string): string | undefined =>
-    tables.find(t => norm(t.name) === norm(ent))?.name;
+    tables.find(t => singularize(t.name) === singularize(ent))?.name;
   const targetTable = tableFor(entity);
   if (!targetTable) return undefined;
   const routeFor = (table: string): string | null => {
-    const iu = ius.find(u => norm(u.name) === norm(table));
+    const iu = ius.find(u => singularize(u.name) === singularize(table));
     return iu ? routeSlug(iu.name) : null;
   };
   const input: SeedPlanInput = { tables, constraints, routeFor };

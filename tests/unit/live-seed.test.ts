@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseTableSchemas, topoSortTables, synthesizeColumnValue, synthesizeBody,
-  makeSeededRng, type ColumnSchema,
+  makeSeededRng, singularize, type ColumnSchema,
 } from '../../src/live-seed.js';
 import type { StructuredConstraint } from '../../src/constraints/model.js';
 
@@ -39,6 +39,27 @@ describe('live-seed: schema parse', () => {
       'CREATE TABLE items (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, FOREIGN KEY (order_id) REFERENCES orders(id))',
     );
     expect(t.columns.find(c => c.name === 'order_id')!.fkTable).toBe('orders');
+  });
+
+  it('reads a column CHECK-IN enum as the DB\'s own membership constraint (the hoard entry.type fix)', () => {
+    const [t] = parseTableSchemas(
+      "CREATE TABLE entries (id INTEGER PRIMARY KEY, type TEXT NOT NULL CHECK (type IN ('loot', 'purchase')), amount REAL NOT NULL DEFAULT 0)",
+    );
+    const type = t.columns.find(c => c.name === 'type')!;
+    expect(type.checkEnum).toEqual(['loot', 'purchase']);
+    // Synthesis uses the CHECK member even with no explicit constraint.
+    expect(synthesizeColumnValue(type, [], makeSeededRng())).toBe('loot');
+  });
+});
+
+describe('live-seed: singularization matches entities to tables (ies→y, the hoard fix)', () => {
+  it('maps entry↔entries, adventurer↔adventurers, account↔accounts', () => {
+    expect(singularize('entries')).toBe('entry');
+    expect(singularize('entry')).toBe('entry');
+    expect(singularize('adventurers')).toBe('adventurer');
+    expect(singularize('accounts')).toBe('account');
+    expect(singularize('boxes')).toBe('box');
+    expect(singularize('address')).toBe('address'); // -ss is not a plural
   });
 });
 
