@@ -46,7 +46,8 @@ import { parseSchema, checkModuleSchema } from '../schema-contract.js';
 import { deriveSchema } from '../schema-plan.js';
 import { buildPrompt } from '../llm/prompt.js';
 import { runRepairLoop, routeFindings } from '../repair.js';
-import type { RepairTarget } from '../repair.js';
+import type { RepairTarget, Repairer } from '../repair.js';
+import { computeObligations, isObligation } from '../constraints/obligations.js';
 import type { RepairFinding } from '../models/repair.js';
 
 // ─── test-data helpers ───────────────────────────────────────────────────────
@@ -653,6 +654,51 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const boundOk = !!boundAfter && checkConstraint(boundC, boundAfter).result === 'conforms';
       return { passed: beforeVerdict === 'absent' && afterVerdict === 'conforms' && boundOk && isMechanical(card),
         detail: `cardinality ${beforeVerdict}→${afterVerdict}; bound→${boundOk ? 'conforms' : 'unfixed'}` };
+    },
+  },
+
+  {
+    id: 'repair.loop-convergence-invariants-hold', capability: 'repair', tier: 'unit', expect: 'green',
+    description: 'The repair loop is convergence-safe under an OSCILLATING repairer (fixes one finding, breaks another — the afterimage stall): it always TERMINATES within the budget and the finding count NEVER increases round over round (a worsening round is rolled back), so it can never thrash toward a false green.',
+    run: async () => {
+      const schema = parseSchema('CREATE TABLE accounts (id INTEGER PRIMARY KEY); CREATE TABLE entries (id INTEGER PRIMARY KEY)');
+      let src = "q(){ db.prepare('SELECT * FROM account').all(); db.prepare('SELECT * FROM entries').all(); }";
+      const target: RepairTarget = { id: 'iu-mod', file: 'mod.ts', iu: iu('mod') };
+      const verify = () => checkModuleSchema('mod.ts', src, schema).map(f => ({
+        category: 'schema' as const, iu_id: 'iu-mod', file: 'mod.ts', subject: f.ref, message: f.detail,
+        action: f.suggestion ? `use "${f.suggestion}"` : 'align',
+      }));
+      // Oscillate: apply the suggestion, then sabotage a currently-correct reference.
+      const oscillate: Repairer = (_t, findings, s) => {
+        let out = s;
+        for (const f of findings) { const m = f.action.match(/use "([a-z_]+)"/); if (m) out = out.replace(new RegExp(`\\b${m[1].replace(/s$/, '')}\\b`, 'g'), m[1]); }
+        return out.replace(/\bentries\b/, 'entrie');
+      };
+      const result = await runRepairLoop({
+        targets: [target], verify, readSource: () => src, writeSource: (_t, s) => { src = s; },
+        artifactHash: () => createHash('sha256').update(src).digest('hex'), repairer: oscillate, maxRounds: 5,
+      });
+      const nonIncreasing = result.rounds.every(r => r.findingsAfter <= r.findingsBefore);
+      const terminated = result.rounds.length <= 5 && ['stalled', 'green', 'budget'].includes(result.stop);
+      return { passed: nonIncreasing && terminated, detail: `stop=${result.stop}, rounds=${result.rounds.length}, nonIncreasing=${nonIncreasing}` };
+    },
+  },
+  {
+    id: 'intake.hostile-specs-never-crash-or-drop', capability: 'ingestion', tier: 'unit', expect: 'green',
+    description: 'Hostile spec input (unicode / RTL / emoji / non-ASCII digits, a homonym entity, contradictory bounds) never crashes the intake and never silently drops a normative sentence — every normative node is surfaced as a constraint, defect, or flagged obligation.',
+    run: () => {
+      let threw = false, silent = 0, constraints = 0;
+      try {
+        const clauses = parseSpec('# X ☕\n\n## Rules\n\n- A widget name must not exceed ٥ characters 🙃\n- A ‮weird‬ widget status must be one of 日本, français\n- A widget name must be at least 20 characters\n', 'h.md');
+        const nodes = extractCanonicalNodes(clauses);
+        const attrs = mineEntityAttributes([iu('widget')], nodes, clauses);
+        const ex = extractConstraints(nodes, attrs);
+        constraints = ex.constraints.length;
+        const obl = computeObligations(nodes, clauses.map(c => ({ clause_id: (c as { clause_id: string }).clause_id, normalized_text: (c as { normalized_text: string }).normalized_text })), ex.constraints, ex.defects, new Set());
+        const surfaced = new Set(obl.map(o => o.statement.trim().toLowerCase()));
+        for (const n of nodes) if (isObligation(n.statement) && !surfaced.has(n.statement.trim().toLowerCase())) silent++;
+      } catch { threw = true; }
+      return { passed: !threw && silent === 0, detail: `threw=${threw}, silentDrops=${silent}, constraints=${constraints}` };
     },
   },
 

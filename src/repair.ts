@@ -135,6 +135,11 @@ export async function runRepairLoop(ctx: RepairLoopContext): Promise<RepairLoopR
     }
     ctx.onProgress?.({ kind: 'round-start', round, message: `${residual.length} finding(s) → ${byTarget.size} target(s)` });
 
+    // Snapshot every target this round will rewrite, so a round that makes things WORSE
+    // can be rolled back (the finding count must never grow round over round).
+    const snapshots = new Map<string, string>();
+    for (const [id] of byTarget) snapshots.set(id, ctx.readSource(ctx.targets.find(t => t.id === id)!));
+
     const changes: RepairRound['changes'] = [];
     for (const [id, findings] of byTarget) {
       const target = ctx.targets.find(t => t.id === id)!;
@@ -148,6 +153,21 @@ export async function runRepairLoop(ctx: RepairLoopContext): Promise<RepairLoopR
     }
 
     const findingsAfter = await Promise.resolve(ctx.verify());
+
+    // Oscillation guard (false-green=0's convergence invariant): a round that INCREASED the
+    // finding count is not progress — it is the afterimage-style oscillation where a
+    // regeneration clears some findings and surfaces more. Roll the round back to its
+    // snapshot so the count can never grow, and stop honestly rather than thrash the budget.
+    if (findingsAfter.length > residual.length) {
+      for (const [id, src] of snapshots) await Promise.resolve(ctx.writeSource(ctx.targets.find(t => t.id === id)!, src));
+      const reverted: RepairRound = { round, findingsBefore: residual.length, regenerated: changes.map(c => c.id), changes, findingsAfter: residual.length };
+      rounds.push(reverted);
+      ctx.onRound?.(reverted);
+      ctx.onProgress?.({ kind: 'round-end', round, message: `${residual.length} → ${findingsAfter.length} finding(s) — round REVERTED (count increased), stopping` });
+      stop = 'stalled';
+      break;
+    }
+
     const roundResult: RepairRound = {
       round,
       findingsBefore: residual.length,
