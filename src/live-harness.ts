@@ -193,24 +193,32 @@ async function jsonPost(app: AppHandle, path: string, body: unknown): Promise<Re
   });
 }
 
+/**
+ * Extra body fields for the CONTROL / seed writes, synthesized per-boot (e.g. FK ids from
+ * seeding parent entities on the fresh DB). Merged UNDER `plan.extraBody` and the governed
+ * field, so a spec-aware seeder can satisfy the multi-field/FK contract the naive body
+ * can't — turning an abstention into a real gated verdict.
+ */
+export type SeedBody = Record<string, unknown>;
+
 /** Drive one live plan against a booted app. Returns pass/fail/indeterminate. */
-export async function driveLivePlan(app: AppHandle, plan: LivePlan): Promise<LiveProbe> {
+export async function driveLivePlan(app: AppHandle, plan: LivePlan, seed: SeedBody = {}): Promise<LiveProbe> {
   try {
-    if (plan.kind === 'aggregate') return await driveAggregate(app, plan);
-    if (plan.kind === 'state-nonneg') return await driveStateNonNeg(app, plan);
-    return await driveTemporal(app, plan);
+    if (plan.kind === 'aggregate') return await driveAggregate(app, plan, seed);
+    if (plan.kind === 'state-nonneg') return await driveStateNonNeg(app, plan, seed);
+    return await driveTemporal(app, plan, seed);
   } catch (e) {
     return { status: 'indeterminate', reason: `driving error: ${(e as Error).message}` };
   }
 }
 
-async function driveAggregate(app: AppHandle, plan: AggregatePlan): Promise<LiveProbe> {
+async function driveAggregate(app: AppHandle, plan: AggregatePlan, seed: SeedBody): Promise<LiveProbe> {
   const rng = makeRng();
   let acceptedSum = 0;
   let accepted = 0;
   for (let i = 0; i < 12; i++) {
     const value = rng() % 1000; // deterministic non-negative values
-    const res = await jsonPost(app, plan.seedRoute, { ...plan.extraBody, [plan.seedField]: value });
+    const res = await jsonPost(app, plan.seedRoute, { ...seed, ...plan.extraBody, [plan.seedField]: value });
     if (res.status >= 200 && res.status < 300) { acceptedSum += value; accepted++; }
   }
   if (accepted === 0) return { status: 'indeterminate', reason: `seed route ${plan.seedRoute} accepted nothing` };
@@ -224,16 +232,16 @@ async function driveAggregate(app: AppHandle, plan: AggregatePlan): Promise<Live
     : { status: 'fail', reason: `${plan.aggregateField}=${got} but the sum of accepted ${plan.seedField}s is ${acceptedSum}` };
 }
 
-async function driveStateNonNeg(app: AppHandle, plan: StateNonNegPlan): Promise<LiveProbe> {
+async function driveStateNonNeg(app: AppHandle, plan: StateNonNegPlan, seed: SeedBody): Promise<LiveProbe> {
   // Control first: a VALID positive write must be ACCEPTED, so that a rejection of the
   // attack is attributable to the governed field — not to a missing/invalid other field.
   // If the app won't accept a clean control, we cannot isolate the signal → abstain.
-  const control = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.field]: 5 });
+  const control = await jsonPost(app, plan.writeRoute, { ...seed, ...plan.extraBody, [plan.field]: 5 });
   if (!(control.status >= 200 && control.status < 300)) {
     return { status: 'indeterminate', reason: `no valid control accepted on ${plan.writeRoute} (${control.status}) — cannot isolate the ${plan.field} guard` };
   }
   // The attack: write a value that would take the governed field below zero.
-  const res = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.field]: -999 });
+  const res = await jsonPost(app, plan.writeRoute, { ...seed, ...plan.extraBody, [plan.field]: -999 });
   const rejected = res.status >= 400 && res.status < 500;
   // Confirm the invariant is preserved on the read side (no negative slipped through).
   const read = await app.fetch(plan.readRoute);
@@ -246,16 +254,16 @@ async function driveStateNonNeg(app: AppHandle, plan: StateNonNegPlan): Promise<
   return { status: 'fail', reason: `overdraft attack on ${plan.writeRoute} ${rejected ? 'rejected' : `ACCEPTED (${res.status})`}; invariant ${preserved ? 'held' : 'BROKEN'} on read` };
 }
 
-async function driveTemporal(app: AppHandle, plan: TemporalPlan): Promise<LiveProbe> {
+async function driveTemporal(app: AppHandle, plan: TemporalPlan, seed: SeedBody): Promise<LiveProbe> {
   // Control first: today's date (a valid body) must be ACCEPTED — otherwise a 400 on the
   // future date could be a missing-field rejection, not the temporal guard. Abstain then.
   const today = new Date().toISOString().slice(0, 10);
-  const control = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.dateField]: today });
+  const control = await jsonPost(app, plan.writeRoute, { ...seed, ...plan.extraBody, [plan.dateField]: today });
   if (!(control.status >= 200 && control.status < 300)) {
     return { status: 'indeterminate', reason: `no valid control accepted on ${plan.writeRoute} (${control.status}) — cannot isolate the ${plan.dateField} temporal guard` };
   }
   const future = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const res = await jsonPost(app, plan.writeRoute, { ...plan.extraBody, [plan.dateField]: future });
+  const res = await jsonPost(app, plan.writeRoute, { ...seed, ...plan.extraBody, [plan.dateField]: future });
   return res.status === 400
     ? { status: 'pass', reason: `future ${plan.dateField} (${future}) rejected with 400 (valid control accepted)` }
     : { status: 'fail', reason: `future ${plan.dateField} (${future}) accepted with ${res.status} (expected 400)` };
@@ -348,6 +356,11 @@ export interface GatedLiveResult {
   mutantsKilled: number;
 }
 
+/** The result of preparing a fresh boot: a seed body to thread into the drive, or an
+ *  honest abstention reason when prerequisites could not be satisfied (→ indeterminate,
+ *  never a false green). */
+export type PrepareResult = { ok: true; seed: SeedBody } | { ok: false; reason: string };
+
 export interface GatedLiveInput {
   /** How to boot the app (same command used for baseline and every mutant re-boot). */
   bootSpec: BootSpec;
@@ -355,6 +368,14 @@ export interface GatedLiveInput {
   plan: LivePlan;
   /** Repo-relative path (under projectRoot) of the module whose guard the gate mutates. */
   targetFile: string;
+  /**
+   * Per-boot preparation: seed FK parents / prerequisite entities on the FRESH database
+   * and return the seed body (e.g. real parent ids + required fields) to thread into the
+   * plan's control + attack writes. Runs on EVERY boot (baseline and each mutant re-boot)
+   * because each boot gets a fresh DB. A `{ ok:false }` result → the harness abstains for
+   * this eval rather than driving an un-seedable body.
+   */
+  prepare?: (app: AppHandle) => Promise<PrepareResult>;
 }
 
 /**
@@ -365,23 +386,33 @@ export interface GatedLiveInput {
  * always restored.
  */
 export async function runGatedLiveEval(input: GatedLiveInput): Promise<GatedLiveResult> {
-  const { bootSpec, plan, targetFile } = input;
+  const { bootSpec, plan, targetFile, prepare } = input;
   const full = join(bootSpec.projectRoot, targetFile);
   const wrap = (status: LiveProbeStatus, reason: string, gated: boolean, applicable = 0, killed = 0): GatedLiveResult =>
     ({ status, gated, method: 'behavioral-gated', reason, mutantsApplicable: applicable, mutantsKilled: killed });
 
-  // 1) Baseline: boot the real app and drive the eval.
-  let baseline: LiveProbe;
-  {
+  // Boot, prepare (seed prerequisites on the fresh DB), and drive — the unit re-used for
+  // the baseline and every mutant re-boot. A failed prepare surfaces as indeterminate.
+  const bootPrepareDrive = async (): Promise<LiveProbe> => {
     let app: AppHandle | null = null;
     try { app = await bootApp(bootSpec); }
     catch (e) {
       const be = e as BootError;
-      return wrap('indeterminate', `could not boot the app: ${be.message}${be.stderr ? ` — ${be.stderr.trim().slice(-200)}` : ''}`, false);
+      return { status: 'indeterminate', reason: `could not boot the app: ${be.message}${be.stderr ? ` — ${be.stderr.trim().slice(-200)}` : ''}` };
     }
-    try { baseline = await driveLivePlan(app, plan); }
-    finally { await app.stop(); }
-  }
+    try {
+      let seed: SeedBody = {};
+      if (prepare) {
+        const p = await prepare(app);
+        if (!p.ok) return { status: 'indeterminate', reason: `could not seed prerequisites: ${p.reason}` };
+        seed = p.seed;
+      }
+      return await driveLivePlan(app, plan, seed);
+    } finally { await app.stop(); }
+  };
+
+  // 1) Baseline: boot the real app, seed, and drive the eval.
+  const baseline = await bootPrepareDrive();
   if (baseline.status !== 'pass') {
     // A failing/abstaining baseline is reported as-is (no gate — nothing to certify).
     return wrap(baseline.status, baseline.reason, false);
@@ -397,16 +428,10 @@ export async function runGatedLiveEval(input: GatedLiveInput): Promise<GatedLive
       if (mutated === null || mutated === original) continue; // pattern didn't apply — not counted
       applicable++;
       writeFileSync(full, mutated, 'utf8');
-      let app: AppHandle | null = null;
-      try { app = await bootApp(bootSpec); }
-      catch {
-        // A mutant that won't even boot is a killed mutant (the bug broke the app).
-        killed++;
-        continue;
-      }
-      let probe: LiveProbe;
-      try { probe = await driveLivePlan(app, plan); }
-      finally { await app.stop(); }
+      // Re-boot, re-seed (fresh DB), re-drive — a mutant that won't boot, or that the
+      // eval now catches (fail/indeterminate), is a killed mutant. A mutant the eval still
+      // passes means the eval is too weak to certify anything → honest indeterminate.
+      const probe = await bootPrepareDrive();
       if (probe.status === 'pass') {
         return wrap('indeterminate',
           `mutation gate too weak: planted bug "${mu.name}" survived the live eval`, false, applicable, killed);
@@ -486,5 +511,86 @@ export function referencePlans(): { plan: LivePlan; label: string }[] {
     { label: 'aggregate', plan: { kind: 'aggregate', seedRoute: '/account', seedField: 'balance', aggregateRoute: '/dashboard', aggregateField: 'total' } },
     { label: 'state-nonneg', plan: { kind: 'state-nonneg', writeRoute: '/account', field: 'balance', readRoute: '/accounts', readField: 'balance' } },
     { label: 'temporal', plan: { kind: 'temporal', writeRoute: '/txn', dateField: 'date' } },
+  ];
+}
+
+// ─── Multi-entity (FK) self-verification fixture ───────────────────────────────
+
+/**
+ * A REAL two-entity app with a FOREIGN KEY: `transactions.account_id → accounts.id`. This
+ * is the exact shape the harness ABSTAINED on before spec-aware seeding (NIGHT-REPORT-4):
+ * `POST /transaction` needs a real parent account and a multi-field body, so a naive
+ * single-field seed can never produce an accepted control. With the seeder present the
+ * harness proves the aggregate (Σ amounts) and the temporal (no future date) invariants on
+ * a genuine multi-entity app — parents seeded first, ids threaded into the child. It also
+ * carries the guards the mutation gate perturbs (SUM→MAX, strip-temporal). `node:http` +
+ * `node:sqlite`, hermetic (no npm install).
+ */
+export function referenceFkApp(): string {
+  return `import { createServer } from 'node:http';
+import { DatabaseSync } from 'node:sqlite';
+
+const db = new DatabaseSync(process.env.DB_PATH ?? ':memory:');
+db.exec('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime(\\'now\\')))');
+db.exec('CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), amount INTEGER NOT NULL, date TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime(\\'now\\')))');
+
+async function readBody(req) { let s = ''; for await (const c of req) s += c; return s ? JSON.parse(s) : {}; }
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+const server = createServer(async (req, res) => {
+  const url = (req.url || '/').split('?')[0];
+  const send = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+  try {
+    if (url === '/health') return send(200, { status: 'ok' });
+    if (url === '/account' && req.method === 'POST') {
+      const b = await readBody(req);
+      const name = String(b.name ?? '');
+      if (!name) return send(400, { error: 'name is required' });
+      const info = db.prepare('INSERT INTO accounts (name) VALUES (?)').run(name);
+      return send(201, { id: info.lastInsertRowid, name });
+    }
+    if (url === '/transaction' && req.method === 'POST') {
+      const b = await readBody(req);
+      const account_id = Number(b.account_id);
+      const amount = Number(b.amount);
+      const date = String(b.date ?? '');
+      // Referential integrity: the account must exist.
+      if (!db.prepare('SELECT id FROM accounts WHERE id = ?').get(account_id)) return send(400, { error: 'account not found' });
+      if (!Number.isFinite(amount)) return send(400, { error: 'amount is required' });
+      // Temporal guard: a date in the future is rejected.
+      if (date && date > todayStr()) return send(400, { error: 'date must not be in the future' });
+      const info = db.prepare('INSERT INTO transactions (account_id, amount, date) VALUES (?, ?, ?)').run(account_id, amount, date);
+      return send(201, { id: info.lastInsertRowid, account_id, amount, date });
+    }
+    if (url === '/dashboard') {
+      const row = db.prepare('SELECT SUM(amount) AS total FROM transactions').get();
+      return send(200, { total: row.total ?? 0 });
+    }
+    if (url === '/transactions') {
+      return send(200, db.prepare('SELECT id, account_id, amount, date FROM transactions').all());
+    }
+    return send(404, { error: 'not found' });
+  } catch (e) { return send(500, { error: String(e) }); }
+});
+server.listen(parseInt(process.env.PORT || '3000', 10), () => console.error('ready'));
+`;
+}
+
+/** The FK fixture's schema DDL (what a schema plan would carry) — the seeder's input. */
+export function referenceFkSchema(): string {
+  return [
+    "CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
+    "CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), amount INTEGER NOT NULL, date TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
+  ].join('\n');
+}
+
+/** The FK fixture's live plans: an aggregate (Σ amount) and a temporal (date), both on the
+ *  CHILD entity whose create route needs a seeded parent account. */
+export function referenceFkPlans(): { plan: LivePlan; label: string; targetTable: string; governedField: string }[] {
+  return [
+    { label: 'aggregate', targetTable: 'transactions', governedField: 'amount',
+      plan: { kind: 'aggregate', seedRoute: '/transaction', seedField: 'amount', aggregateRoute: '/dashboard', aggregateField: 'total' } },
+    { label: 'temporal', targetTable: 'transactions', governedField: 'date',
+      plan: { kind: 'temporal', writeRoute: '/transaction', dateField: 'date' } },
   ];
 }

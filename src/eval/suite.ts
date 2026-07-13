@@ -33,7 +33,8 @@ import { extractBoundConstraints, extractConstraints, mineEntityAttributes } fro
 import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { runAggregateProperty } from '../constraints/exec-runner.js';
-import { runGatedLiveEval, referenceApp, referencePlans } from '../live-harness.js';
+import { runGatedLiveEval, referenceApp, referencePlans, referenceFkApp, referenceFkSchema, referenceFkPlans, type AppHandle, type PrepareResult } from '../live-harness.js';
+import { parseTableSchemas, seedForTarget, type SeedPlanInput } from '../live-seed.js';
 import { synthesizeGuard, isMechanical } from '../repair-template.js';
 import { Journal } from '../journal.js';
 import { verdictOf } from '../models/validation.js';
@@ -379,6 +380,29 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const ok = brokenRes.status === 'fail' && !brokenRes.gated
         && noBoot.status === 'indeterminate' && !noBoot.gated;
       return { passed: ok, detail: `guardStripped=${brokenRes.status}(gated=${brokenRes.gated}), nonBoot=${noBoot.status}` };
+    },
+  },
+  {
+    id: 'oracle.multi-entity-live-seeding-earns-gated-verdicts', capability: 'oracle', tier: 'unit', expect: 'green',
+    description: 'On a real MULTI-ENTITY app with a foreign key (transactions→accounts), the live oracle SEEDS the parent from the schema plan, threads its id into the child\'s create body, and earns behavioral-gated conforms — the exact multi-field/FK shape it abstained on before spec-aware seeding. Without the seeder the same eval honestly abstains, proving seeding is what closes the gap.',
+    run: async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'phx-eval-seed-'));
+      writeFileSync(join(dir, 'app.mjs'), referenceFkApp(), 'utf8');
+      const input: SeedPlanInput = {
+        tables: parseTableSchemas(referenceFkSchema()), constraints: [],
+        routeFor: (t) => t === 'accounts' ? '/account' : t === 'transactions' ? '/transaction' : null,
+      };
+      const { plan, targetTable, governedField } = referenceFkPlans().find(p => p.label === 'aggregate')!;
+      const prepare = async (app: AppHandle): Promise<PrepareResult> => {
+        const r = await seedForTarget(app, input, targetTable, governedField);
+        return r.ok ? { ok: true, seed: r.seed } : { ok: false, reason: r.reason };
+      };
+      const spec = { projectRoot: dir, command: ['node', 'app.mjs'] as const, readyTimeoutMs: 12_000 };
+      const seeded = await runGatedLiveEval({ bootSpec: spec, plan, targetFile: 'app.mjs', prepare });
+      const unseeded = await runGatedLiveEval({ bootSpec: spec, plan, targetFile: 'app.mjs' }); // no prepare → abstain
+      const ok = seeded.status === 'pass' && seeded.gated && seeded.method === 'behavioral-gated' && seeded.mutantsApplicable > 0
+        && unseeded.status === 'indeterminate' && !unseeded.gated;
+      return { passed: ok, detail: `seeded=${seeded.status}/${seeded.method} gated=${seeded.gated} (killed ${seeded.mutantsKilled}/${seeded.mutantsApplicable}); unseeded=${unseeded.status}` };
     },
   },
   {

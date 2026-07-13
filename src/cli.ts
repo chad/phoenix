@@ -2840,7 +2840,11 @@ async function cmdVerify(args: string[]): Promise<void> {
   console.log(`  ${dim('Booting: npx tsx src/server.ts (isolated DB per boot)')}`);
   console.log();
 
-  const report = await runLiveVerification(projectRoot, evals);
+  // The schema plan (the aggregated migrations) is the seeder's map of tables × FKs, so the
+  // live oracle can synthesize valid multi-field/FK create bodies instead of abstaining.
+  const migrationsFile = join(projectRoot, 'src/generated/_migrations.ts');
+  const schemaDdl = existsSync(migrationsFile) ? readFileSync(migrationsFile, 'utf8') : undefined;
+  const report = await runLiveVerification(projectRoot, evals, { schemaDdl, constraints, ius });
   if (!report.booted) {
     console.log(`  ${red('✖')} the generated app did not boot — every live eval is indeterminate (honest abstain).`);
     console.log(`    ${dim(report.bootReason ?? '')}`);
