@@ -21,7 +21,7 @@ stayed frozen.
 | --- | --- | --- |
 | selftest green-health | 100% (35/35) | **100% (40/40)** |
 | selftest overall | 95% (35/37) | **98% (40/41)** |
-| Full test suite | 919 green | **1041 green** (+122, 0 regressions) |
+| Full test suite | 919 green | **1043 green** (+122, 0 regressions) |
 | `--strict` | exit 0 | **exit 0** |
 | Known reds | 2 | **1** (temporal-relative flipped on a real gated pass) |
 | Live oracle on a multi-entity FK app | indeterminate (couldn't seed) | **behavioral-gated conforms** (parents seeded, ids threaded) |
@@ -152,7 +152,32 @@ as `intake.hostile-specs-never-crash-or-drop`.
 
 ## P4 — The cold-start matrix (fresh temp copies, real `anthropic/claude-sonnet-5`)
 
-<!-- LIVE-MATRIX -->
+Each row is a fresh `/tmp` copy of the real spec, full `phoenix bootstrap`, then
+`phoenix verify --live` (boots the real generated app via `npx tsx src/server.ts`, seeds
+from the schema plan, runs the mutation-gated evals). `~/ledger`, `~/hoard`, `~/afterimage`
+were never touched. The **live** column is the harness's verdict on the REAL generated app —
+the headline is that seeding turns NR-4's abstentions into real gated verdicts.
+
+| Project | schema err | constraint err (static, before→after) | app boots | live oracle (real app, per invariant) |
+| --- | --- | --- | --- | --- |
+| **ledger** (accounts, transactions) | 0 | 2 → 1 | ✅ | **`transaction.date` not-future → behavioral-gated conforms** (seeded the `account` FK parent; future date `2027-07-13` rejected 400; mutant killed 1/1). `account` non-negative → honest indeterminate (planted `strip-negative-guard` survived — the guard is Zod-enforced, not a strippable line; never false-greened). |
+| **hoard** (adventurers, entries, board) | 0 | — | ✅ | **`entry.date` not-future → behavioral-gated conforms** (seeded the `adventurer` FK parent + the `type` enum from the DDL `CHECK`; future date rejected 400; mutant killed 1/1). `adventurer` non-negative → honest indeterminate (mutant survived). `board` aggregate → honest indeterminate (response field not named `total`). |
+| **afterimage** (deck-card, ensemble, match, player, player-legacy) | 0 | 4 → 4 (stalled) | ✅ | **all evals honest indeterminate** — `/ensemble` rejects the seeded body because `musician` is a TEXT field with a `.refine()` requiring ≥2 comma-separated values (a cardinality-in-a-string the deterministic seeder can't invert), and `/match` needs a 3-level FK chain (match→ensemble→player) plus a `section` enum. The seeder abstains rather than guess — never a false green. |
+
+**The headline.** On TWO real sonnet-generated apps, the live oracle upgraded a static
+abstention to a mutation-gated **conforms** by *executing* the app — after seeding a real
+FK parent and a valid multi-field body. Ledger is especially telling: the STATIC checker
+left `transaction.date` as a residual "absent" (the enforcement is an imperative route guard,
+not a Zod `.refine`), yet the LIVE oracle *proved by execution* that the app rejects future
+dates. Behavior over structure — the living-green thesis, demonstrated on a real app.
+
+Every abstention carries a concrete reason (can't-seed / mutant-survived / field-name
+mismatch); none is a false green. The two deterministic seeder fixes the matrix surfaced —
+`ies→y` singularization and reading a column's `CHECK (… IN …)` enum — each converted a real
+abstention into a real gated verdict, with zero LLM involvement.
+
+The matrix is reproduced by the commands each row documents (bootstrap + `verify --live`;
+`.phoenix/live-status.json` carries the machine-readable verdicts).
 
 ## Selftest scorecard diff
 
@@ -164,7 +189,7 @@ enforcement unread) — a genuinely-open frontier with a concrete fix path. Regr
 
 ## Hard gates — all held
 
-1. selftest green-health **100%**; `--strict` **exit 0**; full suite **1041 green** (+122),
+1. selftest green-health **100%**; `--strict` **exit 0**; full suite **1043 green** (+122),
    nothing deleted or weakened. ✔
 2. **The verifier stayed frozen.** Seeding produces INPUTS; the LLM pass only ADDS constraints
    through a deterministic gate; the injectable clock is a scaffold hook; repair changes
@@ -186,18 +211,24 @@ enforcement unread) — a genuinely-open frontier with a concrete fix path. Regr
   (P0 + P1 green, then P3) consumed the budget; P2 (surfacing spec-rewording diffs for the
   binding-defect / unbound-obligation cases, human-approved) remains the next stretch, on the
   existing binding-defect surface.
-- **Real-app live column vs the hermetic proof.** The mutation-gated PASS is demonstrated on
-  real multi-entity apps (the FK fixture) and driven end-to-end by `verify --live` with the
-  seeder. On an arbitrary generated app the seeder still abstains where a route's field names
-  diverge from the schema-plan column names, or a required field carries no schema signal —
-  honest indeterminate, the frontier for a richer route-contract reader.
+- **Real-app live column vs the hermetic proof.** Real gated verdicts now land on TWO real
+  sonnet apps (ledger + hoard). The remaining abstentions are honest and specific: afterimage's
+  `/ensemble` needs a `musician` TEXT field holding ≥2 comma-separated values (a cardinality
+  encoded inside a Zod `.refine` on a string — the deterministic seeder can't invert an
+  arbitrary refine), and `/match` needs a 3-level FK chain plus a `section` enum. Closing these
+  needs a richer route-contract reader (parse the module's Zod `.refine`/enum, not just the DDL)
+  or the verified-LLM constraints threaded into the seeder — the honest next frontier.
+
+- **Timings** (real sonnet, this run): ledger bootstrap ~1.5 min + `verify --live` ~20 s;
+  hoard similar; afterimage ~3 min (5 IUs, repair rounds). The hermetic e2e proofs
+  (live-seed, relative-temporal, repair-convergence) run in < 2 s each; the full suite is ~29 s.
 - **Cross-runtime verdict parity** (the sole remaining red) — Pydantic enforcement is unread,
   so a python module diverges from node for identical bounds. Fix: a per-runtime checker hook.
 
 ## How to verify
 
 ```bash
-npm run build && npm test                 # 1041 green (forks pool → deterministic)
+npm run build && npm test                 # 1043 green (forks pool → deterministic)
 npm run phoenix -- selftest --strict      # green-health 100%, exit 0
 
 # The seeding + gated verdicts, hermetic (no install):
