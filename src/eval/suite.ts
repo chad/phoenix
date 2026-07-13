@@ -33,7 +33,7 @@ import { extractBoundConstraints, extractConstraints, mineEntityAttributes } fro
 import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { runAggregateProperty } from '../constraints/exec-runner.js';
-import { runGatedLiveEval, referenceApp, referencePlans, referenceFkApp, referenceFkSchema, referenceFkPlans, type AppHandle, type PrepareResult } from '../live-harness.js';
+import { runGatedLiveEval, referenceApp, referencePlans, referenceFkApp, referenceFkSchema, referenceFkPlans, runGatedRelativeTemporal, referenceClockApp, type AppHandle, type PrepareResult, type RelativeTemporalSeed } from '../live-harness.js';
 import { parseTableSchemas, seedForTarget, type SeedPlanInput } from '../live-seed.js';
 import { synthesizeGuard, isMechanical } from '../repair-template.js';
 import { Journal } from '../journal.js';
@@ -406,14 +406,42 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'oracle.temporal-relative-invariants-not-yet-proven', capability: 'oracle', tier: 'unit', expect: 'red',
-    redReason: 'The absolute-temporal kind ("a date must not be in the future") is captured and checked, and the live harness can drive it. A RELATIVE-temporal invariant that governs a state TRANSITION over elapsed time — "an account must be archived 90 days after its last transaction", "a record retires 90 days after…" — is neither captured as its own assertion kind nor provable: checkProperty abstains (indeterminate, "needs an executable/behavioral check"). Fix: add a relative-temporal assertion kind (offset + anchor event + target state) and a live-harness eval that seeds an aged record, advances a virtual clock (an injectable now/DB date), and asserts the app performs the transition exactly at the boundary — mutation-gated like the other live evals.',
-    description: 'A relative-temporal state invariant ("archived 90 days after the last transaction") is captured as a temporal-relative assertion and proven by advancing a clock in the live harness — not abstained on.',
-    run: () => {
-      const r = checkProperty('an account must be archived 90 days after its last transaction', 'function archive(a){ /* no clock-driven transition */ return a; }');
-      // Today the oracle abstains; the capability is proven when it yields a real verdict.
-      return { passed: r.status === 'pass' || r.status === 'fail',
-        detail: `oracle=${r.status} (abstains today; want a real verdict via a clock-advancing live eval)` };
+    id: 'oracle.temporal-relative-invariants-not-yet-proven', capability: 'oracle', tier: 'unit', expect: 'green',
+    description: 'A relative-temporal state invariant ("archived 90 days after the last transaction") is CAPTURED as a temporal-relative assertion (offset + anchor + target state) and PROVEN by advancing an injectable clock in the live harness: seed an aged record and a recent one, boot with NOW past the boundary, assert the transition fired only for the aged record — mutation-gated (a boundary-stripped variant is killed). No longer abstained on.',
+    run: async () => {
+      // (a) The sentence is captured as its own assertion kind, bound to the state owner.
+      const attrs = mineEntityAttributes([iu('account'), iu('transaction')], [canon(CanonicalType.DEFINITION, 'an account has a name', 'd')]);
+      const { constraints } = extractConstraints([canon(CanonicalType.INVARIANT, 'an account must be archived 90 days after its last transaction', 'c', 'cl', ['account', 'transaction'])], attrs);
+      const rel = constraints.find(c => c.assertion.kind === 'temporal-relative');
+      const capturedOk = !!rel && rel.assertion.kind === 'temporal-relative' && rel.assertion.offsetDays === 90 && rel.binding.entity === 'account';
+      // And statically it abstains (never a false green) — it needs the live clock eval.
+      const staticAbstains = checkConstraint(rel!, 'function archive(a){ return a; }').result === 'indeterminate';
+
+      // (b) PROVEN by advancing a clock: aged record archives past the 90d boundary, recent
+      // one does not; a boundary-stripped mutant is killed. Real boot, real HTTP.
+      const dir = mkdtempSync(join(tmpdir(), 'phx-eval-clock-'));
+      writeFileSync(join(dir, 'app.mjs'), referenceClockApp(), 'utf8');
+      const seed = async (app: AppHandle): Promise<RelativeTemporalSeed | null> => {
+        const mkAcct = async (): Promise<number | null> => {
+          const r = await app.fetch('/account', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"name":"a"}' });
+          return r.status === 201 ? (await r.json() as { id: number }).id : null;
+        };
+        const mkTxn = async (id: number, date: string): Promise<boolean> => {
+          const r = await app.fetch('/transaction', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: id, date }) });
+          return r.status === 201;
+        };
+        const agedId = await mkAcct(); const recentId = await mkAcct();
+        if (agedId == null || recentId == null) return null;
+        if (!(await mkTxn(agedId, '2020-01-01')) || !(await mkTxn(recentId, '2020-04-25'))) return null;
+        return { agedId, recentId };
+      };
+      const live = await runGatedRelativeTemporal({
+        bootSpec: { projectRoot: dir, command: ['node', 'app.mjs'], readyTimeoutMs: 12_000 },
+        plan: { seedRoute: '/transaction', dateField: 'date', readRoutePrefix: '/account/', stateField: 'archived', offsetDays: 90 },
+        targetFile: 'app.mjs', now: '2020-05-01', seed,
+      });
+      const ok = capturedOk && staticAbstains && live.status === 'pass' && live.gated && live.method === 'behavioral-gated' && live.mutantsApplicable > 0;
+      return { passed: ok, detail: `captured=${capturedOk}, staticAbstains=${staticAbstains}, live=${live.status}/${live.method} gated=${live.gated} (killed ${live.mutantsKilled}/${live.mutantsApplicable})` };
     },
   },
 

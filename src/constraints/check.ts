@@ -394,6 +394,11 @@ export function checkConstraint(c: StructuredConstraint, source: string | null):
   if (c.assertion.kind === 'cardinality') return checkCardinality(c, source);
   if (c.assertion.kind === 'expr') return checkExpr(c, source);
   if (c.assertion.kind === 'temporal') return checkTemporal(c, source);
+  if (c.assertion.kind === 'temporal-relative') {
+    // A state transition at an elapsed-time boundary is not statically decidable — it is
+    // PROVEN by advancing a clock in the live harness. Abstain here (never a false green).
+    return { result: 'indeterminate', detail: `relative-temporal (${c.assertion.targetState} ${c.assertion.offsetDays}d after ${c.assertion.anchorEvent}) needs a clock-advancing live eval` };
+  }
   if (c.assertion.kind === 'presence') return checkPresence(c, source);
   return checkUniqueness(c, source);
 }

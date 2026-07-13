@@ -594,3 +594,179 @@ export function referenceFkPlans(): { plan: LivePlan; label: string; targetTable
       plan: { kind: 'temporal', writeRoute: '/transaction', dateField: 'date' } },
   ];
 }
+
+// ─── Relative-temporal (injectable clock) eval ─────────────────────────────────
+
+/**
+ * A relative-temporal invariant ("an account is archived 90 days after its last
+ * transaction") governs a state that flips at an ELAPSED-TIME boundary. It can only be
+ * proven by advancing a clock. The harness sets a `NOW` env var; a scaffold that reads its
+ * clock from `process.env.NOW` (a small, honest scaffold improvement — NOT a verifier
+ * change) makes the invariant executable: seed an aged record, boot with NOW past the
+ * boundary, assert the transition fired; and — the isolating control — a RECENT record at
+ * the same NOW must NOT have transitioned. A guard that ignores the boundary fails one of
+ * the two, so it can be mutation-killed.
+ */
+export interface RelativeTemporalPlan {
+  /** Route that creates the anchor record carrying the date (e.g. '/transaction'). */
+  seedRoute: string;
+  /** The date field on the anchor record. */
+  dateField: string;
+  /** Route to read an entity's derived state (e.g. '/account/'; id appended). */
+  readRoutePrefix: string;
+  /** Boolean/int state field that flips (e.g. 'archived'). */
+  stateField: string;
+  /** The boundary in days. */
+  offsetDays: number;
+}
+
+export interface RelativeTemporalSeed {
+  /** Create an aged anchor + a recent anchor, return the entity ids to read back. */
+  agedId: number;
+  recentId: number;
+}
+
+/**
+ * Result of driving a relative-temporal eval against a booted app whose clock is `now`.
+ * `agedArchived` must be true and `recentArchived` false for the invariant to hold.
+ */
+async function driveRelativeTemporal(
+  app: AppHandle,
+  plan: RelativeTemporalPlan,
+  seed: RelativeTemporalSeed,
+): Promise<LiveProbe> {
+  const read = async (id: number): Promise<boolean | undefined> => {
+    const res = await app.fetch(plan.readRoutePrefix + id);
+    if (res.status !== 200) return undefined;
+    const body = await res.json() as Record<string, unknown>;
+    const v = body[plan.stateField];
+    return typeof v === 'boolean' ? v : typeof v === 'number' ? v !== 0 : undefined;
+  };
+  const aged = await read(seed.agedId);
+  const recent = await read(seed.recentId);
+  if (aged === undefined || recent === undefined) {
+    return { status: 'indeterminate', reason: `could not read "${plan.stateField}" for both records` };
+  }
+  if (aged && !recent) return { status: 'pass', reason: `aged record ${plan.stateField}=true past the ${plan.offsetDays}d boundary; recent record still false` };
+  return { status: 'fail', reason: `boundary not honored: aged ${plan.stateField}=${aged}, recent ${plan.stateField}=${recent}` };
+}
+
+export interface GatedRelativeTemporalInput {
+  bootSpec: BootSpec;
+  plan: RelativeTemporalPlan;
+  targetFile: string;
+  /** The virtual "now" (ISO date) at which the aged record is past the boundary. */
+  now: string;
+  /** Seed the aged + recent anchors on the fresh app (returns the entity ids to read). */
+  seed: (app: AppHandle) => Promise<RelativeTemporalSeed | null>;
+}
+
+/** A mutation that pushes the elapsed-time boundary out of reach (the ">= offset days"
+ *  comparison), so the transition can never fire — the canonical "forgot the boundary"
+ *  bug. Targets a comparison line co-located with a day/elapsed/date token so it doesn't
+ *  perturb an unrelated numeric compare. */
+const breakRelativeBoundary: LiveMutation = {
+  name: 'break-relative-boundary',
+  apply: (src) => {
+    const lines = src.split('\n');
+    const idx = lines.findIndex(l => /[<>]=?\s*\d+/.test(l) && /(elapsed|days?|date|now|diff|\bage\b)/i.test(l));
+    if (idx < 0) return null;
+    lines[idx] = lines[idx].replace(/([<>]=?)\s*\d+/, '$1 100000000');
+    return lines.join('\n');
+  },
+};
+
+/**
+ * Run the relative-temporal eval with the injectable clock and EARN behavioral-gated
+ * conforms through a mutation gate: boot with NOW past the boundary, seed aged + recent
+ * anchors, assert the transition fired only for the aged one; then plant the
+ * boundary-stripping mutant, re-boot, and require the eval to catch it.
+ */
+export async function runGatedRelativeTemporal(input: GatedRelativeTemporalInput): Promise<GatedLiveResult> {
+  const { bootSpec, plan, targetFile, now } = input;
+  const full = join(bootSpec.projectRoot, targetFile);
+  const spec: BootSpec = { ...bootSpec, env: { ...bootSpec.env, NOW: now } };
+  const wrap = (status: LiveProbeStatus, reason: string, gated: boolean, applicable = 0, killed = 0): GatedLiveResult =>
+    ({ status, gated, method: 'behavioral-gated', reason, mutantsApplicable: applicable, mutantsKilled: killed });
+
+  const bootSeedDrive = async (): Promise<LiveProbe> => {
+    let app: AppHandle | null = null;
+    try { app = await bootApp(spec); }
+    catch (e) { const be = e as BootError; return { status: 'indeterminate', reason: `could not boot the app: ${be.message}${be.stderr ? ` — ${be.stderr.trim().slice(-200)}` : ''}` }; }
+    try {
+      const s = await input.seed(app);
+      if (!s) return { status: 'indeterminate', reason: 'could not seed aged + recent anchors' };
+      return await driveRelativeTemporal(app, plan, s);
+    } finally { await app.stop(); }
+  };
+
+  const baseline = await bootSeedDrive();
+  if (baseline.status !== 'pass') return wrap(baseline.status, baseline.reason, false);
+
+  const original = readFileSync(full, 'utf8');
+  let applicable = 0, killed = 0;
+  try {
+    const mutated = breakRelativeBoundary.apply(original);
+    if (mutated !== null && mutated !== original) {
+      applicable++;
+      writeFileSync(full, mutated, 'utf8');
+      const probe = await bootSeedDrive();
+      if (probe.status === 'pass') return wrap('indeterminate', `mutation gate too weak: "${breakRelativeBoundary.name}" survived`, false, applicable, killed);
+      killed++;
+    }
+  } finally { writeFileSync(full, original, 'utf8'); }
+
+  if (applicable === 0) return wrap('indeterminate', 'mutation gate did not apply: no boundary guard to strip', false, 0, 0);
+  return wrap('pass', `${baseline.reason}; mutation gate killed ${killed}/${applicable} planted bug(s)`, true, applicable, killed);
+}
+
+/**
+ * A REAL app with an injectable clock proving a relative-temporal invariant: an account is
+ * "archived" 90 days after its last transaction. It reads `now` from `process.env.NOW`
+ * (falling back to the wall clock) — the scaffold clock hook that makes elapsed-time
+ * invariants executable. `node:http` + `node:sqlite`, hermetic.
+ */
+export function referenceClockApp(): string {
+  return `import { createServer } from 'node:http';
+import { DatabaseSync } from 'node:sqlite';
+
+const db = new DatabaseSync(process.env.DB_PATH ?? ':memory:');
+db.exec('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)');
+db.exec('CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), date TEXT NOT NULL)');
+
+// Injectable clock: honor NOW from the environment so elapsed-time invariants are testable.
+const now = () => process.env.NOW ? new Date(process.env.NOW) : new Date();
+async function readBody(req) { let s = ''; for await (const c of req) s += c; return s ? JSON.parse(s) : {}; }
+
+const server = createServer(async (req, res) => {
+  const url = (req.url || '/').split('?')[0];
+  const send = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+  try {
+    if (url === '/health') return send(200, { status: 'ok' });
+    if (url === '/account' && req.method === 'POST') {
+      const b = await readBody(req);
+      const info = db.prepare('INSERT INTO accounts (name) VALUES (?)').run(String(b.name ?? 'acct'));
+      return send(201, { id: info.lastInsertRowid });
+    }
+    if (url === '/transaction' && req.method === 'POST') {
+      const b = await readBody(req);
+      const account_id = Number(b.account_id);
+      if (!db.prepare('SELECT id FROM accounts WHERE id = ?').get(account_id)) return send(400, { error: 'account not found' });
+      const info = db.prepare('INSERT INTO transactions (account_id, date) VALUES (?, ?)').run(account_id, String(b.date ?? ''));
+      return send(201, { id: info.lastInsertRowid });
+    }
+    const m = url.match(/^\\/account\\/(\\d+)$/);
+    if (m) {
+      const id = Number(m[1]);
+      const last = db.prepare('SELECT MAX(date) AS d FROM transactions WHERE account_id = ?').get(id);
+      const lastDate = last && last.d ? new Date(last.d) : null;
+      const elapsedDays = lastDate ? (now().getTime() - lastDate.getTime()) / 86400000 : 0;
+      const archived = lastDate ? elapsedDays >= 90 : false;
+      return send(200, { id, archived });
+    }
+    return send(404, { error: 'not found' });
+  } catch (e) { return send(500, { error: String(e) }); }
+});
+server.listen(parseInt(process.env.PORT || '3000', 10), () => console.error('ready'));
+`;
+}

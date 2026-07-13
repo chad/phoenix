@@ -18,7 +18,7 @@ import type { CanonicalNode } from '../models/canonical.js';
 import { CanonicalType } from '../models/canonical.js';
 import type { Clause } from '../models/clause.js';
 import type { ImplementationUnit } from '../models/iu.js';
-import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, UniquenessAssertion, ReferenceAssertion, CardinalityAssertion, ExprAssertion, TemporalAssertion, PresenceAssertion, Assertion, AttributeRef } from './model.js';
+import type { StructuredConstraint, BindingDefect, BoundAssertion, MembershipAssertion, PatternAssertion, UniquenessAssertion, ReferenceAssertion, CardinalityAssertion, ExprAssertion, TemporalAssertion, TemporalRelativeAssertion, PresenceAssertion, Assertion, AttributeRef } from './model.js';
 
 const STOP = new Set([
   'the', 'a', 'an', 'is', 'are', 'be', 'to', 'of', 'in', 'for', 'on', 'with', 'and',
@@ -251,6 +251,27 @@ export function parseTemporal(text: string): TemporalAssertion | null {
   return null;
 }
 
+// A relative-temporal transition: "<state> N days after <anchor>". Narrow by design —
+// the "days after" cue is specific and shared by no other kind, so it never collides
+// with the absolute-temporal or expr corpora. The state word is a past-participle
+// transition verb; the anchor is the tail phrase ("its last transaction").
+const TEMPORAL_REL_RE =
+  /\b(archived|retired|retires?|closed|closes?|expired|expires?|deactivated|deactivates?|removed|removes?|purged|purges?|deleted|deletes?|inactive|dormant)\b[^.]*?\b(\d+)\s+(day|week|month|year)s?\s+after\b\s+(?:its\s+|the\s+|their\s+|a\s+|an\s+)?([a-z][a-z\s-]+?)(?:[.;,]|$)/i;
+const UNIT_DAYS: Record<string, number> = { day: 1, week: 7, month: 30, year: 365 };
+
+/** Parse a relative-temporal state invariant ("archived 90 days after its last
+ *  transaction"), or null. Normalizes the offset to days and the state to a participle. */
+export function parseTemporalRelative(text: string): TemporalRelativeAssertion | null {
+  const m = text.match(TEMPORAL_REL_RE);
+  if (!m) return null;
+  const n = parseInt(m[2], 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const offsetDays = n * (UNIT_DAYS[m[3].toLowerCase()] ?? 1);
+  const targetState = m[1].toLowerCase().replace(/e?s$/, 'ed').replace(/eded$/, 'ed');
+  const anchorEvent = m[4].trim().toLowerCase().replace(/\s+/g, ' ');
+  return { kind: 'temporal-relative', offsetDays, anchorEvent, targetState };
+}
+
 // The quantifier-free required-fields form: "provide at least a name and an email".
 // "at least" followed by an ARTICLE (not a number — numeric counts are cardinality)
 // names fields that must be present. Stop at an infinitive/purpose clause.
@@ -294,6 +315,9 @@ export function parseAssertion(text: string): Assertion | null {
     // email" mentions "email" and would mis-read as an email-format constraint;
     // "date … in the future" must not be claimed by the date-format reading.
     ?? parsePresence(text)
+    // Relative-temporal BEFORE absolute-temporal and expr: "archived 90 days after…"
+    // is a state-transition invariant, not a not-future field guard nor a generic expr.
+    ?? parseTemporalRelative(text)
     ?? parseTemporal(text)
     ?? parsePattern(text)
     ?? parseExpr(text);
@@ -379,6 +403,7 @@ function id(binding: AttributeRef, a: Assertion): string {
     : a.kind === 'cardinality' ? `card:${a.min ?? ''}..${a.max ?? ''}:${a.relation}`
     : a.kind === 'expr' ? `expr:${a.statement.slice(0, 60)}`
     : a.kind === 'temporal' ? `tmp:${a.mode}`
+    : a.kind === 'temporal-relative' ? `tmprel:${a.targetState}:${a.offsetDays}:${a.anchorEvent}`
     : a.kind === 'presence' ? 'required'
     : 'unique';
   return createHash('sha256').update([a.kind, binding.entity, binding.attribute, shape].join('\x00')).digest('hex').slice(0, 16);
@@ -416,7 +441,7 @@ function bindPresenceField(
  */
 function bindRelational(
   statement: string,
-  a: ReferenceAssertion | CardinalityAssertion | ExprAssertion,
+  a: ReferenceAssertion | CardinalityAssertion | ExprAssertion | TemporalRelativeAssertion,
   entityAttrs: Map<string, Set<string>>,
 ): { ref: AttributeRef } | { subject: string } {
   const lower = statement.toLowerCase();
@@ -439,6 +464,14 @@ function bindRelational(
     const holder = mentioned.find(x => x.e !== a.relation) ?? mentioned[0];
     if (!holder) return { subject: a.relation };
     return { ref: { entity: holder.e, attribute: a.relation } };
+  }
+  if (a.kind === 'temporal-relative') {
+    // The state owner is the earliest-named entity that is NOT the anchor's entity
+    // ("an account … 90 days after its last transaction" governs the account).
+    const anchorHead = a.anchorEvent.split(/\s+/).map(singular);
+    const holder = mentioned.find(x => !anchorHead.includes(x.e)) ?? mentioned[0];
+    if (!holder) return { subject: a.targetState };
+    return { ref: { entity: holder.e, attribute: a.targetState } };
   }
   // expr: bind to the STATE OWNER — the entity mentioned nearest BEFORE the
   // invariant cue ("…gold BALANCE never becomes negative" governs the balance,
@@ -510,8 +543,8 @@ export function extractConstraints(
     }
 
     // Relational kinds name the governing entity directly (a FK holder, a collection
-    // owner, an invariant's actor); scalar kinds resolve to a mined attribute.
-    const bound = (assertion.kind === 'reference' || assertion.kind === 'cardinality' || assertion.kind === 'expr')
+    // owner, an invariant's actor, a state's owner); scalar kinds resolve to a mined attribute.
+    const bound = (assertion.kind === 'reference' || assertion.kind === 'cardinality' || assertion.kind === 'expr' || assertion.kind === 'temporal-relative')
       ? bindRelational(node.statement, assertion, entityAttrs)
       : resolveBinding(node.statement, node.tags ?? [], entityAttrs, loc.text ?? '');
     if ('ref' in bound) {
