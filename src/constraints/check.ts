@@ -17,6 +17,7 @@ import type { StructuredConstraint } from './model.js';
 import type { CheckResult, CheckMethod } from '../models/validation.js';
 import { checkProperty } from '../evals.js';
 import { deriveAggregateProperty, runAggregateProperty } from './exec-runner.js';
+import { checkConstraintPydantic } from './pydantic.js';
 
 const zodMethod = (op: string) => (op === '<=' ? 'max' : 'min');
 
@@ -384,6 +385,13 @@ export function checkPresence(c: StructuredConstraint, source: string | null): C
 
 /** Dispatch a constraint to its kind's static checker. */
 export function checkConstraint(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  // Per-runtime reader hook (cross-runtime parity): a Pydantic module is read by the
+  // pydantic dialect reader for the kinds it owns; everything else falls through to the
+  // unchanged checkers. Same verdict semantics — only the reader's eyes widen.
+  if (source != null) {
+    const py = checkConstraintPydantic(c, source);
+    if (py) return py;
+  }
   if (c.assertion.kind === 'bound') {
     const r = checkBound(c, source);
     return { result: r.result, detail: r.detail };

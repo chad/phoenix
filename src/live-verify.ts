@@ -23,6 +23,18 @@ import {
 } from './live-harness.js';
 import { parseTableSchemas, seedForTarget, singularize, type SeedPlanInput, type TableSchema } from './live-seed.js';
 
+/**
+ * The boot spec a project's runtime target implies: the command the harness boots and
+ * the migrations file the seeder reads. TODAY this returns the node-typescript
+ * constants for every target — the live oracle's node coupling, and the seam the
+ * cross-runtime live-parity red probes. The fix resolves per runtime (uvicorn +
+ * `src/generated/_migrations.py` for python-fastapi, with DB_PATH isolation).
+ */
+export function bootSpecForTarget(target: string | undefined): { command: string[]; migrationsFile: string } {
+  void target; // runtime-blind today — the red defines the required behavior.
+  return { command: ['npx', 'tsx', 'src/server.ts'], migrationsFile: 'src/generated/_migrations.ts' };
+}
+
 /** Slugify an entity/IU name to its mounted route prefix (mirrors scaffold's rule). */
 export function routeSlug(name: string): string {
   const slug = name.toLowerCase().normalize('NFKD').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');

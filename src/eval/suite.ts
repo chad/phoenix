@@ -29,12 +29,14 @@ import { computeInvalidation, iuKey, dependentsToRegenerate } from '../invalidat
 import type { ImplementationUnit } from '../models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from '../models/iu.js';
 import { checkBound, checkConstraint } from '../constraints/check.js';
+import { checkConstraintAst } from '../constraints/check-ast.js';
 import { extractBoundConstraints, extractConstraints, mineEntityAttributes } from '../constraints/extract.js';
 import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { runAggregateProperty } from '../constraints/exec-runner.js';
 import { runGatedLiveEval, referenceApp, referencePlans, referenceFkApp, referenceFkSchema, referenceFkPlans, runGatedRelativeTemporal, referenceClockApp, type AppHandle, type PrepareResult, type RelativeTemporalSeed } from '../live-harness.js';
 import { parseTableSchemas, seedForTarget, type SeedPlanInput } from '../live-seed.js';
+import { bootSpecForTarget } from '../live-verify.js';
 import { acceptProposal } from '../constraints/extract-llm.js';
 import { synthesizeGuard, isMechanical } from '../repair-template.js';
 import { Journal } from '../journal.js';
@@ -562,19 +564,63 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
     },
   },
   {
-    id: 'retarget.cross-runtime-verdict-parity-not-yet-reached', capability: 'retarget', tier: 'unit', expect: 'red',
-    redReason: 'The constraint checkers are coupled to the node-typescript (Zod) dialect: enforcement is read as `.max(60)`/`z.enum([...])`. The python-fastapi target resolves and generates, but the SAME bound expressed the Pydantic way (`name: str = Field(max_length=60)`) is not recognized, so a python module that DOES enforce the bound reads as `absent` — the verdict diverges from node for identical enforcement. python-fastapi is a retarget stub for the trust surface. Fix: a per-runtime constraint-checker hook (a Pydantic-aware reader, or lower each RuntimeTarget’s enforcement to a common shape the checkers consume) so the same constraint earns the same verdict on either runtime.',
-    description: 'The same bound constraint earns the same verdict on a python-fastapi (Pydantic) module as on a node-typescript (Zod) module — enforcement parity across runtimes.',
+    id: 'retarget.cross-runtime-verdict-parity-not-yet-reached', capability: 'retarget', tier: 'unit', expect: 'green',
+    description: 'The same constraint earns the same verdict on a python-fastapi (Pydantic) module as on a node-typescript (Zod) module — enforcement parity across runtimes, for the POSITIVE and the NEGATIVE verdicts alike: bound, membership, and presence each read conforms / violates / absent identically on either dialect (a per-runtime reader hook; the verdict rules never changed).',
     run: () => {
-      const attrs = mineEntityAttributes([iu('account')], [canon(CanonicalType.DEFINITION, 'an account has a name', 'd')]);
-      const { constraints } = extractConstraints([canon(CanonicalType.CONSTRAINT, 'an account name must not exceed 60 characters', 'c', 'cl', ['account', 'name'])], attrs);
+      const attrs = mineEntityAttributes([iu('account')], [canon(CanonicalType.DEFINITION, 'an account has a name and a status', 'd')]);
+      const { constraints } = extractConstraints([
+        canon(CanonicalType.CONSTRAINT, 'an account name must not exceed 60 characters', 'c1', 'cl', ['account', 'name']),
+        canon(CanonicalType.CONSTRAINT, 'an account status must be one of active, archived', 'c2', 'cl', ['account', 'status']),
+      ], attrs);
       const b = constraints.find(c => c.assertion.kind === 'bound')!;
-      // Node/Zod: the bound is enforced and recognized → conforms.
-      const nodeVerdict = checkConstraint(b, 'const S = z.object({ name: z.string().max(60) });').result;
-      // Python/Pydantic: the SAME bound, enforced the Pydantic way. Parity requires conforms too.
-      const pyVerdict = checkConstraint(b, 'class Account(BaseModel):\n    name: str = Field(max_length=60)').result;
-      return { passed: nodeVerdict === 'conforms' && pyVerdict === 'conforms',
-        detail: `node=${nodeVerdict}, python=${pyVerdict} (want both conforms; python enforcement unread today)` };
+      const m = constraints.find(c => c.assertion.kind === 'membership')!;
+      // [zod source, pydantic source, the verdict BOTH must earn]
+      const boundPairs: Array<[string, string, CheckResult]> = [
+        ['const S = z.object({ name: z.string().max(60) });', 'class CreateAccount(BaseModel):\n    name: str = Field(max_length=60)', 'conforms'],
+        ['const S = z.object({ name: z.string().max(100) });', 'class CreateAccount(BaseModel):\n    name: str = Field(max_length=100)', 'violates'],
+        ['const S = z.object({ name: z.string() });', 'class CreateAccount(BaseModel):\n    name: str', 'absent'],
+      ];
+      for (const [zod, py, want] of boundPairs) {
+        const zn = checkConstraint(b, zod).result, pv = checkConstraint(b, py).result;
+        if (zn !== want || pv !== want) return { passed: false, detail: `bound parity broke — want ${want}, got zod=${zn} pydantic=${pv}` };
+      }
+      const memberPairs: Array<[string, string, CheckResult]> = [
+        [`const S = z.object({ status: z.enum(['active','archived']) });`, "class CreateAccount(BaseModel):\n    status: Literal['active', 'archived']", 'conforms'],
+        [`const S = z.object({ status: z.enum(['active','paused']) });`, "class CreateAccount(BaseModel):\n    status: Literal['active', 'paused']", 'violates'],
+        ['const S = z.object({ status: z.string() });', 'class CreateAccount(BaseModel):\n    status: str', 'absent'],
+      ];
+      for (const [zod, py, want] of memberPairs) {
+        const zn = checkConstraint(m, zod).result, pv = checkConstraint(m, py).result;
+        if (zn !== want || pv !== want) return { passed: false, detail: `membership parity broke — want ${want}, got zod=${zn} pydantic=${pv}` };
+      }
+      // Presence parity through the AST dispatcher (the pipeline's actual path).
+      const attrs2 = mineEntityAttributes([iu('account')], [canon(CanonicalType.DEFINITION, 'an account has a name and an email', 'd2')]);
+      const { constraints: pres } = extractConstraints([canon(CanonicalType.REQUIREMENT, 'the system requires a user to provide at least a name and an email to create an account', 'c3', 'cl', ['account', 'name', 'email'])], attrs2);
+      const p = pres.find(c => c.assertion.kind === 'presence')!;
+      const presencePairs: Array<[string, string, CheckResult]> = [
+        ['const S = z.object({ name: z.string().min(1) });', 'class CreateAccount(BaseModel):\n    name: str = Field(min_length=1)', 'conforms'],
+        ['const S = z.object({ name: z.string().optional() });', 'class CreateAccount(BaseModel):\n    name: Optional[str] = None', 'absent'],
+      ];
+      for (const [zod, py, want] of presencePairs) {
+        const zn = checkConstraintAst(p, zod).result, pv = checkConstraintAst(p, py).result;
+        if (zn !== want || pv !== want) return { passed: false, detail: `presence parity broke — want ${want}, got zod=${zn} pydantic=${pv}` };
+      }
+      return { passed: true, detail: 'bound/membership/presence verdicts identical on Zod and Pydantic (conforms, violates, and absent alike)' };
+    },
+  },
+  {
+    id: 'oracle.live-verdicts-on-python-apps-not-yet-earned', capability: 'oracle', tier: 'unit', expect: 'red',
+    redReason: 'Static checker parity is reached (the pydantic reader), but the LIVE oracle still speaks node only: `phoenix verify --live` hardcodes the boot (`npx tsx src/server.ts`) and the migrations path (`src/generated/_migrations.ts`), so a python-fastapi project cannot boot under the harness at all — no mutation-gated verdict is reachable on the python runtime. The mutation patterns themselves are mostly language-agnostic line shapes (a `< 0`/`SUM(` regex reads python too), but the boot seam is not. Fix: resolve the boot command + migrations path from the project\'s configured runtime target (uvicorn + `src/generated/_migrations.py` for python-fastapi, with DB_PATH isolation), and audit each mutation pattern for dialect coverage (e.g. a python guard short-circuits with `raise`, not `return`/`throw`).',
+    description: 'The live oracle earns a mutation-gated verdict on a python-fastapi app the same way it does on node — the boot command, the migrations path, and every applicable mutation are resolved for the project\'s runtime, not hardcoded to node-typescript.',
+    run: () => {
+      // The probe is offline and honest: it asks the harness for the boot spec a
+      // python-fastapi project would get. Today the answer is the node constants —
+      // a python app could never boot from `npx tsx src/server.ts`.
+      const py = bootSpecForTarget('python-fastapi');
+      const node = bootSpecForTarget('web-api/node-typescript');
+      const bootParity = py.command.some(p => /uvicorn|python/.test(p)) && /_migrations\.py$/.test(py.migrationsFile)
+        && node.command.some(p => /tsx|node/.test(p)) && /_migrations\.ts$/.test(node.migrationsFile);
+      return { passed: bootParity, detail: `python boot=[${py.command.join(' ')}] migrations=${py.migrationsFile} (want uvicorn + _migrations.py)` };
     },
   },
 
