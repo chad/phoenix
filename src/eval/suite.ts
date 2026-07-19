@@ -35,8 +35,9 @@ import type { StructuredConstraint } from '../constraints/model.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from '../evals.js';
 import { runAggregateProperty } from '../constraints/exec-runner.js';
 import { runGatedLiveEval, referenceApp, referencePlans, referenceFkApp, referenceFkSchema, referenceFkPlans, runGatedRelativeTemporal, referenceClockApp, type AppHandle, type PrepareResult, type RelativeTemporalSeed } from '../live-harness.js';
-import { parseTableSchemas, seedForTarget, type SeedPlanInput } from '../live-seed.js';
-import { bootSpecForTarget } from '../live-verify.js';
+import { parseTableSchemas, seedForTarget, resolveRouteOverlay, type SeedPlanInput } from '../live-seed.js';
+import { parseRouteContract } from '../route-contract.js';
+import { bootSpecForTarget, buildSeedPrepare } from '../live-verify.js';
 import { acceptProposal } from '../constraints/extract-llm.js';
 import { synthesizeGuard, isMechanical } from '../repair-template.js';
 import { Journal } from '../journal.js';
@@ -621,6 +622,45 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       const bootParity = py.command.some(p => /uvicorn|python/.test(p)) && /_migrations\.py$/.test(py.migrationsFile)
         && node.command.some(p => /tsx|node/.test(p)) && /_migrations\.ts$/.test(node.migrationsFile);
       return { passed: bootParity, detail: `python boot=[${py.command.join(' ')}] migrations=${py.migrationsFile} (want uvicorn + _migrations.py)` };
+    },
+  },
+  {
+    id: 'oracle.array-fk-seeding-not-yet-earned', capability: 'oracle', tier: 'unit', expect: 'red',
+    redReason: 'The route-contract overlay reads `musician_ids: z.array(z.number().int()).min(2)` (the afterimage ensemble) and the seeder now abstains EARLY with a precise reason instead of a bare 400 — but it cannot yet SEED the array: the referenced table does not resolve from the field name alone (musician → players), and inventing ids would be a false green. The chain behind it (match → ensemble → players) is NIGHT-REPORT-5\'s documented seeding frontier. Fix: resolve the referenced table for `*_ids` array fields (naming, junction-table evidence in the schema plan, and/or handler existence-checks), seed N parents, and thread their real ids into the array.',
+    description: 'The seeder creates an entity whose create route requires an ARRAY of ≥N existing foreign ids — seeding the referenced parents and threading their real ids — turning the array-FK frontier abstention into a gated verdict.',
+    run: async () => {
+      // Offline probe of the frontier: the overlay reads the shape honestly today
+      // (idArrayMin), and resolveRouteOverlay reports the blocker. The red flips when
+      // the overlay can instead resolve the referenced table and plan the parent seeds.
+      const ddl = [
+        'CREATE TABLE players (id INTEGER PRIMARY KEY, name TEXT NOT NULL)',
+        'CREATE TABLE ensembles (id INTEGER PRIMARY KEY, player_id INTEGER NOT NULL, name TEXT NOT NULL)',
+      ].join('\n');
+      const tables = parseTableSchemas(ddl);
+      const contract = parseRouteContract('const CreateEnsembleSchema = z.object({\n'
+        + '  player_id: z.number().int(),\n'
+        + '  name: z.string().min(1),\n'
+        + '  musician_ids: z.array(z.number().int()).min(2),\n'
+        + '});');
+      const overlay = resolveRouteOverlay(tables.find(t => t.name === 'ensembles')!, contract, tables);
+      // GREEN would mean: no blocker — the overlay resolved musician_ids to a seedable
+      // plan (e.g. an arrayFk field naming the referenced table + min). Today it blocks.
+      const resolved = overlay.arrayFkBlocker === undefined
+        && (overlay as { arrayFk?: { field: string; table: string; min: number } }).arrayFk?.table === 'players';
+      return { passed: resolved, detail: `blocker=${JSON.stringify(overlay.arrayFkBlocker ?? null)} — array-FK resolution not implemented` };
+    },
+  },
+  {
+    id: 'oracle.entity-table-resolution-beyond-plural-not-yet-earned', capability: 'oracle', tier: 'unit', expect: 'red',
+    redReason: 'The live seeder resolves a constraint\'s entity to a schema table by singular/plural match only. The afterimage legacy aggregate names entity "legacy" while its table is "player_legacies" — the eval derives the right route (/player-legacy) from the IU, but buildSeedPrepare finds no table, returns no prepare, and the naive body (missing the required name) is rejected: an avoidable abstention. Fix: resolve entity→table through the IU that owns the eval (route-slug reverse lookup, normalizing spaces/underscores/dashes) before falling back to the plural scan.',
+    description: 'The seeder resolves an eval\'s entity to its schema table even when the names differ beyond pluralization (legacy → player_legacies), so the spec-aware prepare runs and the create contract is satisfied.',
+    run: () => {
+      // Offline probe: buildSeedPrepare must produce a prepare for entity 'legacy'
+      // against a schema whose only candidate table is player_legacies.
+      const ddl = 'CREATE TABLE player_legacies (id INTEGER PRIMARY KEY, name TEXT NOT NULL)';
+      const legacyIu = iu('player legacy', ['c1']);
+      const prepare = buildSeedPrepare(ddl, [], [legacyIu], 'legacy', 'entries', '/tmp/nonexistent-phx-root');
+      return { passed: prepare !== undefined, detail: `prepare for entity 'legacy' → ${prepare ? 'resolved' : 'undefined (table scan misses player_legacies)'}` };
     },
   },
 

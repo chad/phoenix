@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseRouteContract } from '../../src/route-contract.js';
-import { synthesizeColumnValue, makeSeededRng, type ColumnSchema } from '../../src/live-seed.js';
+import { synthesizeColumnValue, makeSeededRng, parseTableSchemas, resolveRouteOverlay, type ColumnSchema } from '../../src/live-seed.js';
 import type { StructuredConstraint } from '../../src/constraints/model.js';
 
 const MODULE = `
@@ -138,5 +138,90 @@ const CreateDeckSchema = z.object({
     const c = parseRouteContract(src);
     expect(c.get('cards')?.csvMinParts).toBeUndefined();
     expect(c.get('ensemble_id')?.scalar).toBe('number');
+  });
+});
+
+describe('route-level FK facts (the afterimage ensemble/match shape)', () => {
+  const FK_MODULE = `
+const CreateMatchSchema = z.object({
+  ensemble_id: z.number().int(),
+  section: SectionEnum,
+  date: z.string().min(1),
+});
+const CreateEnsembleSchema = z.object({
+  player_id: z.number().int(),
+  name: z.string().min(1).max(60),
+  musician_ids: z.array(z.number().int()).min(2),
+  pulse: z.number().nullable().optional(),
+});
+`;
+  it('reads a required <entity>_id scalar as an FK hint', () => {
+    const c = parseRouteContract(FK_MODULE); // first z.object wins → the match schema
+    expect(c.get('ensemble_id')?.fkHint).toBe('ensemble');
+    expect(c.get('section')?.fkHint).toBeUndefined();
+  });
+  it('reads an *_ids array-min as an array-of-existing-ids fact', () => {
+    const src = FK_MODULE.replace('const CreateMatchSchema', 'const IgnoredMatchSchema');
+    const c = parseRouteContract(src); // now the ensemble schema is first
+    expect(c.get('musician_ids')?.idArrayMin).toBe(2);
+    expect(c.get('player_id')?.fkHint).toBe('player');
+    expect(c.get('pulse')?.optional).toBe(true);
+  });
+});
+
+describe('resolveRouteOverlay', () => {
+  const tables = parseTableSchemas([
+    'CREATE TABLE players (id INTEGER PRIMARY KEY, name TEXT NOT NULL)',
+    'CREATE TABLE ensembles (id INTEGER PRIMARY KEY, player_id INTEGER NOT NULL, name TEXT NOT NULL)',
+  ].join('\n'));
+  const ensembles = tables.find(t => t.name === 'ensembles')!;
+  it('a hinted <entity>_id becomes a real FK when the table exists', () => {
+    const contract = new Map([['player_id', { optional: false, scalar: 'number' as const, fkHint: 'player' }]]);
+    const o = resolveRouteOverlay(ensembles, contract, tables);
+    expect(o.arrayFkBlocker).toBeUndefined();
+    expect(o.columns.find(c => c.name === 'player_id')?.fkTable).toBe('players');
+  });
+  it('an unresolvable hint leaves the column untouched (honest fallback)', () => {
+    const contract = new Map([['player_id', { optional: false, scalar: 'number' as const, fkHint: 'coach' }]]);
+    const o = resolveRouteOverlay(ensembles, contract, tables);
+    expect(o.columns.find(c => c.name === 'player_id')?.fkTable).toBeUndefined();
+  });
+  it('a required array-of-ids blocks seeding; an optional one is omitted', () => {
+    const req = new Map([['musician_ids', { optional: false, idArrayMin: 2 }]]);
+    expect(resolveRouteOverlay(ensembles, req, tables).arrayFkBlocker).toEqual({ field: 'musician_ids', min: 2 });
+    const opt = new Map([['musician_ids', { optional: true, idArrayMin: 2 }]]);
+    const o = resolveRouteOverlay(ensembles, opt, tables);
+    expect(o.arrayFkBlocker).toBeUndefined();
+    expect(o.columns.some(c => c.name === 'musician_ids')).toBe(false);
+  });
+});
+
+describe('route-vs-DDL drift (the afterimage ensemble_id case)', () => {
+  it('a DDL-nullable FK the route requires tightens to notNull (null FK is never sent)', () => {
+    const tables = parseTableSchemas([
+      'CREATE TABLE ensembles (id INTEGER PRIMARY KEY, name TEXT NOT NULL)',
+      'CREATE TABLE matches (id INTEGER PRIMARY KEY, ensemble_id INTEGER REFERENCES ensembles(id), date TEXT NOT NULL)',
+    ].join('\n'));
+    const matches = tables.find(t => t.name === 'matches')!;
+    expect(matches.columns.find(c => c.name === 'ensemble_id')?.notNull).toBe(false); // the drift: plan says nullable
+    const contract = parseRouteContract(`const CreateMatchSchema = z.object({
+  ensemble_id: z.number().int(),
+  date: z.string().min(1),
+});`);
+    const o = resolveRouteOverlay(matches, contract, tables);
+    expect(o.columns.find(c => c.name === 'ensemble_id')?.notNull).toBe(true); // the route's word wins
+  });
+  it('a DDL-nullable FK the route marks optional stays nullable', () => {
+    const tables = parseTableSchemas([
+      'CREATE TABLE sprints (id INTEGER PRIMARY KEY)',
+      'CREATE TABLE issues (id INTEGER PRIMARY KEY, sprint_id INTEGER REFERENCES sprints(id), title TEXT NOT NULL)',
+    ].join('\n'));
+    const issues = tables.find(t => t.name === 'issues')!;
+    const contract = parseRouteContract(`const CreateIssueSchema = z.object({
+  sprint_id: z.number().int().nullable().optional(),
+  title: z.string().min(1),
+});`);
+    const o = resolveRouteOverlay(issues, contract, tables);
+    expect(o.columns.find(c => c.name === 'sprint_id')?.notNull).toBe(false);
   });
 });

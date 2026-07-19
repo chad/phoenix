@@ -296,6 +296,62 @@ export function synthesizeBody(
   return body;
 }
 
+// ─── Route-contract FK resolution ────────────────────────────────────────────
+
+/** The result of overlaying a table's route contract onto its columns. */
+export interface RouteOverlay {
+  /** Columns with DDL facts intact plus any route-level FK hints resolved to real tables. */
+  columns: ColumnSchema[];
+  /** A required array-of-existing-ids field the seeder cannot synthesize (the frontier). */
+  arrayFkBlocker?: { field: string; min: number };
+}
+
+/**
+ * Overlay a table's route contract onto its column schema:
+ *   - a `<entity>_id` scalar-number field whose DDL column declares no FK becomes a
+ *     route-level FK when the hinted entity resolves to a real table (its parent is
+ *     then seeded first, exactly like a DDL-declared FK);
+ *   - an `*_ids` array with a min length is an array of EXISTING foreign ids: when
+ *     required it blocks seeding with a precise reason (synthesizing N real ids is the
+ *     frontier); when optional the field is omitted (valid — the route defaults it).
+ * Fields the contract does not claim pass through untouched.
+ */
+export function resolveRouteOverlay(schema: TableSchema, contract: RouteContract | undefined, tables: TableSchema[]): RouteOverlay {
+  if (!contract) return { columns: schema.columns };
+  const columns: ColumnSchema[] = [];
+  let arrayFkBlocker: RouteOverlay['arrayFkBlocker'];
+  for (const col of schema.columns) {
+    const fc = contract.get(col.name);
+    if (!fc) { columns.push(col); continue; }
+    if (fc.idArrayMin !== undefined) {
+      if (fc.optional) continue; // omit — the route accepts its absence
+      arrayFkBlocker = arrayFkBlocker ?? { field: col.name, min: fc.idArrayMin };
+      columns.push(col);
+      continue;
+    }
+    if (!col.fkTable && fc.fkHint) {
+      const hinted = tables.find(t => singularize(t.name) === singularize(fc.fkHint!));
+      if (hinted) { columns.push({ ...col, fkTable: hinted.name, notNull: col.notNull || !fc.optional }); continue; }
+    }
+    // A DDL-declared FK the route REQUIRES (not optional/nullable in the create schema):
+    // tighten requiredness to the route's word — the afterimage drift (schema plan says
+    // nullable, module+route demand existence) made a null FK "valid" per the DDL and
+    // the route rejected it. With the tightening, an unseedable parent blocks honestly.
+    if (col.fkTable && !fc.optional && !col.notNull) {
+      columns.push({ ...col, notNull: true });
+      continue;
+    }
+    columns.push(col);
+  }
+  // Array-of-ids fields are usually NOT DDL columns at all (junction-table inputs, the
+  // afterimage musician_ids) — a required one blocks seeding even so.
+  for (const [field, fc] of contract) {
+    if (fc.idArrayMin === undefined || fc.optional) continue;
+    if (!arrayFkBlocker) arrayFkBlocker = { field, min: fc.idArrayMin };
+  }
+  return { columns, arrayFkBlocker };
+}
+
 // ─── Runtime seeding (drive the real app's create routes, parents first) ───────
 
 /** Minimal HTTP surface the seeder needs (an AppHandle satisfies it). */
@@ -364,10 +420,24 @@ export async function seedTable(
   if (seen.has(table)) { ctx.unseedable.push({ table, reason: 'FK cycle' }); return undefined; }
   seen.add(table);
 
-  const schema = input.tables.find(t => t.name === table);
-  if (!schema) { ctx.unseedable.push({ table, reason: 'not in schema plan' }); return undefined; }
+  const baseSchema = input.tables.find(t => t.name === table);
+  if (!baseSchema) { ctx.unseedable.push({ table, reason: 'not in schema plan' }); return undefined; }
   const route = input.routeFor(table);
   if (!route) { ctx.unseedable.push({ table, reason: 'no mounted route' }); return undefined; }
+
+  // The route-contract overlay: resolve route-level FK hints to real tables and abstain
+  // EARLY (with a precise reason) on a required array-of-existing-ids field — the
+  // seeding frontier (inventing ids would be a false green).
+  const contract = input.contractFor?.(table);
+  const overlay = resolveRouteOverlay(baseSchema, contract, input.tables);
+  if (overlay.arrayFkBlocker) {
+    ctx.unseedable.push({
+      table,
+      reason: `route contract requires ${overlay.arrayFkBlocker.min} existing id(s) for "${overlay.arrayFkBlocker.field}" (array-FK seeding is the frontier)`,
+    });
+    return undefined;
+  }
+  const schema: TableSchema = { ...baseSchema, columns: overlay.columns };
 
   // Seed each required FK parent first, threading its id in.
   const fkIds: Record<string, number> = {};
@@ -378,7 +448,7 @@ export async function seedTable(
     else if (col.notNull) { ctx.unseedable.push({ table, reason: `required FK ${col.name}→${col.fkTable} unseedable` }); return undefined; }
   }
 
-  const body = synthesizeBody(schema, byTable.get(table) ?? new Map(), rng, { fkIds, contract: input.contractFor?.(table) });
+  const body = synthesizeBody(schema, byTable.get(table) ?? new Map(), rng, { fkIds, contract });
   const res = await app.fetch(route, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
@@ -410,11 +480,20 @@ export async function seedForTarget(
   targetTable: string,
   governedField: string | undefined,
 ): Promise<SeedResult> {
-  const schema = input.tables.find(t => t.name === targetTable);
-  if (!schema) return { ok: false, reason: `${targetTable} not in schema plan` };
+  const baseSchema = input.tables.find(t => t.name === targetTable);
+  if (!baseSchema) return { ok: false, reason: `${targetTable} not in schema plan` };
   const byTable = constraintsByTable(input);
   const rng = makeSeededRng();
   const ctx: SeedContext = { ids: new Map(), unseedable: [] };
+
+  // The route-contract overlay (see resolveRouteOverlay): hinted parents and early,
+  // precise abstention on the array-FK frontier.
+  const contract = input.contractFor?.(targetTable);
+  const overlay = resolveRouteOverlay(baseSchema, contract, input.tables);
+  if (overlay.arrayFkBlocker) {
+    return { ok: false, reason: `route contract requires ${overlay.arrayFkBlocker.min} existing id(s) for "${overlay.arrayFkBlocker.field}" (array-FK seeding is the frontier)` };
+  }
+  const schema: TableSchema = { ...baseSchema, columns: overlay.columns };
 
   const fkIds: Record<string, number> = {};
   for (const col of schema.columns) {
@@ -425,6 +504,6 @@ export async function seedForTarget(
       return { ok: false, reason: `FK ${col.name}→${col.fkTable}: ${ctx.unseedable.map(u => `${u.table} (${u.reason})`).join('; ') || 'unseedable'}` };
     }
   }
-  const seed = synthesizeBody(schema, byTable.get(targetTable) ?? new Map(), rng, { skipField: governedField, fkIds, contract: input.contractFor?.(targetTable) });
+  const seed = synthesizeBody(schema, byTable.get(targetTable) ?? new Map(), rng, { skipField: governedField, fkIds, contract });
   return { ok: true, seed };
 }
