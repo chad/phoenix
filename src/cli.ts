@@ -105,6 +105,7 @@ import type { ResolvedTarget } from './models/architecture.js';
 import { auditIU, auditAll } from './audit.js';
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
+import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
 import { NegativeKnowledgeStore } from './store/negative-knowledge-store.js';
 import { failedGenerationKnowledge } from './models/negative-knowledge.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
@@ -2749,6 +2750,54 @@ async function cmdRegen(args: string[]): Promise<void> {
  */
 async function cmdRepair(args: string[]): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
+
+  if (args.includes('--spec')) {
+    // P2 — the spec talks back: PROPOSE rewordings for binding defects and unverified
+    // obligations, each validated by re-running the frozen extractor on the proposed
+    // line. Read-only: intent is human-sovereign, phoenix never edits the spec. (Entity
+    // mining keys off planned IUs, like status — run `phoenix plan` first for the full
+    // picture; without IUs it degrades to honest no-confident-proposals.)
+    const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+    const specStore = new SpecStore(phoenixDir);
+    const allClauses: Clause[] = [];
+    const specLines = new Map<string, string[]>();
+    for (const specFile of findSpecFiles(projectRoot)) {
+      allClauses.push(...specStore.getClauses(relative(projectRoot, specFile)));
+      specLines.set(relative(projectRoot, specFile), readFileSync(specFile, 'utf8').split('\n'));
+    }
+    const ius = loadIUs(phoenixDir);
+    // trackedByEval — identical to status, so an obligation a durable eval already
+    // verifies is not re-proposed here.
+    const iuSourceById = new Map<string, string>();
+    for (const u of ius) {
+      const f = u.output_files[0];
+      const full = f ? join(projectRoot, f) : '';
+      if (full && existsSync(full)) iuSourceById.set(u.iu_id, readFileSync(full, 'utf8'));
+    }
+    const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+    const trackedByEval = new Set<string>();
+    for (const iu of ius) {
+      const src = iuSourceById.get(iu.iu_id);
+      if (!src) continue;
+      for (const e of deriveEvaluations(iu, canonNodes)) {
+        if (e.canon_ids.length !== 1) continue;
+        const r = checkEvaluation(e, src, canonById);
+        if (r.status === 'pass' || r.status === 'fail') trackedByEval.add(e.canon_ids[0]);
+      }
+    }
+    const proposals = proposeSpecFixes({ ius, canonNodes, clauses: allClauses, specLines, trackedByEval });
+    if (args.includes('--json')) { console.log(JSON.stringify(proposals, null, 2)); return; }
+    console.log(bold('📜 Phoenix Spec Proposals') + '  ' + dim('(validated rewordings — phoenix never edits the spec)'));
+    console.log();
+    console.log(`  ${proposals.filter(p => p.kind === 'rewording').length} validated rewording(s) · ${proposals.filter(p => p.kind === 'informational').length} informational · ${proposals.filter(p => p.kind === 'no-confident-proposal').length} without a confident proposal`);
+    console.log();
+    console.log(renderSpecProposals(proposals).split('\n').map(l => '  ' + l).join('\n'));
+    console.log();
+    console.log(dim('  Application path: edit the spec line(s) above, then `phoenix canonicalize && phoenix status`.'));
+    console.log(dim('  The human is sovereign over intent — a proposal is a suggestion, never an edit.'));
+    return;
+  }
+
   const ius = loadIUs(phoenixDir);
   if (ius.length === 0) {
     console.log(yellow('⚠ No IUs planned. Run `phoenix bootstrap` first.'));
@@ -3892,6 +3941,7 @@ ${bold('Implementation:')}
                          ${dim('--all    Regenerate every IU (ignore the invalidation set)')}
                          ${dim('--stubs  Force stub generation (skip LLM)')}
   ${cyan('repair')} [--rounds=N]   Repair loop: feed verifier findings into targeted regeneration
+  ${cyan('repair')} --spec       Propose validated spec rewordings for defects/obligations (read-only)
                          ${dim('Bounded (default 3 rounds); the verifier is frozen — code changes only')}
   ${cyan('verify')} --live       Live oracle: boot the real app, run mutation-gated invariant evals
                          ${dim('Aggregate/state/temporal invariants the static path can only abstain on')}
