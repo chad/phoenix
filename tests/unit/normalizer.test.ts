@@ -87,3 +87,11 @@ describe('normalizeText', () => {
     expect(normalizeText(v1)).toBe(normalizeText(v2));
   });
 });
+
+describe('HTML comments', () => {
+  it('strips HTML comments — author notes and provenance annotations are not content', () => {
+    expect(normalizeText('A room must have a name. <!-- from:L10-L12 -->')).toBe(
+      normalizeText('A room must have a name.'));
+    expect(normalizeText('a <!-- multi\nline\nnote --> b')).toBe(normalizeText('a  b'));
+  });
+});

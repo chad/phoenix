@@ -26,6 +26,7 @@ export type JournalEventType =
   | 'regen'         // an IU regenerated into files
   | 'schema-plan'   // the shared schema derived BEFORE module generation (P0)
   | 'repair'        // a bounded repair round fed verifier findings into regeneration (P1)
+  | 'adapt-spec'    // an LLM drafted a derived spec (provenance + coverage receipted)
   | 'repair:template' // deterministic guard synthesis closed a mechanical finding (P1)
   | 'evidence'      // evidence recorded for an IU
   | 'invalidate'    // a spec change marked IUs stale

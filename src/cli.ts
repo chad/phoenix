@@ -58,6 +58,7 @@ import { computeInvalidation, iuKey, dependentsToRegenerate } from './invalidati
 import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
+import { adaptSpec } from './spec-adapt.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
 import { deriveProjectLivePlans, runLiveVerification } from './live-verify.js';
@@ -1479,6 +1480,93 @@ function reportRegenGate(verdicts: GateVerdict[], indent = '  '): void {
     }
   }
   console.log();
+}
+
+/**
+ * phoenix adapt — draft an operational spec from any-shape spec, with provenance.
+ * The LLM drafts; the human adopts. The source is never touched: the draft lands in
+ * spec.adapted/ with every rule citing its source lines, and the coverage report names
+ * both failure modes (dropped intent / invented intent) in the open.
+ */
+async function cmdAdapt(args: string[]): Promise<void> {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const onlySpec = args.find(a => a.startsWith('--spec='))?.split('=')[1];
+  const force = args.includes('--force');
+
+  const llm = resolveProvider(phoenixDir);
+  if (!llm) {
+    console.error(red('✖ adapt needs an LLM provider (set ANTHROPIC_API_KEY, OPENAI_API_KEY, or MOONSHOT_API_KEY).'));
+    return;
+  }
+
+  const specFiles = findSpecFiles(projectRoot).filter(f => !onlySpec || basename(f) === onlySpec);
+  if (specFiles.length === 0) {
+    console.log(yellow(onlySpec ? `⚠ No spec file named ${onlySpec} under spec/.` : '⚠ No spec files found in spec/ directory.'));
+    return;
+  }
+
+  console.log(bold('📝 Phoenix Adapt — the LLM drafts, the human adopts'));
+  console.log(dim(`  LLM: ${llm.name}/${llm.model}`));
+  console.log();
+
+  const outDir = join(projectRoot, 'spec.adapted');
+  mkdirSync(outDir, { recursive: true });
+
+  for (const specFile of specFiles) {
+    const docName = basename(specFile);
+    const source = readFileSync(specFile, 'utf8');
+    console.log(bold(`  ${docName}`));
+    let wroteCheckpoint = false; // our own partial file must not block the final write
+    const result = await adaptSpec(docName, source, llm, {
+      onProgress: (msg) => console.log(dim(`    ⏳ ${msg}`)),
+      // Persist partial work after every section — a crashed run loses nothing completed.
+      checkpoint: (parts, gloss) => {
+        const partial = `<!-- PHOENIX-DERIVED DRAFT (PARTIAL — run still in progress) -->\n\n# Data model (derived)\n\n${gloss}\n\n${parts.filter(p => p.length > 0).join('\n\n')}\n`;
+        writeFileSync(join(outDir, docName), partial, 'utf8');
+        wroteCheckpoint = true;
+      },
+    });
+
+    const outPath = join(outDir, docName);
+    if (existsSync(outPath) && !force && !wroteCheckpoint) {
+      console.log(yellow(`    ⚠ ${relative(projectRoot, outPath)} exists — re-run with --force to overwrite. Skipping write (coverage still reported).`));
+    } else {
+      writeFileSync(outPath, result.derivedMarkdown, 'utf8');
+    }
+
+    const c = result.coverage;
+    const pct = c.sourceNormatives.length > 0 ? Math.round((c.covered / c.sourceNormatives.length) * 100) : 100;
+    console.log(`    ${green('✔')} draft → ${relative(projectRoot, outPath)}`);
+    console.log(`    Obligations cited: ${c.covered}/${c.sourceNormatives.length} (${pct}%)  ·  proposed (invented — endorse or delete): ${c.proposedRules.length}`);
+    if (c.dropped.length > 0) {
+      console.log(yellow(`    Dropped intent (${c.dropped.length}) — source obligations no rule cites:`));
+      for (const d of c.dropped.slice(0, 15)) console.log(yellow(`      · L${d.line}: ${d.text.slice(0, 100)}`));
+      if (c.dropped.length > 15) console.log(dim(`      … and ${c.dropped.length - 15} more in the draft header`));
+    }
+    if (c.unboundSpans.length > 0) {
+      console.log(red(`    Hallucinated line references (${c.unboundSpans.length}) — provenance spans outside the source; treat those rules as proposed:`));
+      for (const [a, b] of c.unboundSpans.slice(0, 5)) console.log(red(`      · L${a}-L${b}`));
+    }
+    console.log();
+
+    new Journal(phoenixDir).append({
+      type: 'adapt-spec',
+      inputs: [docName],
+      outputs: [relative(projectRoot, outPath)],
+      meta: {
+        model_id: result.model,
+        source_sha: result.sourceSha,
+        obligations_total: c.sourceNormatives.length,
+        obligations_covered: c.covered,
+        obligations_dropped: c.dropped.length,
+        rules_proposed: c.proposedRules.length,
+        spans_unbound: c.unboundSpans.length,
+      },
+    });
+  }
+
+  console.log(dim('  The source spec was not modified. To adopt: review the draft, move the source out of'));
+  console.log(dim('  spec/ (keep it — it is the intent record), move the draft in, then `phoenix canonicalize`.'));
 }
 
 async function cmdBootstrap(): Promise<void> {
@@ -4002,6 +4090,9 @@ async function main(): Promise<void> {
       break;
     case 'bootstrap':
       await cmdBootstrap();
+      break;
+    case 'adapt':
+      await cmdAdapt(commandArgs);
       break;
     case 'status':
       cmdStatus();
