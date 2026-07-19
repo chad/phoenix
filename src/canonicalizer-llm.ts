@@ -20,11 +20,17 @@ import { CONFIG } from './experiment-config.js';
 export interface LLMCanonOptions {
   /** Enable self-consistency with k samples (default: 1 = no self-consistency) */
   selfConsistencyK?: number;
+  /** Invoked when any candidate fails to normalize via the LLM and keeps its
+   *  deterministic rule form instead. A silent downgrade is a trust violation —
+   *  the caller surfaces this (CLI warning + journal receipt), so a user paying
+   *  for tokens never gets rule-based output presented as LLM extraction.
+   *  `fellBack === attempted` means the graph is entirely rule-based. */
+  onFallback?: (err: Error, info: { fellBack: number; attempted: number }) => void;
 }
 
 /**
  * Extract canonical nodes using rule-based extraction + LLM normalization.
- * Falls back to pure rule-based on any LLM failure.
+ * Falls back to pure rule-based on any LLM failure — LOUDLY, via onFallback.
  */
 export async function extractCanonicalNodesLLM(
   clauses: Clause[],
@@ -40,9 +46,15 @@ export async function extractCanonicalNodesLLM(
 
   try {
     const k = options?.selfConsistencyK ?? 1;
-    const normalized = await normalizeCandidates(candidates, llm, k);
+    const stats = { fellBack: 0, attempted: 0, firstError: undefined as Error | undefined };
+    const normalized = await normalizeCandidates(candidates, llm, k, stats);
+    if (stats.fellBack > 0 && options?.onFallback) {
+      const err = stats.firstError ?? new Error('unusable normalizer response');
+      options.onFallback(err, { fellBack: stats.fellBack, attempted: stats.attempted });
+    }
     return resolveGraph(normalized, clauses);
-  } catch {
+  } catch (e) {
+    options?.onFallback?.(e instanceof Error ? e : new Error(String(e)), { fellBack: candidates.length, attempted: candidates.length });
     return resolveGraph(candidates, clauses);
   }
 }
@@ -51,6 +63,7 @@ async function normalizeCandidates(
   candidates: CandidateNode[],
   llm: LLMProvider,
   k: number = 1,
+  stats?: { fellBack: number; attempted: number; firstError?: Error },
 ): Promise<CandidateNode[]> {
   const results: CandidateNode[] = [];
 
@@ -60,6 +73,7 @@ async function normalizeCandidates(
       continue;
     }
 
+    if (stats) stats.attempted++;
     try {
       const prompt = `Rewrite this ${c.type} statement in canonical form:\n"${c.statement}"`;
 
@@ -75,6 +89,7 @@ async function normalizeCandidates(
           const newId = sha256([c.type, normalized, c.source_clause_ids[0]].join('\x00'));
           results.push({ ...c, candidate_id: newId, statement: normalized, extraction_method: 'llm' });
         } else {
+          if (stats) { stats.fellBack++; stats.firstError ??= new Error('unusable normalizer response'); }
           results.push(c);
         }
       } else {
@@ -91,6 +106,7 @@ async function normalizeCandidates(
         }
 
         if (samples.length === 0) {
+          if (stats) { stats.fellBack++; stats.firstError ??= new Error('no usable self-consistency sample'); }
           results.push(c);
         } else {
           const medoid = selectMedoid(samples);
@@ -98,7 +114,8 @@ async function normalizeCandidates(
           results.push({ ...c, candidate_id: newId, statement: medoid, extraction_method: 'llm' });
         }
       }
-    } catch {
+    } catch (e) {
+      if (stats) { stats.fellBack++; stats.firstError ??= e instanceof Error ? e : new Error(String(e)); }
       results.push(c);
     }
   }

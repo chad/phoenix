@@ -38,5 +38,7 @@ export interface LLMConfig {
 export const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-sonnet-5',
   openai: 'gpt-4o',
+  kimi: 'kimi-k3',
+  ollama: 'qwen3.5:4b',
   'claude-cli': 'sonnet',
 };

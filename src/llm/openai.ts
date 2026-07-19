@@ -1,22 +1,30 @@
 /**
- * OpenAI (GPT) LLM Provider.
+ * OpenAI-compatible LLM Provider.
  *
- * Uses the Chat Completions API via native fetch.
- * Requires OPENAI_API_KEY env var.
+ * Uses the Chat Completions API via native fetch. Serves OpenAI itself
+ * (OPENAI_API_KEY, api.openai.com) and any OpenAI-completions-compatible
+ * endpoint — Moonshot/Kimi, Ollama, or a custom base URL — via `opts`.
  */
 
 import type { LLMProvider, GenerateOptions } from './provider.js';
 
-const API_URL = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
 export class OpenAIProvider implements LLMProvider {
-  readonly name = 'openai';
+  readonly name: string;
   readonly model: string;
   private apiKey: string;
+  private baseUrl: string;
+  private omitTemperature: boolean;
 
-  constructor(apiKey: string, model: string) {
+  constructor(apiKey: string, model: string, opts: { baseUrl?: string; name?: string; omitTemperature?: boolean } = {}) {
     this.apiKey = apiKey;
     this.model = model;
+    this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
+    this.name = opts.name ?? 'openai';
+    // Reasoning models (kimi-k3) reject any temperature but 1 — the field is omitted
+    // entirely rather than sending a value the model would reject or silently ignore.
+    this.omitTemperature = opts.omitTemperature ?? false;
   }
 
   async generate(prompt: string, options?: GenerateOptions): Promise<string> {
@@ -33,11 +41,11 @@ export class OpenAIProvider implements LLMProvider {
       max_tokens: options?.maxTokens ?? 8192,
     };
 
-    if (options?.temperature !== undefined) {
+    if (options?.temperature !== undefined && !this.omitTemperature) {
       body.temperature = options.temperature;
     }
 
-    const res = await fetch(API_URL, {
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1524,8 +1524,11 @@ async function cmdBootstrap(): Promise<void> {
     allClauses.push(...specStore.getClauses(docId));
   }
 
-  // Extract canonical nodes (LLM-enhanced when available)
-  const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly);
+  // Extract canonical nodes (LLM-enhanced when available; a failed LLM pass warns —
+  // never a silent downgrade to rule extraction)
+  const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM normalization failed — using deterministic rule extraction ${dim(`(${e.message})`)}`),
+  });
   canonStore.replaceNodes(canonNodes);
   // Seed the canonical-stability baseline (first run; nothing to compare yet).
   new CanonStabilityStore(phoenixDir).update(canonNodes);
@@ -3225,7 +3228,9 @@ async function cmdUpgrade(args: string[]): Promise<void> {
   console.log();
 
   // Run the new pipeline (fresh extraction) without saving.
-  const newNodes = await extractCanonicalNodesLLM(allClauses, llm);
+  const newNodes = await extractCanonicalNodesLLM(allClauses, llm, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM normalization failed — using deterministic rule extraction ${dim(`(${e.message})`)}`),
+  });
 
   const oldCfg = {
     pipeline_id: 'current', model_id: 'stored', promptpack_version: 'stored',
@@ -3290,7 +3295,15 @@ async function cmdCanonicalize(): Promise<void> {
   }
   console.log();
 
-  const canonNodes = await extractCanonicalNodesLLM(allClauses, llm);
+  // The fallback must never be silent: a user paying for tokens gets a warning and
+  // the journal records which extraction actually produced the graph.
+  let extraction: 'llm-normalized' | 'llm-partial' | 'rule' | 'rule-fallback' = llm ? 'llm-normalized' : 'rule';
+  const canonNodes = await extractCanonicalNodesLLM(allClauses, llm, {
+    onFallback: (e, info) => {
+      extraction = info.fellBack >= info.attempted ? 'rule-fallback' : 'llm-partial';
+      console.log(`  ${yellow('⚠')} LLM normalization fell back to rule form for ${info.fellBack}/${info.attempted} candidates ${dim(`(${e.message})`)}`);
+    },
+  });
   canonStore.replaceNodes(canonNodes);
 
   // Canonical stability (PRD §20): how much did re-canonicalization churn the
@@ -3301,7 +3314,7 @@ async function cmdCanonicalize(): Promise<void> {
     type: 'canonicalize',
     inputs: allClauses.map(c => c.clause_id),
     outputs: canonNodes.map(n => n.canon_id),
-    meta: { node_count: canonNodes.length, stability_retention: stability.retention, model_id: llm ? `${llm.name}/${llm.model}` : 'rule' },
+    meta: { node_count: canonNodes.length, stability_retention: stability.retention, model_id: llm ? `${llm.name}/${llm.model}` : 'rule', extraction },
   });
 
   console.log(`  ${green('✔')} ${canonNodes.length} canonical nodes extracted from ${allClauses.length} clauses`);
