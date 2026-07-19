@@ -663,6 +663,20 @@ export const CAPABILITY_SUITE: CapabilityCase[] = [
       return { passed: prepare !== undefined, detail: `prepare for entity 'legacy' → ${prepare ? 'resolved' : 'undefined (table scan misses player_legacies)'}` };
     },
   },
+  {
+    id: 'canonicalization.incremental-per-clause-not-yet-earned', capability: 'canonicalization', tier: 'unit', expect: 'red',
+    redReason: 'Re-canonicalization always re-extracts EVERY clause (batched LLM prompts), so a one-line spec edit costs a full extraction pass. The blocker to incrementalizing is batch context: a clause\'s candidates depend on its batch-mates, so per-clause extraction cannot be proven identical to the batched full run — and shipping a second, per-clause mode beside the batched one would give Phoenix two extraction paths that can disagree (a trust smell). Fix (the design this red encodes): (1) a per-clause extraction mode used by BOTH cold and warm paths; (2) a content-keyed candidate cache (clause raw_text hash + model + prompt version); (3) re-canonicalization extracts only changed/new clauses, reuses cached candidates for the rest, and re-runs resolveGraph globally over the union; (4) the suite proves hermetically (stub LLM) that incremental output is IDENTICAL to a cold full run and that unchanged clauses caused zero LLM calls.',
+    description: 'After a one-clause spec edit, re-canonicalization calls the LLM only for the changed clause and produces a canonical graph identical to a cold full run.',
+    run: async () => {
+      // The probe looks for the per-clause extraction mode + candidate cache the design
+      // requires. Today extraction is batch-only and there is no cache → honest red.
+      const mod = await import('../canonicalizer-llm.js');
+      const m = mod as unknown as Record<string, unknown>;
+      const hasPerClauseMode = typeof m.extractPerClauseLLM === 'function';
+      const hasCache = typeof m.loadCandidateCache === 'function' || typeof m.CandidateCacheStore === 'function';
+      return { passed: hasPerClauseMode && hasCache, detail: `per-clause mode=${hasPerClauseMode} candidate cache=${hasCache} — batched-only extraction today` };
+    },
+  },
 
   // ── schema-first generation (prevention) ──
   {
