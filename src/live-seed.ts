@@ -30,6 +30,7 @@
  */
 
 import type { StructuredConstraint } from './constraints/model.js';
+import type { RouteContract } from './route-contract.js';
 
 /** Proper-ish singularization so an entity ("entry") matches its table ("entries",
  *  ies→y) and the simple plurals ("accounts"→"account"). */
@@ -186,12 +187,17 @@ const futureDate = () => new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOStri
 
 /** A valid value for one column, honoring any constraint on its attribute. `fkId` is the
  *  already-seeded parent id when the column is a foreign key. Returns undefined to mean
- *  "omit this field" (e.g. a nullable FK with no seeded parent). */
+ *  "omit this field" (e.g. a nullable FK with no seeded parent).
+ *
+ *  Precedence (highest truth first): FK → the DB's own CHECK-IN enum → the route
+ *  contract's enum (the Zod create-schema — what the route actually accepts) → the
+ *  constraint algebra → the route contract's csv-min-parts → the type default. */
 export function synthesizeColumnValue(
   col: ColumnSchema,
   constraints: StructuredConstraint[],
   rng: () => number,
   fkId?: number,
+  routeField?: import('./route-contract.js').RouteFieldContract,
 ): unknown {
   // Foreign key: the real parent id (or omit when the parent could not be seeded and
   // the column is nullable — a null FK is valid, an invented id is not).
@@ -199,6 +205,10 @@ export function synthesizeColumnValue(
 
   // The column's own CHECK-IN enum is a membership constraint straight from the schema.
   if (col.checkEnum && col.checkEnum.length > 0) return col.checkEnum[0];
+
+  // The route's own value-set (Zod enum / named const / union-of-literals): the create
+  // route will reject anything outside it, so it outranks the spec-level algebra.
+  if (routeField?.enumValues && routeField.enumValues.length > 0) return routeField.enumValues[0];
 
   // Constraint-directed synthesis takes precedence over the raw column type.
   for (const c of constraints) {
@@ -222,11 +232,19 @@ export function synthesizeColumnValue(
     }
   }
 
+  // A CSV-shape route refine (`.split(',').length >= N`) that no constraint captured:
+  // synthesize exactly N parts — the afterimage cold-start's abstention, closed.
+  if (routeField?.csvMinParts !== undefined && routeField.csvMinParts > 1) {
+    return Array.from({ length: routeField.csvMinParts }, (_, i) => `part${i + 1}`).join(',');
+  }
+
   // Unconstrained: a type-correct default. A date-like column name gets a past date so a
   // temporal guard elsewhere never rejects the control.
   if (/(^|_)(date|at|on|day|deadline|due)$/.test(col.name) && col.type !== 'integer') return pastDate();
   if (col.type === 'integer') return 1 + (rng() % 5);
   if (col.type === 'real' || col.type === 'numeric' || col.type === 'float') return 1 + (rng() % 5);
+  if (routeField?.scalar === 'number') return 1 + (rng() % 5);
+  if (routeField?.scalar === 'boolean') return true;
   return `seed_${(rng() % 1000).toString(36)}`;
 }
 
@@ -242,6 +260,8 @@ export interface BodyOptions {
   skipField?: string;
   /** column name → parent id already seeded (for FK columns). */
   fkIds?: Record<string, number>;
+  /** The route contract overlay (the create-schema's acceptance facts) for this table. */
+  contract?: RouteContract;
 }
 
 /**
@@ -258,11 +278,19 @@ export function synthesizeBody(
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   for (const col of table.columns) {
-    if (isServerColumn(col)) continue;
     if (opts.skipField && col.name === opts.skipField) continue;
+    const routeField = opts.contract?.get(col.name);
+    if (isServerColumn(col)) {
+      // A column skipped as server-owned (DEFAULT-nullable) must STILL be sent when the
+      // route's create-schema requires it — the route, not the DDL, owns acceptance.
+      const trulyServerOwned = col.isPrimaryKey || col.isAutoincrement
+        || col.name === 'created_at' || col.name === 'updated_at';
+      const routeRequires = routeField !== undefined && !routeField.optional;
+      if (trulyServerOwned || !routeRequires) continue;
+    }
     const cons = constraintsByAttr.get(col.name) ?? [];
     const fkId = opts.fkIds?.[col.name];
-    const v = synthesizeColumnValue(col, cons, rng, fkId);
+    const v = synthesizeColumnValue(col, cons, rng, fkId, routeField);
     if (v !== undefined) body[col.name] = v;
   }
   return body;
@@ -282,6 +310,8 @@ export interface SeedPlanInput {
   constraints: StructuredConstraint[];
   /** table (plural) → its mounted POST route ('/transaction'), or null if it has none. */
   routeFor: (table: string) => string | null;
+  /** table (plural) → the route-contract overlay parsed from its generated module. */
+  contractFor?: (table: string) => RouteContract | undefined;
 }
 
 export interface SeedContext {
@@ -348,7 +378,7 @@ export async function seedTable(
     else if (col.notNull) { ctx.unseedable.push({ table, reason: `required FK ${col.name}→${col.fkTable} unseedable` }); return undefined; }
   }
 
-  const body = synthesizeBody(schema, byTable.get(table) ?? new Map(), rng, { fkIds });
+  const body = synthesizeBody(schema, byTable.get(table) ?? new Map(), rng, { fkIds, contract: input.contractFor?.(table) });
   const res = await app.fetch(route, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
@@ -395,6 +425,6 @@ export async function seedForTarget(
       return { ok: false, reason: `FK ${col.name}→${col.fkTable}: ${ctx.unseedable.map(u => `${u.table} (${u.reason})`).join('; ') || 'unseedable'}` };
     }
   }
-  const seed = synthesizeBody(schema, byTable.get(targetTable) ?? new Map(), rng, { skipField: governedField, fkIds });
+  const seed = synthesizeBody(schema, byTable.get(targetTable) ?? new Map(), rng, { skipField: governedField, fkIds, contract: input.contractFor?.(targetTable) });
   return { ok: true, seed };
 }
