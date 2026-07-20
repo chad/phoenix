@@ -22,6 +22,9 @@ export const webApi: Architecture = {
   // list. No interactive client, no realtime presence, no audio: a game spec run
   // through web-api gets a loud OUT OF TARGET banner, never a silent narrowing.
   capabilities: ['http-api', 'domain-logic', 'persistence'],
+  // ...and it COMPOSES all three: routes are mounted into one app, migrations are
+  // aggregated into one schema. The whole is coherent, not a pile of modules.
+  composes: ['http-api', 'domain-logic', 'persistence'],
 
   systemPrompt: `## Architecture: API-driven Web Application
 

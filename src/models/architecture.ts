@@ -31,12 +31,21 @@ export interface Architecture {
   /** How to verify components: 'http-endpoints', 'unit-tests', 'cli-output' */
   evaluationSurface: string;
 
-  /** What this architecture can EXPRESS (architecture-fit gate vocabulary):
+  /** What this architecture can EXPRESS — a module can hold code for it:
    *  'http-api' | 'domain-logic' | 'persistence' | 'interactive-client' |
    *  'realtime-presence' | 'audio-engine'. Requirements demanding capabilities
    *  outside this list are OUT OF TARGET — reported loudly, never silently
    *  narrowed away. */
   capabilities: string[];
+
+  /** What this architecture can COMPOSE — capabilities for which it has a real
+   *  assembly mechanism that builds a coherent WHOLE, not just modules that each
+   *  compile. MUST be a subset of `capabilities`. The distinction is the freeqworld
+   *  lesson made structural: browser-game can EXPRESS an interactive client (137
+   *  modules generated) but could not COMPOSE one (no layout aggregate — 367 entities
+   *  in one flat space). A capability that is expressed but not composed is exactly
+   *  the soup case, and adequacy resolution (Step 0) refuses to generate against it. */
+  composes: string[];
 
   /** Architecture-level prompt: describes system shape for the LLM (no language specifics) */
   systemPrompt: string;

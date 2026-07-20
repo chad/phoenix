@@ -29,6 +29,12 @@ export const browserGame: Architecture = {
   // before they exist would re-create the exact silent gap this target was built
   // to close.
   capabilities: ['interactive-client', 'domain-logic'],
+  // ...but it only COMPOSES domain-logic. It can EXPRESS an interactive client
+  // (modules define entities + rules) yet has NO layout aggregate to assemble a
+  // navigable world — so interactive-client is deliberately absent here. This is the
+  // honest declaration that makes Step 0 refuse to ship soup: a game spec finds no
+  // architecture that both expresses AND composes an interactive client, and halts.
+  composes: ['domain-logic'],
 
   systemPrompt: `## Architecture: Browser Game Client
 

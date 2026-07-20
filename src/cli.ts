@@ -60,6 +60,7 @@ import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
 import { adaptSpec } from './spec-adapt.js';
 import { assessArchitectureFit, formatFitReport } from './architecture-fit.js';
+import { resolveArchitectureAdequacy, formatAdequacy } from './architecture-adequacy.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
 import { deriveProjectLivePlans, runLiveVerification } from './live-verify.js';
@@ -1584,7 +1585,7 @@ async function cmdAdapt(args: string[]): Promise<void> {
   console.log(dim('  spec/ (keep it — it is the intent record), move the draft in, then `phoenix canonicalize`.'));
 }
 
-async function cmdBootstrap(): Promise<void> {
+async function cmdBootstrap(args: string[] = []): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
 
   console.log(bold('🔥 Phoenix Bootstrap'));
@@ -1658,18 +1659,62 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`    ${green('✔')} System state: ${cyan(machine.getState())}`);
   console.log();
 
-  // Load architecture from config (before planning so output paths match the target).
+  // Step 0: Architecture adequacy. Derive the system's SHAPE from the canon graph and
+  // resolve an architecture that can both EXPRESS and COMPOSE it — BEFORE planning or
+  // generating anything. Refuses to build against an architecture it knows cannot
+  // produce the thing (the freeqworld cascade started exactly there).
   const configPath = join(phoenixDir, 'config.json');
-  let arch: ResolvedTarget | null = null;
+  let configuredArch: string | null = null;
   if (existsSync(configPath)) {
-    try {
-      const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      if (config.architecture) {
-        arch = resolveTarget(config.architecture);
-        if (arch) console.log(`  ${dim('Architecture:')} ${cyan(arch.architecture.name)} / ${cyan(arch.runtime.name)}`);
-      }
-    } catch { /* ignore */ }
+    try { configuredArch = JSON.parse(readFileSync(configPath, 'utf8')).architecture ?? null; } catch { /* ignore */ }
   }
+  const acceptInadequate = args.includes('--accept-inadequate-architecture');
+  // Normalize legacy/alias names (e.g. 'sqlite-web-api', 'web-api/python-fastapi') to the
+  // canonical architecture name the adequacy registry is keyed by.
+  const configuredCanonical = configuredArch ? (resolveTarget(configuredArch)?.architecture.name ?? configuredArch) : null;
+  const adequacy = resolveArchitectureAdequacy(canonNodes, configuredCanonical);
+  console.log(`  ${bold('🧭 Architecture')} ${dim('(Step 0 — derive the shape, resolve a fit)')}`);
+  for (const line of formatAdequacy(adequacy)) {
+    const c = line.startsWith('✔') ? green : line.startsWith('✖') ? red : line.startsWith('The architecture') || line.startsWith('Author') || line.startsWith('To generate') ? yellow : dim;
+    console.log(`    ${c(line)}`);
+  }
+
+  let arch: ResolvedTarget | null = null;
+  const isAdequate = adequacy.verdict === 'selected' || adequacy.verdict === 'chosen-adequate';
+  if (!isAdequate && !acceptInadequate) {
+    // HALT — do not generate against an inadequate architecture.
+    new Journal(phoenixDir).append({
+      type: 'plan', inputs: [], outputs: [],
+      meta: { architecture_adequacy: adequacy.verdict, configured: configuredArch, needed: adequacy.needed },
+    });
+    console.log();
+    console.log(red('  ■ Bootstrap halted at Step 0 — no adequate architecture.'));
+    console.log(`    ${dim('Author the architecture above (or pass --accept-inadequate-architecture to generate known-incoherent output).')}`);
+    return;
+  }
+  // Resolve the arch string: a chosen-adequate config keeps the human's exact target
+  // (runtime and all); a derived selection uses the canonical name; an override falls
+  // back to the configured target or the nearest base.
+  const useArchName = adequacy.verdict === 'chosen-adequate'
+    ? configuredArch
+    : adequacy.selected ?? configuredArch ?? adequacy.needed?.closest ?? null;
+  if (useArchName) {
+    arch = resolveTarget(useArchName);
+    // Persist a spec-derived selection so status/regen agree on the target.
+    if (arch && !configuredArch) {
+      try {
+        const cfg = existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')) : {};
+        cfg.architecture = useArchName;
+        writeFileSync(configPath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+      } catch { /* best effort */ }
+    }
+    const tag = adequacy.selected ? '' : dim(' (inadequate — proceeding by override; output will be incoherent)');
+    if (arch) console.log(`  ${dim('Architecture:')} ${cyan(arch.architecture.name)} / ${cyan(arch.runtime.name)}${tag}`);
+  }
+  new Journal(phoenixDir).append({
+    type: 'plan', inputs: [], outputs: [],
+    meta: { architecture_adequacy: adequacy.verdict, selected: useArchName, configured: configuredArch, accepted_inadequate: acceptInadequate && !adequacy.selected },
+  });
 
   // Step 3: Plan IUs — semantic domain clustering (LLM) when available
   console.log(`  ${dim('Phase C:')} IU planning`);
@@ -4185,7 +4230,7 @@ async function main(): Promise<void> {
       cmdInit(commandArgs);
       break;
     case 'bootstrap':
-      await cmdBootstrap();
+      await cmdBootstrap(commandArgs);
       break;
     case 'adapt':
       await cmdAdapt(commandArgs);

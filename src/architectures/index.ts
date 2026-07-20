@@ -59,6 +59,12 @@ export function listArchitectures(): string[] {
   return Object.keys(ARCHITECTURES);
 }
 
+/** The full architecture definitions (name, capabilities, composes) for adequacy
+ *  resolution — Step 0 scores the spec's shape against every one of these. */
+export function listArchitectureDefs(): Architecture[] {
+  return Object.values(ARCHITECTURES);
+}
+
 export function listRuntimeTargets(): string[] {
   return Object.keys(RUNTIME_TARGETS);
 }

@@ -66,9 +66,30 @@ const CAPABILITY_PATTERNS: Array<{ capability: string; label: string; re: RegExp
 const SAMPLES_PER_CAPABILITY = 3;
 
 /**
+ * Detect which DISTINGUISHING capabilities the spec demands (interactive-client,
+ * realtime-presence, audio-engine). Only normative nodes create demand — vision
+ * context acknowledges an aspiration; a requirement demands construction. The baseline
+ * service capabilities (http-api/domain-logic/persistence) are assumed, not detected:
+ * they are the floor, not what separates one architecture from another.
+ */
+export function detectCapabilityDemands(canonNodes: CanonicalNode[]): CapabilityDemand[] {
+  const normative = canonNodes.filter(n =>
+    n.type === CanonicalType.REQUIREMENT || n.type === CanonicalType.CONSTRAINT || n.type === CanonicalType.INVARIANT);
+  const demands: CapabilityDemand[] = [];
+  for (const { capability, label, re } of CAPABILITY_PATTERNS) {
+    const hits = normative.filter(n => re.test(n.statement));
+    if (hits.length === 0) continue;
+    demands.push({
+      capability, label,
+      nodeCount: hits.length,
+      samples: hits.slice(0, SAMPLES_PER_CAPABILITY).map(n => ({ statement: n.statement, canon_id: n.canon_id })),
+    });
+  }
+  return demands;
+}
+
+/**
  * Assess fit: which demanded capabilities does the target not provide?
- * Only normative nodes (REQUIREMENT/CONSTRAINT/INVARIANT) create demand — vision
- * context acknowledges an aspiration; a requirement demands construction.
  */
 export function assessArchitectureFit(
   canonNodes: CanonicalNode[],
@@ -76,21 +97,10 @@ export function assessArchitectureFit(
 ): ArchitectureFitReport {
   const provided = target?.architecture.capabilities ?? DEFAULT_SERVICE_CAPABILITIES;
   const targetName = target ? `${target.architecture.name}/${target.runtime.name}` : `(default service scaffold: ${DEFAULT_SERVICE_CAPABILITIES.join(', ')})`;
-
-  const normative = canonNodes.filter(n =>
-    n.type === CanonicalType.REQUIREMENT || n.type === CanonicalType.CONSTRAINT || n.type === CanonicalType.INVARIANT);
-
   const covered: CapabilityDemand[] = [];
   const outOfTarget: CapabilityDemand[] = [];
-  for (const { capability, label, re } of CAPABILITY_PATTERNS) {
-    const hits = normative.filter(n => re.test(n.statement));
-    if (hits.length === 0) continue;
-    const demand: CapabilityDemand = {
-      capability, label,
-      nodeCount: hits.length,
-      samples: hits.slice(0, SAMPLES_PER_CAPABILITY).map(n => ({ statement: n.statement, canon_id: n.canon_id })),
-    };
-    (provided.includes(capability) ? covered : outOfTarget).push(demand);
+  for (const demand of detectCapabilityDemands(canonNodes)) {
+    (provided.includes(demand.capability) ? covered : outOfTarget).push(demand);
   }
   return { targetName, provided, covered, outOfTarget };
 }
