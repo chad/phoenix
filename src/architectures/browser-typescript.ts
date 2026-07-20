@@ -295,10 +295,15 @@ function assembleBrowserModule(llmResponse: string, iu: ImplementationUnit): str
   let body = cleanCodeResponse(llmResponse)
     .split('\n')
     .filter(l => !(l.trim().startsWith('import ') && ENGINE_IMPORT.test(l)))
+    .filter(l => !/^\s*(?:\/\*\s*)?__[A-Z_]+__(?:\s*\*\/)?\s*$/.test(l)) // models echo the section markers
     .join('\n')
     .trim();
   // Ban node imports outright — better a compile-visible hole than a silent node dep.
   body = body.replace(/^import .*from\s*['"]node:[^'"]*['"].*$/gm, '// [phoenix] removed node import — browser module');
+  // Strip any _phoenix metadata the model emitted (it copies patterns from context) —
+  // the canonical block is appended below; two declarations do not compile.
+  body = body.replace(/\/\*\*[^]*?_phoenix[^]*?\*\/\s*export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
+  body = body.replace(/export\s+const\s+_phoenix\s*=\s*\{[^}]*\}\s*as\s+const\s*;?\s*/g, '');
 
   const slug = iu.output_files[0]?.split('/').at(-2) ?? iu.name.toLowerCase().replace(/\s+/g, '-');
   if (!/export function register\s*\(/.test(body)) {
