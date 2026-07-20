@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  lintRule,
   splitSpecSections,
   parseAdaptedSection,
   computeAdaptCoverage,
@@ -214,5 +215,39 @@ describe('adaptSpec (stub LLM — the trust surface, not the prose)', () => {
         : '```markdown\n# FreeqWorld\n- The room must have a unique name. <!-- from:L2 -->\n```');
     const result = await adaptSpec('s.md', '# FreeqWorld\nA room must have a unique name.', llm);
     expect(result.coverage.covered).toBe(1);
+  });
+});
+
+describe('lintRule — the patterns a human review rejected once, flagged forever', () => {
+  it('flags commentary (no modal verb) — the L1960 class', () => {
+    expect(lintRule('No numeric targets or thresholds are given for any launch metric, so these read as categories of interest.'))
+      .toMatch(/no modal verb/);
+  });
+
+  it('flags double negatives — the L1606 class', () => {
+    expect(lintRule('Client must not fail to render a Message when the type is unsupported.'))
+      .toMatch(/double negative/);
+    expect(lintRule('Client must render an unsupported structured event as a generic event.')).toBeNull();
+  });
+
+  it('flags project-planning meta — the L1939 / roadmap-module class', () => {
+    expect(lintRule('Each roadmap phase (2–6) must have a unique phase number.')).toMatch(/project-planning/);
+    expect(lintRule('The MVP must include public read-only guest access.')).toMatch(/project-planning/);
+    expect(lintRule('The room must have a unique name.')).toBeNull();
+  });
+
+  it('a metric WITH a system threshold is a real rule, not planning meta', () => {
+    expect(lintRule('The server must accept at most 15 position updates per second per participant.')).toBeNull();
+  });
+
+  it('adaptSpec surfaces suspects without deleting them (human stays sovereign)', async () => {
+    const llm = new StubProvider((prompt, system) => {
+      if (system?.includes('converting one section') === false) return '# Data model\n- Room: name';
+      return '# Plan\n- Each roadmap phase must have a unique number. <!-- from:L2 -->';
+    });
+    const result = await adaptSpec('s.md', '# Plan\nEach roadmap phase must have a unique number.', llm);
+    expect(result.suspectRules).toHaveLength(1);
+    expect(result.suspectRules[0].reason).toMatch(/project-planning/);
+    expect(result.rules).toHaveLength(1); // still in the draft — flagged, not deleted
   });
 });

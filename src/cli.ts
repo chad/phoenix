@@ -1552,6 +1552,11 @@ async function cmdAdapt(args: string[]): Promise<void> {
       console.log(red(`    Hallucinated line references (${c.unboundSpans.length}) — provenance spans outside the source; treat those rules as proposed:`));
       for (const [a, b] of c.unboundSpans.slice(0, 5)) console.log(red(`      · L${a}-L${b}`));
     }
+    if (result.suspectRules.length > 0) {
+      console.log(yellow(`    Suspect rules (${result.suspectRules.length}) — flagged by the lint, review with extra care:`));
+      for (const s of result.suspectRules.slice(0, 10)) console.log(yellow(`      · [${s.reason}] ${s.text.slice(0, 90)}`));
+      if (result.suspectRules.length > 10) console.log(dim(`      … and ${result.suspectRules.length - 10} more`));
+    }
     console.log();
 
     new Journal(phoenixDir).append({
@@ -1568,6 +1573,7 @@ async function cmdAdapt(args: string[]): Promise<void> {
         rules_proposed: c.proposedRules.length,
         rescued_rules: result.rescued.rules,
         rescued_vision: result.rescued.vision,
+        rules_suspect: result.suspectRules.length,
         spans_unbound: c.unboundSpans.length,
       },
     });

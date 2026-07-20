@@ -70,8 +70,38 @@ export interface AdaptResult {
   coverage: AdaptCoverage;
   /** Second-pass salvage: rules/vision recovered from first-pass drops. */
   rescued: { rules: number; vision: number };
+  /** Rules the deterministic lint flags — shown to the human, never auto-deleted. */
+  suspectRules: SuspectRule[];
   sourceSha: string;
   model: string;
+}
+
+export interface SuspectRule {
+  text: string;
+  reason: string;
+  proposed: boolean;
+}
+
+/**
+ * Deterministic rule lint — the patterns a human review rejected once, so the machine
+ * flags them forever (prompts reduce occurrence; the lint catches recurrence). Flags,
+ * never deletes: the human stays sovereign over what counts as a rule.
+ *   - commentary: a "rule" with no modal verb is an observation, not an obligation
+ *   - double negative: "must not fail to X" hides the actual requirement (state X)
+ *   - project-planning meta: roadmap phases, launch posts, MVP scoping, and metric
+ *     categories describe the PROJECT, not the system under construction
+ */
+export function lintRule(text: string): string | null {
+  if (!/\b(must|shall|never|always)\b/i.test(text)) {
+    return 'no modal verb — commentary, not a rule';
+  }
+  if (/\bmust not [^.]{0,40}\b(fail|unable|omit to|neglect)\b/i.test(text)) {
+    return 'double negative — state what must happen instead';
+  }
+  if (/\b(roadmap|phase \d|launch post|success metric|metric categor|mvp\b|open.?source strategy)\b/i.test(text)) {
+    return 'project-planning meta — describes the project, not the system';
+  }
+  return null;
 }
 
 // ─── Section splitting ───────────────────────────────────────────────────────
@@ -121,7 +151,11 @@ Rules for the rewrite:
 4. If the section implies a rule it never states (a gap a reader must assume), you MAY add it as a bullet ending with <!-- proposed --> — sparingly. Never silently invent.
 5. Aspirations that cannot be machine-checked ("feel like", "evoke", "recognizable", "not annoying") go under a "### Vision (unverified context)" subsection, rewritten WITHOUT modal verbs as plain descriptive sentences, each with provenance. Do not delete them — they are context, not rules.
 6. Tables and list fragments carrying normative content become full-sentence rules with provenance.
-7. Keep the section's original heading as the first line. Output ONLY markdown for this section — no preamble, no fences.`;
+7. PROJECT-PLANNING content is not system behavior. Roadmaps, phase sequences, MVP scoping, launch plans, HN/demo strategy, success metrics without numeric thresholds, open-source strategy, and risk lists describe the PROJECT — put their content under Vision, and never emit a rule about a roadmap phase, launch post, or metric category. (A metric WITH a numeric threshold the system itself must meet is a real rule.)
+8. Never emit meta-commentary about the spec itself ("no thresholds are given…") as a bullet — if you cannot make a rule, classify the sentence as Vision or leave it uncited.
+9. Scope rules exactly as the source scopes them: a world-level or product-level goal must NOT be widened into a per-entity requirement ("the world should show X" never becomes "every room must show X").
+10. No double negatives ("must not fail to render") — state what MUST happen ("must render … as …").
+11. Keep the section's original heading as the first line. Output ONLY markdown for this section — no preamble, no fences.`;
 
 // ─── Derived-output parsing ──────────────────────────────────────────────────
 
@@ -129,7 +163,9 @@ const RESCUE_SYSTEM = `You are a requirements engineer. The first translation pa
 
 For EACH listed sentence, output exactly one bullet, in one of the two sections:
 - Under "## Rescued rules": a machine-checkable rule — explicit entity subject, modal verb, checkable predicate — ending with <!-- from:LN --> citing the sentence's line number. Tables and list fragments become full-sentence rules.
-- Under "### Vision (unverified context)": if the sentence CANNOT be machine-checked ("feel like", "evoke", aspirations), restate it WITHOUT modal verbs as plain description, ending with <!-- from:LN -->. NEVER force a rule from an unverifiable sentence — misclassifying vision as a rule is worse than admitting it.
+- Under "### Vision (unverified context)": if the sentence CANNOT be machine-checked ("feel like", "evoke", aspirations) or is PROJECT-PLANNING content (roadmap, MVP scope, launch strategy, metric categories without thresholds), restate it WITHOUT modal verbs as plain description, ending with <!-- from:LN -->. NEVER force a rule from an unverifiable sentence — misclassifying vision as a rule is worse than admitting it.
+
+No double negatives; scope rules exactly as the source scopes them; never emit meta-commentary about the spec as a bullet.
 
 Output ONLY markdown with those two section headings (omit an empty section). Every listed line number must appear in exactly one bullet.`;
 
@@ -367,6 +403,15 @@ export async function adaptSpec(
     '',
   ].join('\n');
 
+  // The lint runs over every rule (cited and proposed alike) — a cited double
+  // negative is as unreviewable as an invented one.
+  const suspectRules: SuspectRule[] = [];
+  for (const r of allRules) {
+    if (/^vision\b/i.test(r.section)) continue; // vision lines are exempt — they are not rules
+    const reason = lintRule(r.text);
+    if (reason) suspectRules.push({ text: r.text, reason, proposed: r.proposed });
+  }
+
   const derivedMarkdown = `${header}\n# Data model (derived)\n\n${glossary}\n\n${partsInOrder.join('\n\n')}\n`;
-  return { derivedMarkdown, glossary, rules: allRules, coverage, rescued, sourceSha, model: `${llm.name}/${llm.model}` };
+  return { derivedMarkdown, glossary, rules: allRules, coverage, rescued, suspectRules, sourceSha, model: `${llm.name}/${llm.model}` };
 }

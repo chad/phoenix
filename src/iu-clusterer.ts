@@ -63,6 +63,8 @@ const STOP_ANCHORS = new Set([
   'include', 'equal', 'able', 'exactly', 'within', 'contain', 'locally', 'other',
   'use', 'displayed', 'present', 'required', 'retain', 'offer', 'string', 'boolean',
   'who', 'optional', 'stored', 'named', 'deterministic', 'mvp',
+  // project-planning language — a roadmap is about the project, never a domain module
+  'roadmap', 'milestone',
   // common attributes / values
   'status', 'priority', 'point', 'estimate', 'capacity', 'title', 'goal', 'label',
   'assignee', 'description', 'count', 'color', 'complete', 'overdue', 'unique', 'integer',
