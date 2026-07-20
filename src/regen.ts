@@ -192,12 +192,18 @@ export async function generateIU(iu: ImplementationUnit, ctx?: RegenContext): Pr
  * real contract (schemas + routes) is extracted and accumulated into
  * ctx.siblingContracts so later (consumer) IUs are generated against it.
  */
-export async function generateAll(ius: ImplementationUnit[], ctx?: RegenContext): Promise<RegenResult[]> {
+export async function generateAll(
+  ius: ImplementationUnit[],
+  ctx?: RegenContext,
+  opts: { concurrency?: number } = {},
+): Promise<RegenResult[]> {
   const contracts = ctx?.siblingContracts ?? new Map<string, string>();
   if (ctx) ctx.siblingContracts = contracts;
 
-  const results: RegenResult[] = [];
-  for (const iu of orderForGeneration(ius)) {
+  const ordered = orderForGeneration(ius);
+  const results = new Map<string, RegenResult>();
+
+  async function generateOne(iu: ImplementationUnit): Promise<void> {
     const result = await generateIU(iu, ctx);
     // Extract this IU's contract (via the target) for downstream consumers.
     const primary = result.files.get(iu.output_files[0]) ?? [...result.files.values()][0];
@@ -205,9 +211,26 @@ export async function generateAll(ius: ImplementationUnit[], ctx?: RegenContext)
       const contract = ctx.target.runtime.extractContract(primary);
       if (contract) contracts.set(iu.iu_id, contract);
     }
-    results.push(result);
+    results.set(iu.iu_id, result);
   }
-  return results;
+
+  // Two waves. Entity/API modules generate concurrently — the pre-planned shared
+  // schema is the HARD coordination between them; sibling contracts are soft context
+  // (sequential generation also gave early modules few or none). UI modules wait for
+  // wave one so they see the complete contract map — that ordering is the guarantee
+  // that matters. Each module touches only its own files; compile checks filter to
+  // the module's own path, and modules never import siblings.
+  const concurrency = Math.max(1, opts.concurrency ?? 1);
+  const waves = [ordered.filter(iu => !isUiIU(iu)), ordered.filter(iu => isUiIU(iu))];
+  for (const wave of waves) {
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < wave.length) await generateOne(wave[next++]);
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(wave.length, 1)) }, worker));
+  }
+
+  return ordered.map(iu => results.get(iu.iu_id)!);
 }
 
 /** UI IUs depend on API/data IUs, so generate them last. Stable otherwise. */

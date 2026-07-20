@@ -1734,16 +1734,16 @@ async function cmdBootstrap(): Promise<void> {
     siblingContracts: loadExistingContracts(projectRoot, ius, arch),
     sharedSchema: schemaPlan?.ddl,
     onGenerationFailure,
+    // Concurrency-safe progress: whole lines on completion (start/done pairs interleave).
     onProgress: (iu, status, msg) => {
-      if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
-      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
-      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
+      if (status === 'done') console.log(`    ${green('✔')} ${iu.name}`);
+      else if (status === 'error') console.log(`    ${red('✖')} ${iu.name} ${dim(msg || 'failed, using stub')}`);
     },
   };
 
   const manifestManager = new ManifestManager(phoenixDir);
   const previousMasses = loadPreviousMasses(manifestManager);
-  const regenResults = await generateAll(ius, regenCtx);
+  const regenResults = await generateAll(ius, regenCtx, { concurrency: 4 });
 
   // Lift shared aggregate artifacts (migrations) out of the modules into one file with
   // per-IU regions. In schema-first mode the pre-planned schema is AUTHORITATIVE: its
@@ -2717,10 +2717,10 @@ async function cmdRegen(args: string[]): Promise<void> {
     negativeKnowledge: nkByIU,
     siblingContracts: loadExistingContracts(projectRoot, ius, regenArch),
     onGenerationFailure,
+    // Concurrency-safe progress: whole lines on completion (start/done pairs interleave).
     onProgress: (iu, status, msg) => {
-      if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
-      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
-      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
+      if (status === 'done') console.log(`  ${green('✔')} ${iu.name}`);
+      else if (status === 'error') console.log(`  ${red('✖')} ${iu.name} ${dim(msg || 'failed, using stub')}`);
     },
   };
 
@@ -2731,7 +2731,7 @@ async function cmdRegen(args: string[]): Promise<void> {
   // contract change after regeneration and pull in dependents that would break.
   const oldContracts = loadExistingContracts(projectRoot, targetIUs, regenArch);
 
-  const results = await generateAll(targetIUs, regenCtx);
+  const results = await generateAll(targetIUs, regenCtx, { concurrency: 4 });
 
   // Contract-aware dependent regeneration: if a regenerated IU's contract CHANGED,
   // regenerate its transitive dependents against the new contract — otherwise a
