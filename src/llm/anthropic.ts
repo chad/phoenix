@@ -88,9 +88,18 @@ export class AnthropicProvider implements LLMProvider {
           throw new Error(`Anthropic API error ${res.status}: ${text}`);
         }
 
-        const data = await res.json() as { content: Array<{ type: string; text: string }> };
+        const data = await res.json() as { content: Array<{ type: string; text: string }>; stop_reason?: string };
         const textBlocks = data.content.filter(b => b.type === 'text');
-        if (textBlocks.length === 0) throw new Error('Anthropic returned no text content');
+        // Self-heal: models that think by default can burn the max_tokens budget
+        // inside a thinking block — zero text, or text cut off mid-JSON (the same
+        // failure kimi-k3 taught us). Phoenix's deterministic calls don't need
+        // thinking — retry once with it disabled so the full budget goes to the
+        // answer, rather than collapsing to a stub or returning a truncated reply.
+        if (!('thinking' in body) && data.stop_reason === 'max_tokens' && data.content.some(b => b.type === 'thinking')) {
+          (body as Record<string, unknown>).thinking = { type: 'disabled' };
+          continue;
+        }
+        if (textBlocks.length === 0) throw new Error(`Anthropic returned no text content (stop_reason: ${data.stop_reason ?? 'unknown'})`);
         return textBlocks.map(b => b.text).join('');
       } catch (err) {
         lastErr = err;

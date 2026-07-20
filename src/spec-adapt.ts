@@ -47,11 +47,15 @@ export interface AdaptedRule {
 }
 
 export interface AdaptCoverage {
-  /** Source lines carrying a normative cue. */
+  /** Source lines carrying a normative cue (headings excluded — a heading that says
+   *  "Requirement" is structure, not a rule). */
   sourceNormatives: Array<{ line: number; text: string }>;
-  /** Normatives cited by at least one derived rule. */
+  /** Normatives cited by at least one derived RULE. */
   covered: number;
-  /** Normatives NO derived rule cites — intent lost in transformation. */
+  /** Normatives cited only by Vision-section lines — acknowledged as unverifiable
+   *  context, deliberately not rules. Not lost; not checkable. */
+  vision: Array<{ line: number; text: string }>;
+  /** Normatives NO derived line cites — intent lost in transformation. */
   dropped: Array<{ line: number; text: string }>;
   /** Derived rules with no source span — intent invented. */
   proposedRules: string[];
@@ -64,6 +68,8 @@ export interface AdaptResult {
   glossary: string;
   rules: AdaptedRule[];
   coverage: AdaptCoverage;
+  /** Second-pass salvage: rules/vision recovered from first-pass drops. */
+  rescued: { rules: number; vision: number };
   sourceSha: string;
   model: string;
 }
@@ -119,6 +125,14 @@ Rules for the rewrite:
 
 // ─── Derived-output parsing ──────────────────────────────────────────────────
 
+const RESCUE_SYSTEM = `You are a requirements engineer. The first translation pass missed the sentences below — each is a normative sentence from a product spec that no derived rule cites. Give each ONE more careful attempt.
+
+For EACH listed sentence, output exactly one bullet, in one of the two sections:
+- Under "## Rescued rules": a machine-checkable rule — explicit entity subject, modal verb, checkable predicate — ending with <!-- from:LN --> citing the sentence's line number. Tables and list fragments become full-sentence rules.
+- Under "### Vision (unverified context)": if the sentence CANNOT be machine-checked ("feel like", "evoke", aspirations), restate it WITHOUT modal verbs as plain description, ending with <!-- from:LN -->. NEVER force a rule from an unverifiable sentence — misclassifying vision as a rule is worse than admitting it.
+
+Output ONLY markdown with those two section headings (omit an empty section). Every listed line number must appear in exactly one bullet.`;
+
 const FROM_COMMENT_RE = /<!--\s*from:([^>]*)-->/g;
 // Inside a from: body, citations appear as L120, L120-L124, L120-124, or comma lists
 // (L120, L124) — models vary; every shape parses to tight spans.
@@ -169,28 +183,64 @@ function undecorate(line: string): string {
 }
 
 /**
- * The trust report: which source normatives the draft covers (a derived rule cites
- * their line), which it DROPPED (intent lost), and which rules it PROPOSED (intent
- * invented). Line-level: a normative is covered when any rule's span contains it.
+ * The lines whose citation carries an intro line's intent: a normative ending in ':'
+ * introduces a list — the RULES live in the bullets that follow. Returns the 1-based
+ * line numbers of the intro's block (bullets, table rows, indented continuations),
+ * bounded and stopping at the next heading or flush plain paragraph.
+ */
+function introBlockLines(lines: string[], introIdx: number): number[] {
+  if (!/:\s*$/.test(lines[introIdx].trim())) return [];
+  const block: number[] = [];
+  for (let j = introIdx + 1; j < Math.min(lines.length, introIdx + 40); j++) {
+    const l = lines[j];
+    if (/^#{1,6}\s/.test(l)) break;                       // next heading ends the block
+    if (l.trim() === '') { if (block.length > 0) continue; else continue; } // leading/interior blanks ok
+    if (/^\s*(?:[-*+]|\d+[.)])\s/.test(l) || /^\s*\|/.test(l) || /^\s{2,}\S/.test(l)) {
+      block.push(j + 1);
+      continue;
+    }
+    break;                                                // flush plain text ends the block
+  }
+  return block;
+}
+
+/**
+ * The trust report, three-way: which source normatives the draft covers as RULES,
+ * which it preserved as VISION (acknowledged unverifiable context), and which it
+ * DROPPED (cited by nothing — intent lost); plus rules it PROPOSED (intent invented).
+ * Line-level, with two shape smarts: markdown headings never count as normatives, and
+ * an intro line ending in ':' is carried by its list block's citations.
  */
 export function computeAdaptCoverage(source: string, rules: AdaptedRule[], unboundSpans: Array<[number, number]>): AdaptCoverage {
   const lines = source.split('\n');
   const sourceNormatives: Array<{ line: number; text: string }> = [];
   for (let i = 0; i < lines.length; i++) {
+    if (/^#{1,6}\s/.test(lines[i])) continue; // headings are structure, not rules
     const text = undecorate(lines[i]);
     if (text.length >= 8 && isObligation(text)) sourceNormatives.push({ line: i + 1, text });
   }
-  const citedLines = new Set<number>();
+
+  const ruleCited = new Set<number>();
+  const visionCited = new Set<number>();
   for (const r of rules) {
-    // Vision-section lines acknowledge a normative as context — they do not COVER it
-    // as a checkable rule, and the report must not pretend otherwise.
-    if (/^vision\b/i.test(r.section)) continue;
-    for (const [a, b] of r.fromSpans) for (let n = a; n <= b; n++) citedLines.add(n);
+    const target = /^vision\b/i.test(r.section) ? visionCited : ruleCited;
+    for (const [a, b] of r.fromSpans) for (let n = a; n <= b; n++) target.add(n);
   }
-  const dropped = sourceNormatives.filter(n => !citedLines.has(n.line));
+
+  let covered = 0;
+  const vision: Array<{ line: number; text: string }> = [];
+  const dropped: Array<{ line: number; text: string }> = [];
+  for (const n of sourceNormatives) {
+    const carriers = [n.line, ...introBlockLines(lines, n.line - 1)];
+    if (carriers.some(l => ruleCited.has(l))) covered++;
+    else if (carriers.some(l => visionCited.has(l))) vision.push(n);
+    else dropped.push(n);
+  }
+
   return {
     sourceNormatives,
-    covered: sourceNormatives.length - dropped.length,
+    covered,
+    vision,
     dropped,
     proposedRules: rules.filter(r => r.proposed).map(r => r.text),
     unboundSpans,
@@ -272,18 +322,51 @@ export async function adaptSpec(
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
 
-  const coverage = computeAdaptCoverage(source, allRules, allUnbound);
+  let coverage = computeAdaptCoverage(source, allRules, allUnbound);
   const partsInOrder = derivedParts.filter(p => p.length > 0);
+
+  // The rescue pass — first-pass drops get a second, targeted shot. Each dropped
+  // sentence returns as a rule OR an explicit vision classification; whatever still
+  // isn't cited stays honestly dropped.
+  let rescued = { rules: 0, vision: 0 };
+  if (coverage.dropped.length > 0) {
+    const srcLines = source.split('\n');
+    const RESCUE_BATCH = 20;
+    const rescueParts: string[] = [];
+    for (let off = 0; off < coverage.dropped.length; off += RESCUE_BATCH) {
+      const batch = coverage.dropped.slice(off, off + RESCUE_BATCH);
+      say(`rescue pass: ${batch.length} dropped obligation(s) get a second, targeted shot`);
+      const listed = batch.map(d => {
+        const ctx = srcLines.slice(Math.max(0, d.line - 3), Math.min(srcLines.length, d.line + 2))
+          .map((l, i) => `${Math.max(0, d.line - 3) + i + 1}: ${l}`).join('\n');
+        return `Line ${d.line}: ${srcLines[d.line - 1]}\nContext:\n${ctx}`;
+      }).join('\n\n');
+      try {
+        const out = stripFences(await llm.generate(listed, { system: RESCUE_SYSTEM, temperature: 0, maxTokens: 4096 })).trim();
+        rescueParts.push(out);
+        const parsed = parseAdaptedSection(out, sourceLineCount);
+        for (const r of parsed.rules) (/^vision\b/i.test(r.section) ? rescued.vision++ : rescued.rules++);
+        allRules.push(...parsed.rules);
+        allUnbound.push(...parsed.unboundSpans);
+      } catch (e) {
+        say(`rescue batch failed (${e instanceof Error ? e.message : String(e)}) — those lines stay dropped, honestly`);
+      }
+    }
+    if (rescueParts.length > 0) {
+      partsInOrder.push(`# Rescued obligations (second pass)\n\n${rescueParts.join('\n\n')}`);
+      coverage = computeAdaptCoverage(source, allRules, allUnbound);
+    }
+  }
 
   const header = [
     `<!-- PHOENIX-DERIVED DRAFT — review, edit, then adopt.`,
     `     source: ${docName} (sha256:${sourceSha.slice(0, 16)}…, ${sourceLineCount} lines)`,
     `     model: ${llm.name}/${llm.model}`,
-    `     coverage: ${coverage.covered}/${coverage.sourceNormatives.length} source obligations cited · ${coverage.dropped.length} dropped · ${coverage.proposedRules.length} proposed (invented — endorse or delete)`,
+    `     coverage: ${coverage.covered}/${coverage.sourceNormatives.length} source obligations → rules · ${coverage.vision.length} preserved as vision · ${coverage.dropped.length} dropped · ${coverage.proposedRules.length} proposed (invented — endorse or delete) · rescued: ${rescued.rules} rules + ${rescued.vision} vision`,
     `     Provenance comments (from:Lx-Ly) are hash-invisible and safe to keep. -->`,
     '',
   ].join('\n');
 
   const derivedMarkdown = `${header}\n# Data model (derived)\n\n${glossary}\n\n${partsInOrder.join('\n\n')}\n`;
-  return { derivedMarkdown, glossary, rules: allRules, coverage, sourceSha, model: `${llm.name}/${llm.model}` };
+  return { derivedMarkdown, glossary, rules: allRules, coverage, rescued, sourceSha, model: `${llm.name}/${llm.model}` };
 }

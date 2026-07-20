@@ -57,6 +57,12 @@ const STOP_ANCHORS = new Set([
   'assign', 'provide', 'support', 'enable', 'accept', 'receive', 'handle',
   'validate', 'reopen', 'let', 'must', 'reset', 'submit', 'cancel', 'approve',
   'reject', 'compute', 'calculate',
+  // requirement-phrasing words that surface as tags on adapted/operational specs
+  // ("must include", "must equal", "must be able to", "must remain within") — a
+  // cluster named 'include' or 'equal' is a phrasing artifact, never a domain
+  'include', 'equal', 'able', 'exactly', 'within', 'contain', 'locally', 'other',
+  'use', 'displayed', 'present', 'required', 'retain', 'offer', 'string', 'boolean',
+  'who', 'optional', 'stored', 'named', 'deterministic', 'mvp',
   // common attributes / values
   'status', 'priority', 'point', 'estimate', 'capacity', 'title', 'goal', 'label',
   'assignee', 'description', 'count', 'color', 'complete', 'overdue', 'unique', 'integer',
@@ -200,12 +206,39 @@ function splitOversized(c: CanonCluster, tagsOf: Map<string, string[]>, freq: Ma
     if (!sub.has(key)) sub.set(key, []);
     sub.get(key)!.push(n);
   }
-  if (sub.size <= 1) return [c]; // can't split meaningfully
+  if (sub.size <= 1) return chunkSplit(c); // tags can't split — bound the grain anyway
   const result = mergeTiny([...sub].map(([anchor, nodes]) => ({ anchor, nodes })), tagsOf);
   // If every sub-bucket is a singleton, mergeTiny is a no-op and we'd emit only singletons
   // (violating MIN_CLUSTER) — keep the original cluster intact instead of exploding it.
-  if (result.every(r => r.nodes.length < MIN_CLUSTER)) return [c];
-  return result;
+  if (result.every(r => r.nodes.length < MIN_CLUSTER)) return chunkSplit(c);
+  // A sub-bucket can still exceed the ceiling (one dominant second tag) — bound it.
+  return result.flatMap(r => (r.nodes.length > MAX_CLUSTER ? chunkSplit(r) : [r]));
+}
+
+/**
+ * Last-resort split when tags cannot partition an oversized cluster: stable
+ * order-preserving chunks ("room", "room-2", …). Sacrifices semantic sub-naming to
+ * keep every IU a generatable grain — an 80-node module fits no codegen prompt.
+ */
+function chunkSplit(c: CanonCluster): CanonCluster[] {
+  if (c.nodes.length <= MAX_CLUSTER) return [c];
+  const parts = Math.ceil(c.nodes.length / MAX_CLUSTER);
+  const per = Math.ceil(c.nodes.length / parts);
+  const out: CanonCluster[] = [];
+  for (let i = 0; i < parts; i++) {
+    out.push({ anchor: i === 0 ? c.anchor : `${c.anchor}-${i + 1}`, nodes: c.nodes.slice(i * per, (i + 1) * per) });
+  }
+  return out;
+}
+
+/** Above this many nodes, one prompt cannot hold the assignment JSON — go two-stage. */
+export const LLM_SINGLE_CALL_MAX = 150;
+
+export interface LLMClusterOptions {
+  /** Invoked when LLM clustering fails and the deterministic rule clusterer takes
+   *  over — a silent downgrade would present tag-heuristic module names as semantic
+   *  judgment (this exact silence produced 'include'/'equal' modules once). */
+  onFallback?: (err: Error) => void;
 }
 
 /**
@@ -213,15 +246,42 @@ function splitOversized(c: CanonCluster, tagsOf: Map<string, string[]>, freq: Ma
  * cohesive domain modules (an entity + its constraints + its operations; a UI is its
  * own module; a derived report is its own module), which is the judgment a tag
  * heuristic can't reliably make. Falls back to the deterministic rule clusterer on
- * any transport/parse failure or for nodes the model leaves unassigned.
+ * any transport/parse failure or for nodes the model leaves unassigned — LOUDLY,
+ * via onFallback. Large graphs go two-stage (discover modules, then assign in
+ * batches) because a single reply cannot hold a thousand-node mapping.
  */
 export async function clusterCanonNodesLLM(
   nodes: CanonicalNode[],
   llm: LLMProvider,
+  opts: LLMClusterOptions = {},
 ): Promise<CanonCluster[]> {
   const real = nodes.filter(n => n.type !== CanonicalType.CONTEXT);
   if (real.length === 0) return [];
 
+  try {
+    const clusters = real.length <= LLM_SINGLE_CALL_MAX
+      ? await clusterSingleCall(real, llm)
+      : await clusterTwoStage(real, llm);
+    if (clusters.length === 0) throw new Error('LLM returned no usable clusters');
+    clusters.sort((a, b) => b.nodes.length - a.nodes.length || (a.anchor < b.anchor ? -1 : 1));
+    return clusters;
+  } catch (e) {
+    opts.onFallback?.(e instanceof Error ? e : new Error(String(e)));
+    return clusterCanonNodes(real); // deterministic fallback
+  }
+}
+
+/** Fold model-dropped requirements into rule-clustered homes so nothing is lost. */
+function foldOrphans(clusters: CanonCluster[], real: CanonicalNode[], assigned: Set<number>): void {
+  const orphans = real.filter((_, i) => !assigned.has(i));
+  if (!orphans.length) return;
+  for (const c of clusterCanonNodes(orphans)) {
+    const existing = clusters.find(x => x.anchor === c.anchor);
+    if (existing) existing.nodes.push(...c.nodes); else clusters.push(c);
+  }
+}
+
+async function clusterSingleCall(real: CanonicalNode[], llm: LLMProvider): Promise<CanonCluster[]> {
   const listed = real.map((n, i) => `${i + 1}. [${n.type}] ${n.statement.replace(/\n/g, ' ')}`).join('\n');
   const prompt = `Group these software requirements into cohesive implementation modules.
 
@@ -237,34 +297,93 @@ Return ONLY a JSON array: [{"name": "<short entity or capability name>", "member
 Requirements:
 ${listed}`;
 
-  try {
-    const raw = await llm.generate(prompt, { temperature: 0, maxTokens: 4096 });
-    const json = raw.slice(raw.indexOf('['), raw.lastIndexOf(']') + 1);
-    const groups = JSON.parse(json) as { name: string; members: number[] }[];
-    const assigned = new Set<number>();
-    const clusters: CanonCluster[] = [];
-    for (const g of groups) {
-      const ns: CanonicalNode[] = [];
-      for (const m of g.members || []) {
-        const idx = m - 1;
-        if (idx >= 0 && idx < real.length && !assigned.has(idx)) { assigned.add(idx); ns.push(real[idx]); }
-      }
-      if (ns.length) clusters.push({ anchor: slugAnchor(g.name), nodes: ns });
+  const raw = await llm.generate(prompt, { temperature: 0, maxTokens: 8192 });
+  const json = raw.slice(raw.indexOf('['), raw.lastIndexOf(']') + 1);
+  const groups = JSON.parse(json) as { name: string; members: number[] }[];
+  const assigned = new Set<number>();
+  const clusters: CanonCluster[] = [];
+  for (const g of groups) {
+    const ns: CanonicalNode[] = [];
+    for (const m of g.members || []) {
+      const idx = m - 1;
+      if (idx >= 0 && idx < real.length && !assigned.has(idx)) { assigned.add(idx); ns.push(real[idx]); }
     }
-    // Any requirement the model dropped: fold into the rule-clustered home so nothing is lost.
-    const orphans = real.filter((_, i) => !assigned.has(i));
-    if (orphans.length) {
-      for (const c of clusterCanonNodes(orphans)) {
-        const existing = clusters.find(x => x.anchor === c.anchor);
-        if (existing) existing.nodes.push(...c.nodes); else clusters.push(c);
-      }
-    }
-    if (clusters.length === 0) return clusterCanonNodes(real);
-    clusters.sort((a, b) => b.nodes.length - a.nodes.length || (a.anchor < b.anchor ? -1 : 1));
-    return clusters;
-  } catch {
-    return clusterCanonNodes(real); // deterministic fallback
+    if (ns.length) clusters.push({ anchor: slugAnchor(g.name), nodes: ns });
   }
+  foldOrphans(clusters, real, assigned);
+  return clusters;
+}
+
+/**
+ * Two-stage clustering for large graphs. Stage A reads every statement (truncated)
+ * and names the system's modules; stage B assigns requirements to those modules in
+ * concurrent batches. Batch assignment is order-independent: results key on the
+ * requirement's global number.
+ */
+async function clusterTwoStage(real: CanonicalNode[], llm: LLMProvider): Promise<CanonCluster[]> {
+  // Stage A — discover the module list from the whole (truncated) corpus.
+  const brief = real.map((n, i) => `${i + 1}. ${n.statement.replace(/\n/g, ' ').slice(0, 100)}`).join('\n');
+  const nameRaw = await llm.generate(
+    `Here are ${real.length} software requirements (truncated). Name the domain modules that partition this system — one per domain entity, one for the user-facing UI, one per genuinely derived view. Aim for ${Math.max(6, Math.min(24, Math.round(real.length / 40)))}–${Math.max(10, Math.min(30, Math.round(real.length / 25)))} modules. Return ONLY a JSON array of short lowercase names, no prose.\n\n${brief}`,
+    { temperature: 0, maxTokens: 1024 },
+  );
+  const names = (JSON.parse(nameRaw.slice(nameRaw.indexOf('['), nameRaw.lastIndexOf(']') + 1)) as string[])
+    .map(slugAnchor).filter((v, i, a) => v.length > 0 && a.indexOf(v) === i);
+  if (names.length === 0) throw new Error('stage A returned no module names');
+
+  // Stage B — assign every requirement to a module, in concurrent batches.
+  const BATCH = 120, POOL = 4;
+  const assignment = new Map<number, string>(); // global idx → module
+  const batches: Array<{ start: number; nodes: CanonicalNode[] }> = [];
+  for (let s = 0; s < real.length; s += BATCH) batches.push({ start: s, nodes: real.slice(s, s + BATCH) });
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < batches.length) {
+      const b = batches[next++];
+      const listed = b.nodes.map((n, i) => `${b.start + i + 1}. [${n.type}] ${n.statement.replace(/\n/g, ' ').slice(0, 200)}`).join('\n');
+      try {
+        const raw = await llm.generate(
+          `Assign each requirement to exactly one of these modules: ${names.join(', ')}.\nReturn ONLY a JSON object mapping module name to the list of requirement numbers, e.g. {"room": [1, 4], "avatar": [2]}. Every number must appear exactly once. No prose.\n\n${listed}`,
+          { temperature: 0, maxTokens: 4096 },
+        );
+        const obj = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)) as Record<string, number[]>;
+        for (const [name, nums] of Object.entries(obj)) {
+          const anchor = slugAnchor(name);
+          for (const num of nums || []) {
+            const idx = num - 1;
+            if (idx >= 0 && idx < real.length && !assignment.has(idx)) assignment.set(idx, anchor);
+          }
+        }
+      } catch {
+        // One failed batch must not nuke the whole semantic clustering — its nodes
+        // fold into rule-clustered homes below (and if EVERY batch fails, the empty
+        // assignment throws to the caller's loud fallback).
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: POOL }, worker));
+  if (assignment.size === 0) throw new Error('every assignment batch failed');
+
+  const groups = new Map<string, CanonicalNode[]>();
+  for (const [idx, anchor] of assignment) {
+    if (!groups.has(anchor)) groups.set(anchor, []);
+    groups.get(anchor)!.push(real[idx]);
+  }
+  let clusters: CanonCluster[] = [...groups].map(([anchor, ns]) => ({ anchor, nodes: ns }));
+  foldOrphans(clusters, real, new Set(assignment.keys()));
+
+  // Bound the grain: tiny clusters merge, oversized ones split by salient sub-tag —
+  // a 100-node 'room' module is not a replaceable unit for codegen.
+  const tagsOf = new Map<string, string[]>();
+  const freq = new Map<string, number>();
+  for (const n of real) {
+    const ts = [...new Set((n.tags || []).map(singular).filter(t => t.length > 2))];
+    tagsOf.set(n.canon_id, ts);
+    for (const t of ts) freq.set(t, (freq.get(t) || 0) + 1);
+  }
+  clusters = mergeTiny(clusters, tagsOf);
+  clusters = clusters.flatMap(c => (c.nodes.length > MAX_CLUSTER ? splitOversized(c, tagsOf, freq) : [c]));
+  return clusters;
 }
 
 function slugAnchor(name: string): string {

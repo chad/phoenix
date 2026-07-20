@@ -100,6 +100,35 @@ describe('computeAdaptCoverage', () => {
     'This is plain description with no cue.',                      // L5
   ].join('\n');
 
+  it('markdown headings never count as normatives ("## 8.1 Requirement" is structure)', () => {
+    const src = '## 8.1 Requirement\nA room must have a name.';
+    const c = computeAdaptCoverage(src, [], []);
+    expect(c.sourceNormatives).toEqual([{ line: 2, text: 'A room must have a name.' }]);
+  });
+
+  it('an intro line ending in ":" is carried by its list block\'s citations', () => {
+    const src = [
+      '# Users',
+      'A user must be able to:',        // L2 — normative intro, never cited directly
+      '',
+      '- create a room',                // L4 — cited by a rule
+      '- send a message',               // L5
+      'Plain paragraph ends the block.',
+    ].join('\n');
+    const rules = [{ text: 'The user must be able to create a room.', fromSpans: [[4, 4]] as Array<[number, number]>, proposed: false, section: 'Users' }];
+    const c = computeAdaptCoverage(src, rules, []);
+    expect(c.covered).toBe(1);
+    expect(c.dropped).toHaveLength(0);
+  });
+
+  it('a normative cited only by a Vision line lands in vision, not covered, not dropped', () => {
+    const rules = [{ text: 'The vibe is cozy and warm.', fromSpans: [[3, 3]] as Array<[number, number]>, proposed: false, section: 'Vision (unverified context)' }];
+    const c = computeAdaptCoverage(source, rules, []);
+    expect(c.covered).toBe(0);
+    expect(c.vision).toEqual([{ line: 3, text: 'The vibe should feel cozy and warm.' }]);
+    expect(c.dropped).toHaveLength(2);
+  });
+
   it('names covered, dropped, and proposed in the open', () => {
     const rules = [
       { text: 'The room must have a unique name.', fromSpans: [[2, 2]] as Array<[number, number]>, proposed: false, section: 'Rooms' },
@@ -146,10 +175,36 @@ describe('adaptSpec (stub LLM — the trust surface, not the prose)', () => {
     expect(result.derivedMarkdown).toContain('PHOENIX-DERIVED DRAFT');
     expect(result.derivedMarkdown).toContain('from:L2');
     expect(result.coverage.covered).toBe(2);
-    expect(result.coverage.dropped).toHaveLength(1);
-    expect(result.coverage.dropped[0].line).toBe(3); // the vision sentence became context, not a rule
+    // The vision sentence was PRESERVED as context — acknowledged, not lost, not a rule.
+    expect(result.coverage.vision).toEqual([{ line: 3, text: 'The design should evoke a 1992 RPG.' }]);
+    expect(result.coverage.dropped).toHaveLength(0);
     expect(result.coverage.proposedRules).toHaveLength(0);
+    expect(result.rescued).toEqual({ rules: 0, vision: 0 }); // nothing dropped → no rescue calls
     expect(result.model).toBe('stub/stub-1');
+  });
+
+  it('the rescue pass gives dropped obligations a second shot and recomputes coverage', async () => {
+    const source = [
+      '# Channels',                                                  // L1
+      'A channel must have a unique name.',                          // L2 — first pass covers
+      '| Invite-only channel | Guarded entrance |',                  // L3 — first pass MISSES
+    ].join('\n');
+    let rescueCalls = 0;
+    const llm = new StubProvider((prompt, system) => {
+      if (system?.includes('first translation pass missed')) {
+        rescueCalls++;
+        expect(prompt).toContain('Line 3:');
+        return '## Rescued rules\n- The channel with access policy invite-only must require an invitation to enter. <!-- from:L3 -->';
+      }
+      if (system?.includes('converting one section') === false) return '# Data model\n- Channel: name';
+      return '# Channels\n- The channel must have a unique name. <!-- from:L2 -->';
+    });
+    const result = await adaptSpec('s.md', source, llm);
+    expect(rescueCalls).toBe(1);
+    expect(result.rescued).toEqual({ rules: 1, vision: 0 });
+    expect(result.coverage.covered).toBe(2);
+    expect(result.coverage.dropped).toHaveLength(0);
+    expect(result.derivedMarkdown).toContain('# Rescued obligations (second pass)');
   });
 
   it('fence-wrapped model output is stripped before parsing', async () => {

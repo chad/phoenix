@@ -14,7 +14,7 @@ import { CanonicalType } from './models/canonical.js';
 import type { Clause } from './models/clause.js';
 import type { ImplementationUnit } from './models/iu.js';
 import { defaultBoundaryPolicy, defaultEnforcement } from './models/iu.js';
-import type { CanonCluster } from './iu-clusterer.js';
+import type { CanonCluster, LLMClusterOptions } from './iu-clusterer.js';
 import { clusterCanonNodes, clusterCanonNodesLLM } from './iu-clusterer.js';
 import type { LLMProvider } from './llm/provider.js';
 import type { ResolvedTarget } from './models/architecture.js';
@@ -27,16 +27,19 @@ export function planIUs(canonNodes: CanonicalNode[], clauses?: Clause[], target?
   return buildIUsFromClusters(clusterCanonNodes(canonNodes), target);
 }
 
-/** Semantic planning — LLM domain clustering when a provider is given; rule fallback. */
+/** Semantic planning — LLM domain clustering when a provider is given; rule fallback
+ *  (loud, via opts.onFallback — tag-heuristic module names must never masquerade as
+ *  semantic judgment). */
 export async function planIUsAuto(
   canonNodes: CanonicalNode[],
   clauses?: Clause[],
   llm?: LLMProvider | null,
   target?: ResolvedTarget | null,
+  opts: LLMClusterOptions = {},
 ): Promise<ImplementationUnit[]> {
   void clauses;
   if (canonNodes.filter(n => n.type !== CanonicalType.CONTEXT).length === 0) return [];
-  const clusters = llm ? await clusterCanonNodesLLM(canonNodes, llm) : clusterCanonNodes(canonNodes);
+  const clusters = llm ? await clusterCanonNodesLLM(canonNodes, llm, opts) : clusterCanonNodes(canonNodes);
   return buildIUsFromClusters(clusters, target);
 }
 
@@ -49,7 +52,6 @@ export function buildIUsFromClusters(clusters: CanonCluster[], target?: Resolved
     const nodes = cluster.nodes;
     if (nodes.length === 0) continue;
 
-    const name = cleanName(cluster.anchor.replace(/-/g, ' '));
     const baseSlug = slugify(cluster.anchor);
     // Distinct clusters whose anchors slugify identically (or to empty) must NOT share
     // an output file — disambiguate with a stable numeric suffix.
@@ -60,6 +62,9 @@ export function buildIUsFromClusters(clusters: CanonCluster[], target?: Resolved
       outputPath = pathFor(serviceName);
     }
     usedPaths.add(outputPath);
+    // The display name carries the same disambiguation — two IUs both named
+    // "room agent" would ambiguate repair targeting and human review alike.
+    const name = cleanName(serviceName.replace(/-/g, ' '));
     const riskTier = deriveRiskTier(nodes);
     const canonIds = nodes.map(n => n.canon_id);
 

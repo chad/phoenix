@@ -112,6 +112,40 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Rank validated qualifier entities by SECTION PROXIMITY — mechanical bindability is
+ * not correctness ("Reference avatar characteristics" once validated on a soundtrack
+ * line, because every qualifier binds). The entity that the surrounding section
+ * actually talks about outranks the alphabet; an entity nobody mentions nearby scores
+ * zero, and an all-zero field means NO confident proposal.
+ */
+function rankBySectionProximity<T extends { entity: string }>(
+  candidates: T[],
+  specLines: string[] | undefined,
+  line1: number,
+): { ranked: Array<T & { mentions: number }>; anyMentioned: boolean } {
+  if (!specLines || specLines.length === 0 || line1 < 1) {
+    return { ranked: candidates.map(c => ({ ...c, mentions: 0 })), anyMentioned: false };
+  }
+  const idx = Math.min(line1 - 1, specLines.length - 1);
+  // The enclosing section: previous heading (inclusive) to next heading (exclusive).
+  let start = 0, end = specLines.length;
+  for (let i = idx; i >= 0; i--) if (/^#{1,6}\s/.test(specLines[i])) { start = i; break; }
+  for (let i = idx + 1; i < specLines.length; i++) if (/^#{1,6}\s/.test(specLines[i])) { end = i; break; }
+
+  const scored = candidates.map(c => {
+    const re = new RegExp(`\\b${escapeRe(c.entity)}\\b`, 'i');
+    let mentions = 0, nearest = Number.MAX_SAFE_INTEGER;
+    for (let i = start; i < end; i++) {
+      if (i === idx) continue; // the defect line itself doesn't vouch for a qualifier
+      if (re.test(specLines[i])) { mentions++; nearest = Math.min(nearest, Math.abs(i - idx)); }
+    }
+    return { ...c, mentions, nearest };
+  });
+  scored.sort((a, b) => b.mentions - a.mentions || a.nearest - b.nearest || (a.entity < b.entity ? -1 : 1));
+  return { ranked: scored, anyMentioned: scored.some(s => s.mentions > 0) };
+}
+
 /** A located spec line: the exact document line a canon statement lives on. */
 interface LocatedLine { doc: string; line: number; rawLine: string }
 
@@ -189,11 +223,18 @@ function proposeForDefect(
     return { ...base, kind: 'no-confident-proposal',
       rationale: `qualifying the subject with each known entity (${[...mineEntityAttributes(ius, canonNodes, clauses).keys()].sort().join(', ') || 'none'}) never re-extracts cleanly — the spec likely needs a definition sentence for this attribute, not just a rewording` };
   }
-  const [first, ...rest] = validated;
+
+  // Bindability found candidates; section proximity decides which one is CORRECT.
+  const { ranked, anyMentioned } = rankBySectionProximity(validated, input.specLines.get(loc.doc), loc.line);
+  if (!anyMentioned) {
+    return { ...base, kind: 'no-confident-proposal',
+      rationale: `every entity qualifier binds mechanically (${ranked.map(v => v.entity).join(', ')}), but none of them is mentioned anywhere in this section — the right entity is likely missing from the graph; name it by hand` };
+  }
+  const [first, ...rest] = ranked;
   return {
     ...base, kind: 'rewording', proposed: first.proposed, validation: first.receipt,
-    rationale: `qualify the unbound subject "${d.subject}" with its entity ("${first.entity}") so the frozen extractor can bind it`,
-    alternatives: rest.map(v => `${v.entity} (${v.receipt})`),
+    rationale: `qualify the unbound subject "${d.subject}" with its entity ("${first.entity}", mentioned ${first.mentions}× in this section) so the frozen extractor can bind it`,
+    alternatives: rest.filter(v => v.mentions > 0).map(v => `${v.entity} (${v.mentions}× nearby — ${v.receipt})`),
   };
 }
 

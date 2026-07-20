@@ -1514,34 +1514,39 @@ async function cmdAdapt(args: string[]): Promise<void> {
 
   for (const specFile of specFiles) {
     const docName = basename(specFile);
+    const outPath = join(outDir, docName);
+    // Decide up front — an existing draft under review must not be clobbered by a
+    // checkpoint mid-run, and skipping BEFORE the run spends zero LLM budget.
+    if (existsSync(outPath) && !force) {
+      console.log(yellow(`  ⚠ ${relative(projectRoot, outPath)} exists — re-run with --force to overwrite. Skipping ${docName}.`));
+      continue;
+    }
     const source = readFileSync(specFile, 'utf8');
     console.log(bold(`  ${docName}`));
-    let wroteCheckpoint = false; // our own partial file must not block the final write
     const result = await adaptSpec(docName, source, llm, {
       onProgress: (msg) => console.log(dim(`    ⏳ ${msg}`)),
       // Persist partial work after every section — a crashed run loses nothing completed.
       checkpoint: (parts, gloss) => {
         const partial = `<!-- PHOENIX-DERIVED DRAFT (PARTIAL — run still in progress) -->\n\n# Data model (derived)\n\n${gloss}\n\n${parts.filter(p => p.length > 0).join('\n\n')}\n`;
-        writeFileSync(join(outDir, docName), partial, 'utf8');
-        wroteCheckpoint = true;
+        writeFileSync(outPath, partial, 'utf8');
       },
     });
 
-    const outPath = join(outDir, docName);
-    if (existsSync(outPath) && !force && !wroteCheckpoint) {
-      console.log(yellow(`    ⚠ ${relative(projectRoot, outPath)} exists — re-run with --force to overwrite. Skipping write (coverage still reported).`));
-    } else {
-      writeFileSync(outPath, result.derivedMarkdown, 'utf8');
-    }
+    writeFileSync(outPath, result.derivedMarkdown, 'utf8');
 
     const c = result.coverage;
     const pct = c.sourceNormatives.length > 0 ? Math.round((c.covered / c.sourceNormatives.length) * 100) : 100;
     console.log(`    ${green('✔')} draft → ${relative(projectRoot, outPath)}`);
-    console.log(`    Obligations cited: ${c.covered}/${c.sourceNormatives.length} (${pct}%)  ·  proposed (invented — endorse or delete): ${c.proposedRules.length}`);
+    console.log(`    Obligations → rules: ${c.covered}/${c.sourceNormatives.length} (${pct}%)  ·  preserved as vision: ${c.vision.length}  ·  proposed (invented — endorse or delete): ${c.proposedRules.length}`);
+    if (result.rescued.rules + result.rescued.vision > 0) {
+      console.log(dim(`    Rescue pass recovered ${result.rescued.rules} rule(s) + ${result.rescued.vision} vision line(s) from first-pass drops.`));
+    }
     if (c.dropped.length > 0) {
-      console.log(yellow(`    Dropped intent (${c.dropped.length}) — source obligations no rule cites:`));
+      console.log(yellow(`    Dropped intent (${c.dropped.length}) — cited by nothing, even after the rescue pass:`));
       for (const d of c.dropped.slice(0, 15)) console.log(yellow(`      · L${d.line}: ${d.text.slice(0, 100)}`));
       if (c.dropped.length > 15) console.log(dim(`      … and ${c.dropped.length - 15} more in the draft header`));
+    } else {
+      console.log(green('    Dropped intent: none — every source obligation is cited by a rule or preserved as vision.'));
     }
     if (c.unboundSpans.length > 0) {
       console.log(red(`    Hallucinated line references (${c.unboundSpans.length}) — provenance spans outside the source; treat those rules as proposed:`));
@@ -1558,8 +1563,11 @@ async function cmdAdapt(args: string[]): Promise<void> {
         source_sha: result.sourceSha,
         obligations_total: c.sourceNormatives.length,
         obligations_covered: c.covered,
+        obligations_vision: c.vision.length,
         obligations_dropped: c.dropped.length,
         rules_proposed: c.proposedRules.length,
+        rescued_rules: result.rescued.rules,
+        rescued_vision: result.rescued.vision,
         spans_unbound: c.unboundSpans.length,
       },
     });
@@ -1658,7 +1666,9 @@ async function cmdBootstrap(): Promise<void> {
 
   // Step 3: Plan IUs — semantic domain clustering (LLM) when available
   console.log(`  ${dim('Phase C:')} IU planning`);
-  const ius = await planIUsAuto(canonNodes, allClauses, llmEarly, arch);
+  const ius = await planIUsAuto(canonNodes, allClauses, llmEarly, arch, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM clustering failed — module boundaries come from the tag heuristic ${dim(`(${e.message})`)}`),
+  });
   saveIUs(phoenixDir, ius);
   new Journal(phoenixDir).append({
     type: 'plan',
@@ -2589,7 +2599,9 @@ async function cmdPlan(): Promise<void> {
       if (cfg.architecture) planArch = resolveTarget(cfg.architecture);
     } catch { /* ignore */ }
   }
-  const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir), planArch);
+  const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir), planArch, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM clustering failed — module boundaries come from the tag heuristic ${dim(`(${e.message})`)}`),
+  });
   saveIUs(phoenixDir, ius);
 
   new Journal(phoenixDir).append({
