@@ -18,6 +18,11 @@ export const webApi: Architecture = {
   dataOwnership: 'per-component',
   evaluationSurface: 'http-endpoints',
 
+  // What this architecture can EXPRESS — the fit gate compares spec demands to this
+  // list. No interactive client, no realtime presence, no audio: a game spec run
+  // through web-api gets a loud OUT OF TARGET banner, never a silent narrowing.
+  capabilities: ['http-api', 'domain-logic', 'persistence'],
+
   systemPrompt: `## Architecture: API-driven Web Application
 
 This system is an API-driven web application with the following architectural constraints:

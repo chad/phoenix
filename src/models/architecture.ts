@@ -31,6 +31,13 @@ export interface Architecture {
   /** How to verify components: 'http-endpoints', 'unit-tests', 'cli-output' */
   evaluationSurface: string;
 
+  /** What this architecture can EXPRESS (architecture-fit gate vocabulary):
+   *  'http-api' | 'domain-logic' | 'persistence' | 'interactive-client' |
+   *  'realtime-presence' | 'audio-engine'. Requirements demanding capabilities
+   *  outside this list are OUT OF TARGET — reported loudly, never silently
+   *  narrowed away. */
+  capabilities: string[];
+
   /** Architecture-level prompt: describes system shape for the LLM (no language specifics) */
   systemPrompt: string;
 

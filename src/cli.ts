@@ -59,6 +59,7 @@ import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
 import { adaptSpec } from './spec-adapt.js';
+import { assessArchitectureFit, formatFitReport } from './architecture-fit.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
 import { deriveProjectLivePlans, runLiveVerification } from './live-verify.js';
@@ -1688,6 +1689,23 @@ async function cmdBootstrap(): Promise<void> {
   }
   console.log();
 
+  // Architecture-fit gate: BEFORE codegen spends a token, say out loud which spec
+  // demands this target cannot express. Silent scope-narrowing is a false green one
+  // level up — freeqworld taught us that with 131 modules and no game.
+  {
+    const fit = assessArchitectureFit(canonNodes, arch);
+    const fitLines = formatFitReport(fit);
+    if (fitLines.length > 0) {
+      console.log(`  ${bold('🧭 Architecture Fit')} ${dim('(can this target express the spec?)')}`);
+      for (const line of fitLines) console.log(`    ${line.startsWith('OUT OF TARGET') || line.startsWith('These') ? red(line) : line.trim().startsWith('✖') ? red(line) : line.trim().startsWith('→') ? yellow(line) : dim(line)}`);
+      console.log();
+      new Journal(phoenixDir).append({
+        type: 'plan', inputs: [], outputs: [],
+        meta: { architecture_fit: 'out-of-target', target: fit.targetName, gaps: fit.outOfTarget.map(d => ({ capability: d.capability, count: d.nodeCount })) },
+      });
+    }
+  }
+
   // Step 4: Generate code
   const llm = resolveProvider(phoenixDir);
   const { hint } = describeAvailability();
@@ -1883,6 +1901,23 @@ function printTrustDashboard(
   console.log(`  ${dim('Canonical Nodes:')} ${canonNodes.length}`);
   console.log(`  ${dim('Implementation Units:')} ${ius.length}`);
   console.log(`  ${dim('Spec Clauses:')} ${allClauses.length}`);
+
+  // Architecture fit — the dashboard must never imply the generated system covers
+  // spec demands the target cannot express.
+  {
+    let statusArch: ResolvedTarget | null = null;
+    try {
+      const cfg = JSON.parse(readFileSync(join(phoenixDir, 'config.json'), 'utf8'));
+      if (cfg.architecture) statusArch = resolveTarget(cfg.architecture);
+    } catch { /* default scaffold */ }
+    const fit = assessArchitectureFit(canonNodes, statusArch);
+    if (fit.outOfTarget.length > 0) {
+      const total = fit.outOfTarget.reduce((s, d) => s + d.nodeCount, 0);
+      console.log(`  ${dim('Architecture Fit:')} ${red(`${total} requirement(s) OUT OF TARGET`)} ${dim(`(${fit.outOfTarget.map(d => d.capability).join(', ')} — not expressible by ${fit.targetName})`)}`);
+    } else {
+      console.log(`  ${dim('Architecture Fit:')} ${green('all demanded capabilities expressible')}`);
+    }
+  }
 
   // Canon type breakdown
   const typeBreakdown: Record<string, number> = {};

@@ -6,11 +6,14 @@ import type { Architecture, RuntimeTarget, ResolvedTarget } from '../models/arch
 import { webApi } from './web-api.js';
 import { nodeTypescript } from './node-typescript.js';
 import { pythonFastapi } from './python-fastapi.js';
+import { browserGame } from './browser-game.js';
+import { browserTypescript } from './browser-typescript.js';
 
 // ─── Architecture registry ──────────────────────────────────────────────────
 
 const ARCHITECTURES: Record<string, Architecture> = {
   'web-api': webApi,
+  'browser-game': browserGame,
 };
 
 // ─── Runtime target registry ────────────────────────────────────────────────
@@ -18,6 +21,7 @@ const ARCHITECTURES: Record<string, Architecture> = {
 const RUNTIME_TARGETS: Record<string, RuntimeTarget> = {
   'node-typescript': nodeTypescript,
   'python-fastapi': pythonFastapi,
+  'browser-typescript': browserTypescript,
 };
 
 // ─── Public API ─────────────────────────────────────────────────────────────
