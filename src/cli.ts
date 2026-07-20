@@ -1840,6 +1840,31 @@ async function cmdBootstrap(): Promise<void> {
   });
   if (arch) refreshBuildStatus(projectRoot, phoenixDir, arch);
 
+  // Assembly gate: the WHOLE must be coherent as the thing the spec describes, not
+  // merely a set of modules that each typecheck. This is the gate the first game
+  // bootstrap lacked — the one that would have said "this is soup" instead of "✔".
+  let assemblyIncoherent = false;
+  if (arch?.runtime.assemblyGate) {
+    const findings = arch.runtime.assemblyGate(projectRoot, ius);
+    const errors = findings.filter(f => f.severity === 'error');
+    assemblyIncoherent = errors.length > 0;
+    console.log(`  ${bold('🧩 Assembly Gate')} ${dim('(is the whole a coherent product, not just compiling parts?)')}`);
+    if (findings.length === 0) {
+      console.log(`    ${green('✔')} assembled product is coherent`);
+    } else {
+      for (const f of findings) {
+        const tag = f.severity === 'error' ? red('✖') : yellow('⚠');
+        console.log(`    ${tag} ${dim(`[${f.code}]`)} ${f.message}`);
+        console.log(`      ${dim('→ ' + f.hint)}`);
+      }
+      new Journal(phoenixDir).append({
+        type: 'plan', inputs: [], outputs: [],
+        meta: { assembly_gate: assemblyIncoherent ? 'incoherent' : 'warnings', findings: findings.map(f => ({ code: f.code, severity: f.severity })) },
+      });
+    }
+    console.log();
+  }
+
   // A full bootstrap regenerates everything, so any prior staleness is resolved.
   new InvalidationStore(phoenixDir).clearAll();
 
@@ -1852,7 +1877,13 @@ async function cmdBootstrap(): Promise<void> {
   printTrustDashboard(phoenixDir, projectRoot, machine, ius, canonNodes, allClauses);
 
   console.log();
-  console.log(green('  ✔ Bootstrap complete.'));
+  if (assemblyIncoherent) {
+    console.log(yellow('  ◑ Bootstrap complete — but the ASSEMBLY GATE is RED.'));
+    console.log(`    ${dim('Every module compiles; the assembled product is not yet coherent as the spec\'s system.')}`);
+    console.log(`    ${dim('This is honest partial progress — not a finished product. See the Assembly Gate above.')}`);
+  } else {
+    console.log(green('  ✔ Bootstrap complete.'));
+  }
   console.log(`    State: ${cyan(machine.getState())}`);
   console.log(`    Run ${cyan('phoenix status')} to see the trust dashboard.`);
 }
@@ -1916,6 +1947,18 @@ function printTrustDashboard(
       console.log(`  ${dim('Architecture Fit:')} ${red(`${total} requirement(s) OUT OF TARGET`)} ${dim(`(${fit.outOfTarget.map(d => d.capability).join(', ')} — not expressible by ${fit.targetName})`)}`);
     } else {
       console.log(`  ${dim('Architecture Fit:')} ${green('all demanded capabilities expressible')}`);
+    }
+    // Assembly coherence — the whole product, not the parts.
+    if (statusArch?.runtime.assemblyGate) {
+      const af = statusArch.runtime.assemblyGate(projectRoot, ius);
+      const errs = af.filter(f => f.severity === 'error');
+      if (errs.length > 0) {
+        console.log(`  ${dim('Assembly Coherence:')} ${red(`${errs.length} error(s)`)} ${dim(`(${errs.map(f => f.code).join(', ')})`)}`);
+      } else if (af.length > 0) {
+        console.log(`  ${dim('Assembly Coherence:')} ${yellow(`${af.length} warning(s)`)}`);
+      } else {
+        console.log(`  ${dim('Assembly Coherence:')} ${green('coherent')}`);
+      }
     }
   }
 

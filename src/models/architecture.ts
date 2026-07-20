@@ -158,6 +158,12 @@ export interface RuntimeTarget {
   ownsGeneratedFile(path: string): boolean;
   /** Optional extra source gate beyond compile (e.g. inline-<script> validation). */
   validateSource?(code: string): string | null;
+  /** Optional ASSEMBLY gate: check the whole generated product for coherence as the
+   *  thing the spec describes — not just that each module typechecks. Phoenix gates
+   *  PARTS (compile, drift, evidence); this gates the WHOLE. A browser game whose 367
+   *  entities pile onto one screen compiles perfectly and is still not a world; this
+   *  is the gate that says so. Returns [] when the assembly is coherent. */
+  assemblyGate?(projectRoot: string, ius: ImplementationUnit[]): AssemblyFinding[];
   /** Shared aggregate artifacts this target lifts out of modules (e.g. migrations). */
   aggregates: AggregateRole[];
   /** Generate the runnable shell: server entry, project config, per-service wiring. */
@@ -165,6 +171,16 @@ export interface RuntimeTarget {
   /** Optional: prepare the project before generation so the compiler can resolve imports
    *  (e.g. write package.json + npm install for tsc). No-op for targets that don't need it. */
   prepareProject?(projectRoot: string): void;
+}
+
+/** A coherence problem with the ASSEMBLED product (not a single module). */
+export interface AssemblyFinding {
+  severity: 'error' | 'warning';
+  /** Stable machine code, e.g. 'no-composition', 'entities-stacked'. */
+  code: string;
+  message: string;
+  /** What would make it coherent — the remediation, in one line. */
+  hint: string;
 }
 
 // ─── Resolved target (what the pipeline actually uses) ──────────────────────

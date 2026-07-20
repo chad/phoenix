@@ -7,9 +7,9 @@
  */
 
 import { execSync } from 'node:child_process';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import type { RuntimeTarget, CompileError, ServiceDescriptor } from '../models/architecture.js';
+import type { RuntimeTarget, CompileError, ServiceDescriptor, AssemblyFinding } from '../models/architecture.js';
 import type { ImplementationUnit } from '../models/iu.js';
 import { cleanCodeResponse } from '../codegen-util.js';
 import { parseTscOutput } from './node-typescript.js';
@@ -260,6 +260,91 @@ registerGameModule('door', register);
 \`\`\`
 `;
 
+// ─── Assembly gate: is the WHOLE a legible world, or a pile of modules? ───────
+
+export const ENGINE_COLS = 26;
+export const ENGINE_ROWS = 15;
+
+export interface SpatialAssemblyInput {
+  /** Every generated module's source. */
+  moduleSources: string[];
+  /** Does the architecture actually COMPOSE a layout (rooms + placement), or does it
+   *  concatenate modules that each place entities blind? */
+  hasLayoutComposition: boolean;
+  cols: number;
+  rows: number;
+}
+
+/**
+ * The check the freeqworld-game run failed silently: a browser game is COMPOSITIONAL —
+ * the world lives in the layout BETWEEN modules — but Phoenix generates modules in
+ * isolation. Without a composition phase, N modules place entities into one flat grid
+ * blind, and the product is soup that compiles. This gate makes that RED.
+ *
+ * Pure and deterministic over module source (no boot needed): the primary finding is
+ * structural (no composition exists), corroborated by literal-coordinate evidence
+ * (off-grid placements, stacked tiles) where modules hardcode positions.
+ */
+export function assessSpatialCoherence(input: SpatialAssemblyInput): AssemblyFinding[] {
+  const findings: AssemblyFinding[] = [];
+  const joined = input.moduleSources.join('\n');
+  const entityCount = (joined.match(/\.register(?:Entity|Player)\s*\(/g) ?? []).length;
+  const playerCount = (joined.match(/\.registerPlayer\s*\(/g) ?? []).length;
+  const tileBudget = input.cols * input.rows;
+
+  // PRIMARY: no composition phase. A world of N entities with no layout that assigns
+  // them to rooms is a concatenation, not a place.
+  if (!input.hasLayoutComposition && entityCount > 0) {
+    findings.push({
+      severity: 'error',
+      code: 'no-composition',
+      message: `${entityCount} entities are placed by ${input.moduleSources.length} modules generated in isolation, with no layout composition — they land in one flat ${input.cols}×${input.rows} space. That is a pile of modules, not a navigable world.`,
+      hint: 'Add a layout aggregate to the architecture: a composition step that reads every module\'s entities + the Room/Exit graph, assigns each entity to a room, and lays rooms out as a navigable map (one room on screen via a camera).',
+    });
+  }
+
+  // CORROBORATING: literal coordinates that stack or fall off the grid.
+  const coords: Array<[number, number]> = [];
+  for (const m of joined.matchAll(/\bx:\s*(\d+)\s*,\s*y:\s*(\d+)/g)) coords.push([+m[1], +m[2]]);
+  const offGrid = coords.filter(([x, y]) => x >= input.cols || y >= input.rows || x < 0 || y < 0);
+  if (offGrid.length > 0) {
+    findings.push({
+      severity: 'error',
+      code: 'entities-off-grid',
+      message: `${offGrid.length} entities are placed outside the ${input.cols}×${input.rows} grid (modules chose coordinates without knowing the world's bounds) — they render off-screen or wrap.`,
+      hint: 'Coordinates must come from the layout composition, not from each module guessing.',
+    });
+  }
+  const tiles = new Map<string, number>();
+  for (const [x, y] of coords) { const k = `${x},${y}`; tiles.set(k, (tiles.get(k) ?? 0) + 1); }
+  const stacked = [...tiles.values()].filter(n => n > 1);
+  if (stacked.length > 0) {
+    findings.push({
+      severity: 'error',
+      code: 'entities-stacked',
+      message: `${stacked.length} tiles hold multiple entities (worst: ${Math.max(...stacked)} on one tile) — labels and sprites overprint into an unreadable mush.`,
+      hint: 'The layout composition must give each entity a distinct cell within its room.',
+    });
+  }
+  if (entityCount > tileBudget) {
+    findings.push({
+      severity: 'warning',
+      code: 'over-dense',
+      message: `${entityCount} entities for ${tileBudget} tiles in a single room — even placed perfectly, a world this dense needs multiple rooms.`,
+      hint: 'Partition entities across rooms; show one room at a time.',
+    });
+  }
+  if (entityCount > 0 && playerCount !== 1) {
+    findings.push({
+      severity: 'warning',
+      code: 'player-count',
+      message: `${playerCount} modules register a player (expected exactly 1) — the world has ${playerCount === 0 ? 'no avatar to control' : 'competing player avatars'}.`,
+      hint: 'Exactly one module should call registerPlayer.',
+    });
+  }
+  return findings;
+}
+
 // ─── Codegen hooks ───────────────────────────────────────────────────────────
 
 const BROWSER_TSCONFIG = JSON.stringify({
@@ -429,6 +514,21 @@ export const browserTypescript: RuntimeTarget = {
   compile: browserTscCompile,
   ownsGeneratedFile: (path: string): boolean => path.startsWith('src/generated/'),
   aggregates: [],
+
+  // The assembly gate — the check the first game bootstrap should have failed.
+  assemblyGate(projectRoot: string, _ius: ImplementationUnit[]): AssemblyFinding[] {
+    const genDir = join(projectRoot, 'src', 'generated');
+    if (!existsSync(genDir)) return [];
+    const moduleSources: string[] = [];
+    for (const dir of readdirSync(genDir)) {
+      const f = join(genDir, dir, `${dir}.ts`);
+      if (existsSync(f)) moduleSources.push(readFileSync(f, 'utf8'));
+    }
+    // hasLayoutComposition: true only once the architecture ships a 'layout' aggregate
+    // that actually places entities. v0 has none, so this is honestly false.
+    const hasLayoutComposition = browserTypescript.aggregates.some(a => a.role === 'layout');
+    return assessSpatialCoherence({ moduleSources, hasLayoutComposition, cols: ENGINE_COLS, rows: ENGINE_ROWS });
+  },
   scaffold: (services: ServiceDescriptor[], projectName: string): Map<string, string> =>
     browserScaffold(services, projectName),
 
