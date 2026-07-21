@@ -1,24 +1,21 @@
 /**
- * Architecture fit — can the chosen target EXPRESS what the spec demands?
+ * Capability demand detection — what SHAPE does the spec demand?
  *
- * The freeqworld lesson: a spec for a browser game went through the whole pipeline —
- * 131 modules, compile gate green, 100% extraction — and produced no game, because
- * every target in the vocabulary generates services and domain logic. The pipeline
- * built the checkable substrate and said NOTHING about the category of thing it
- * couldn't build. That is silent scope-narrowing: the same disease as a false green,
- * one level up.
+ * Deterministic patterns read the canon graph for distinguishing capabilities
+ * (interactive client, real-time presence, audio engine). This is the input to Step
+ * 0's architecture-adequacy resolution (`architecture-adequacy.ts`), which decides
+ * whether a registered architecture can both EXPRESS and COMPOSE those demands, and
+ * halts if none can. (This module used to also host a one-axis "fit" report; that was
+ * collapsed into adequacy — one architecture verdict, two axes, delivered once.)
  *
- * This gate closes it. Deterministic patterns detect requirement demands for
- * capabilities (interactive client, real-time presence, audio engine); the target
- * declares what it provides; the gap is reported as first-class diagnostics with
- * counts, samples, and spec provenance — BEFORE codegen spends a token. It never
- * blocks (warn-first, like the regeneration gate in alpha); it makes the narrowing
- * impossible to miss.
+ * The freeqworld lesson that motivated it: a browser-game spec ran the whole pipeline
+ * — 131 modules, compile gate green — and produced no game, because nothing detected
+ * that the product's shape was outside the target's vocabulary. Silent scope-narrowing
+ * is a false green one level up; detecting the demand is how it's closed.
  */
 
 import type { CanonicalNode } from './models/canonical.js';
 import { CanonicalType } from './models/canonical.js';
-import type { ResolvedTarget } from './models/architecture.js';
 
 export interface CapabilityDemand {
   capability: string;
@@ -29,16 +26,7 @@ export interface CapabilityDemand {
   samples: Array<{ statement: string; canon_id: string }>;
 }
 
-export interface ArchitectureFitReport {
-  targetName: string;
-  provided: string[];
-  /** Demanded AND provided — fine. */
-  covered: CapabilityDemand[];
-  /** Demanded and NOT provided — the loud part. */
-  outOfTarget: CapabilityDemand[];
-}
-
-/** What a service/API target provides when it declares nothing. */
+/** What a service/API target provides when it declares nothing (the baseline floor). */
 export const DEFAULT_SERVICE_CAPABILITIES = ['http-api', 'domain-logic', 'persistence'];
 
 /**
@@ -88,34 +76,3 @@ export function detectCapabilityDemands(canonNodes: CanonicalNode[]): Capability
   return demands;
 }
 
-/**
- * Assess fit: which demanded capabilities does the target not provide?
- */
-export function assessArchitectureFit(
-  canonNodes: CanonicalNode[],
-  target: ResolvedTarget | null,
-): ArchitectureFitReport {
-  const provided = target?.architecture.capabilities ?? DEFAULT_SERVICE_CAPABILITIES;
-  const targetName = target ? `${target.architecture.name}/${target.runtime.name}` : `(default service scaffold: ${DEFAULT_SERVICE_CAPABILITIES.join(', ')})`;
-  const covered: CapabilityDemand[] = [];
-  const outOfTarget: CapabilityDemand[] = [];
-  for (const demand of detectCapabilityDemands(canonNodes)) {
-    (provided.includes(demand.capability) ? covered : outOfTarget).push(demand);
-  }
-  return { targetName, provided, covered, outOfTarget };
-}
-
-/** Render the report as CLI lines (caller owns colors); empty array = full fit. */
-export function formatFitReport(report: ArchitectureFitReport): string[] {
-  if (report.outOfTarget.length === 0) return [];
-  const lines: string[] = [];
-  const total = report.outOfTarget.reduce((s, d) => s + d.nodeCount, 0);
-  lines.push(`OUT OF TARGET: ${total} requirement(s) demand capabilities ${report.targetName} cannot express.`);
-  lines.push(`These will NOT be satisfied by generated code — they remain open obligations, not silent omissions.`);
-  for (const d of report.outOfTarget) {
-    lines.push(`  ✖ ${d.label} — ${d.nodeCount} requirement(s)`);
-    for (const s of d.samples) lines.push(`      · "${s.statement.slice(0, 100)}"`);
-  }
-  lines.push(`  → add an architecture that provides: ${report.outOfTarget.map(d => d.capability).join(', ')} (e.g. \`phoenix init --arch=browser-game\` for client-shaped specs)`);
-  return lines;
-}

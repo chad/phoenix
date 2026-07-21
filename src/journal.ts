@@ -28,6 +28,8 @@ export type JournalEventType =
   | 'repair'        // a bounded repair round fed verifier findings into regeneration (P1)
   | 'adapt-spec'    // an LLM drafted a derived spec (provenance + coverage receipted)
   | 'repair:template' // deterministic guard synthesis closed a mechanical finding (P1)
+  | 'adequacy'      // Step 0: architecture shape derived, a fit resolved or halted
+  | 'assembly-gate' // the assembled product was checked for coherence as a whole
   | 'evidence'      // evidence recorded for an IU
   | 'invalidate'    // a spec change marked IUs stale
   | 'label'         // a manual edit labeled (waiver/promotion)

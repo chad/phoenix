@@ -59,7 +59,6 @@ import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
 import { adaptSpec } from './spec-adapt.js';
-import { assessArchitectureFit, formatFitReport } from './architecture-fit.js';
 import { resolveArchitectureAdequacy, formatAdequacy } from './architecture-adequacy.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
@@ -1684,7 +1683,7 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
   if (!isAdequate && !acceptInadequate) {
     // HALT — do not generate against an inadequate architecture.
     new Journal(phoenixDir).append({
-      type: 'plan', inputs: [], outputs: [],
+      type: 'adequacy', inputs: [], outputs: [],
       meta: { architecture_adequacy: adequacy.verdict, configured: configuredArch, needed: adequacy.needed },
     });
     console.log();
@@ -1712,7 +1711,7 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
     if (arch) console.log(`  ${dim('Architecture:')} ${cyan(arch.architecture.name)} / ${cyan(arch.runtime.name)}${tag}`);
   }
   new Journal(phoenixDir).append({
-    type: 'plan', inputs: [], outputs: [],
+    type: 'adequacy', inputs: [], outputs: [],
     meta: { architecture_adequacy: adequacy.verdict, selected: useArchName, configured: configuredArch, accepted_inadequate: acceptInadequate && !adequacy.selected },
   });
 
@@ -1735,21 +1734,9 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
   console.log();
 
   // Architecture-fit gate: BEFORE codegen spends a token, say out loud which spec
-  // demands this target cannot express. Silent scope-narrowing is a false green one
-  // level up — freeqworld taught us that with 131 modules and no game.
-  {
-    const fit = assessArchitectureFit(canonNodes, arch);
-    const fitLines = formatFitReport(fit);
-    if (fitLines.length > 0) {
-      console.log(`  ${bold('🧭 Architecture Fit')} ${dim('(can this target express the spec?)')}`);
-      for (const line of fitLines) console.log(`    ${line.startsWith('OUT OF TARGET') || line.startsWith('These') ? red(line) : line.trim().startsWith('✖') ? red(line) : line.trim().startsWith('→') ? yellow(line) : dim(line)}`);
-      console.log();
-      new Journal(phoenixDir).append({
-        type: 'plan', inputs: [], outputs: [],
-        meta: { architecture_fit: 'out-of-target', target: fit.targetName, gaps: fit.outOfTarget.map(d => ({ capability: d.capability, count: d.nodeCount })) },
-      });
-    }
-  }
+  // demands this target cannot express — already reported and gated by Step 0's
+  // adequacy resolution ABOVE (expression + composition axes). No second fit report
+  // here: one architecture verdict, delivered before planning, not two.
 
   // Step 4: Generate code
   const llm = resolveProvider(phoenixDir);
@@ -1903,7 +1890,7 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
         console.log(`      ${dim('→ ' + f.hint)}`);
       }
       new Journal(phoenixDir).append({
-        type: 'plan', inputs: [], outputs: [],
+        type: 'assembly-gate', inputs: [], outputs: [],
         meta: { assembly_gate: assemblyIncoherent ? 'incoherent' : 'warnings', findings: findings.map(f => ({ code: f.code, severity: f.severity })) },
       });
     }
@@ -1981,19 +1968,25 @@ function printTrustDashboard(
   // Architecture fit — the dashboard must never imply the generated system covers
   // spec demands the target cannot express.
   {
-    let statusArch: ResolvedTarget | null = null;
+    let statusArchName: string | null = null;
     try {
       const cfg = JSON.parse(readFileSync(join(phoenixDir, 'config.json'), 'utf8'));
-      if (cfg.architecture) statusArch = resolveTarget(cfg.architecture);
+      if (cfg.architecture) statusArchName = resolveTarget(cfg.architecture)?.architecture.name ?? cfg.architecture;
     } catch { /* default scaffold */ }
-    const fit = assessArchitectureFit(canonNodes, statusArch);
-    if (fit.outOfTarget.length > 0) {
-      const total = fit.outOfTarget.reduce((s, d) => s + d.nodeCount, 0);
-      console.log(`  ${dim('Architecture Fit:')} ${red(`${total} requirement(s) OUT OF TARGET`)} ${dim(`(${fit.outOfTarget.map(d => d.capability).join(', ')} — not expressible by ${fit.targetName})`)}`);
+    // One architecture verdict, two axes (express + compose) — derived from Step 0's
+    // adequacy resolver, not a separate fit report.
+    const adq = resolveArchitectureAdequacy(canonNodes, statusArchName);
+    const adequate = adq.verdict === 'selected' || adq.verdict === 'chosen-adequate';
+    if (adequate) {
+      console.log(`  ${dim('Architecture Fit:')} ${green('all demanded capabilities expressible & composable')}${adq.selected ? dim(` (${adq.selected})`) : ''}`);
     } else {
-      console.log(`  ${dim('Architecture Fit:')} ${green('all demanded capabilities expressible')}`);
+      const cand = adq.candidates.find(c => c.name === (statusArchName ?? adq.needed?.closest));
+      const gaps = cand ? [...cand.expressionGaps, ...cand.compositionGaps] : adq.demanded;
+      const total = gaps.reduce((s, d) => s + d.nodeCount, 0);
+      console.log(`  ${dim('Architecture Fit:')} ${red(`${total} requirement(s) OUT OF TARGET`)} ${dim(`(${gaps.map(d => d.capability).join(', ')})`)}`);
     }
     // Assembly coherence — the whole product, not the parts.
+    const statusArch = statusArchName ? resolveTarget(statusArchName) : null;
     if (statusArch?.runtime.assemblyGate) {
       const af = statusArch.runtime.assemblyGate(projectRoot, ius);
       const errs = af.filter(f => f.severity === 'error');
