@@ -108,6 +108,7 @@ import { auditIU, auditAll } from './audit.js';
 import { classifyPaceLayers } from './pace-classify.js';
 import { assessPlanGrain } from './grain-policy.js';
 import { analyzeDeletion, deletionScorecard } from './deletion-test.js';
+import { proposeCompactions, type CompactionProposal } from './compaction-proposals.js';
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
 import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
@@ -3917,6 +3918,60 @@ async function cmdInspect(args: string[]): Promise<void> {
  * properties (boundary clarity, evaluation coverage, coupling depth, replaceability)
  * from the reference graph + eval coverage. Never mutates the project.
  */
+/**
+ * phoenix compact — propose reductions of conceptual mass (book ch10–11). Proposals
+ * only: never merges/deletes on its own (that is regeneration + eval re-run, a
+ * deliberate human act — the same discipline as repair --spec).
+ */
+function cmdCompact(_args: string[]): void {
+  const { phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  if (ius.length === 0) { console.log(yellow('⚠ No Implementation Units found. Run `phoenix plan` first.')); return; }
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const evalStore = new EvaluationStore(phoenixDir);
+  const covered = (iu: ImplementationUnit): boolean => evalStore.coverage(iu).total_evaluations > 0;
+
+  let budgetIUs: number | undefined;
+  try { budgetIUs = JSON.parse(readFileSync(join(phoenixDir, 'config.json'), 'utf8')).mass_budget_ius; } catch { /* none */ }
+
+  const { proposals, mass } = proposeCompactions(ius, canonNodes, covered, { budgetIUs });
+
+  console.log();
+  console.log(bold('🧹 Phoenix Compaction'));
+  console.log(dim('  Proposals to reduce conceptual mass — phoenix never merges or deletes on its own.'));
+  console.log();
+  const massLine = `${mass.ius} IUs · ${mass.nodes} normative nodes`
+    + (mass.budgetIUs !== undefined ? ` · budget ${mass.budgetIUs} IUs ${mass.overBudget ? red('(OVER)') : green('(ok)')}` : '');
+  console.log(`  ${dim('Mass:')} ${massLine}`);
+  console.log();
+
+  if (proposals.length === 0) { console.log(green('  ✔ No compaction proposals — the system is lean.')); return; }
+
+  const byKind: Record<string, CompactionProposal[]> = {};
+  for (const p of proposals) (byKind[p.kind] ??= []).push(p);
+  const titles: Record<string, string> = {
+    'merge-over-fragmented': 'Over-fragmented entities (consolidate)',
+    'dead-weight': 'Dead weight (delete or cover)',
+    'orphan-canon': 'Orphan intent (attach or prune)',
+  };
+  for (const [kind, ps] of Object.entries(byKind)) {
+    console.log(`  ${bold(titles[kind] ?? kind)} — ${ps.length}`);
+    for (const p of ps.slice(0, 10)) {
+      console.log(`    ${yellow('◈')} ${bold(p.subject)}`);
+      console.log(`      ${dim('evidence:')} ${p.evidence}`);
+      console.log(`      ${dim('action:')}   ${p.action}`);
+      console.log(`      ${dim('verify:')}   ${p.verification}`);
+    }
+    if (ps.length > 10) console.log(`    ${dim(`… and ${ps.length - 10} more`)}`);
+    console.log();
+  }
+  console.log(dim('  A proposal is a suggestion. Adopt it deliberately — the human is sovereign over the system\'s shape.'));
+  new Journal(phoenixDir).append({
+    type: 'compact', inputs: [], outputs: [],
+    meta: { mass: mass, proposals: proposals.length, by_kind: Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, v.length])) },
+  });
+}
+
 function cmdDeletionTest(args: string[]): void {
   const { phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
@@ -4370,6 +4425,9 @@ async function main(): Promise<void> {
       break;
     case 'deletion-test':
       cmdDeletionTest(commandArgs);
+      break;
+    case 'compact':
+      cmdCompact(commandArgs);
       break;
     case 'inspect':
       await cmdInspect(commandArgs);
