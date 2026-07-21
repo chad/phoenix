@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyPaceLayers } from '../../src/pace-classify.js';
+import { classifyPaceLayers, filterConservationProtected } from '../../src/pace-classify.js';
 import type { ImplementationUnit } from '../../src/models/iu.js';
 import type { CanonicalNode } from '../../src/models/canonical.js';
 import { CanonicalType } from '../../src/models/canonical.js';
@@ -68,5 +68,25 @@ describe('classifyPaceLayers', () => {
     expect(a.get('iu-room')!.last_reviewed).toBe('');
     // rationale must differ from the model's "needs review" sentinel so audit treats it as classified
     expect(a.get('iu-room')!.classification_rationale).not.toBe('Default classification — needs review');
+  });
+});
+
+describe('filterConservationProtected (ch16 regen refusal)', () => {
+  it('refuses an uncovered conservation IU, allows it when covered or overridden', () => {
+    const filter = filterConservationProtected;
+    const ui = iu('web ui');
+    const room = iu('room', ['a room must have a name']);
+    const pace = classifyPaceLayers([ui, room], [canon('a room must have a name')]);
+    expect(pace.get(ui.iu_id)!.conservation).toBe(true);
+
+    // uncovered conservation → refused; the entity IU passes through
+    const uncovered = filter([ui, room], pace, () => false, false);
+    expect(uncovered.refused.map((i: any) => i.name)).toEqual(['web ui']);
+    expect(uncovered.allowed.map((i: any) => i.name)).toEqual(['room']);
+
+    // covered → allowed
+    expect(filter([ui], pace, () => true, false).refused).toHaveLength(0);
+    // explicit override → allowed even uncovered
+    expect(filter([ui], pace, () => false, true).refused).toHaveLength(0);
   });
 });

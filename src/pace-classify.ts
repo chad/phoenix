@@ -27,6 +27,28 @@ import { mineEntityAttributes, extractConstraints } from './constraints/extract.
 import { isUiIU } from './regen.js';
 import { singular } from './iu-clusterer.js';
 
+/**
+ * Conservation-layer regen protection (ch16). Split a regen target set into IUs safe
+ * to regenerate and conservation IUs refused for lack of eval coverage. Pure and
+ * testable; the CLI supplies the coverage predicate and the --allow override.
+ */
+export function filterConservationProtected(
+  targets: ImplementationUnit[],
+  pace: Map<string, PaceLayerMetadata>,
+  isCovered: (iu: ImplementationUnit) => boolean,
+  allowChange: boolean,
+): { allowed: ImplementationUnit[]; refused: ImplementationUnit[] } {
+  if (allowChange) return { allowed: targets, refused: [] };
+  const allowed: ImplementationUnit[] = [];
+  const refused: ImplementationUnit[] = [];
+  for (const iu of targets) {
+    const meta = pace.get(iu.iu_id);
+    if (meta?.conservation && !isCovered(iu)) refused.push(iu);
+    else allowed.push(iu);
+  }
+  return { allowed, refused };
+}
+
 const CADENCE: Record<PaceLayer, PaceLayerMetadata['expected_change_cadence']> = {
   foundation: 'yearly',
   domain: 'quarterly',

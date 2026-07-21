@@ -105,7 +105,7 @@ import type { ResolvedTarget } from './models/architecture.js';
 
 // Audit & Fowler gaps
 import { auditIU, auditAll } from './audit.js';
-import { classifyPaceLayers } from './pace-classify.js';
+import { classifyPaceLayers, filterConservationProtected } from './pace-classify.js';
 import { assessPlanGrain } from './grain-policy.js';
 import { analyzeDeletion, deletionScorecard } from './deletion-test.js';
 import { proposeCompactions, type CompactionProposal } from './compaction-proposals.js';
@@ -2835,6 +2835,27 @@ async function cmdRegen(args: string[]): Promise<void> {
   const llm = forceStubs ? null : resolveProvider(phoenixDir);
   const canonStore = new CanonicalStore(phoenixDir);
   const canonNodes = canonStore.getAllNodes();
+
+  // Conservation-layer protection (book ch16): the user-facing surface is where
+  // external trust lives; regenerating it without evals that pin the conserved
+  // behavior is how "it's an echo of what I wanted" happens. Refuse an uncovered
+  // conservation IU unless the human explicitly allows the change.
+  {
+    const consEvalStore = new EvaluationStore(phoenixDir);
+    const { allowed, refused } = filterConservationProtected(
+      targetIUs,
+      classifyPaceLayers(ius, canonNodes),
+      iu => consEvalStore.coverage(iu).total_evaluations > 0,
+      args.includes('--allow-conservation-change'),
+    );
+    targetIUs = allowed;
+    if (refused.length > 0) {
+      console.log(`  ${yellow('⚠ conservation layer protected')} — refusing ${refused.length} uncovered conservation IU(s): ${dim(refused.map(i => i.name).join(', '))}`);
+      console.log(`    ${dim('external trust lives in the user-facing surface (ch16). Add evals covering the conserved behavior, or pass --allow-conservation-change.')}`);
+      new Journal(phoenixDir).append({ type: 'regen', inputs: [], outputs: [], meta: { conservation_refused: refused.map(i => i.name) } });
+    }
+    if (targetIUs.length === 0) { console.log(green('  ✔ Nothing to regenerate after conservation protection.')); return; }
+  }
 
   console.log(bold('⚡ Code Regeneration'));
   if (llm) {
