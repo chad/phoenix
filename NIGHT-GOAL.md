@@ -1,66 +1,64 @@
-# NIGHT-GOAL — No false green survives the night
+# Night Goal — advance the remaining book-parity workstreams
 
-**North star:** Close Phoenix's last red — cross-entity/relational + executable
-invariant checking — and *prove* the trust surface stays honest under adversarial
-fault injection at scale. Headline proof: **`phoenix status` catches the Ledger
-overdraft bug it currently cannot see.**
+**Started from**: `ed35095`, 1169 tests green, selftest 41/41 green-health, 4 known-reds.
+**Source of truth**: `PLAN-BOOK-PARITY.md` (untracked) — the WS designs.
+**Directive**: do all the remaining workstreams; commit frequently; document blockers
+and move on; **working, testable results over perfection**.
 
-This pushes on the one thing the whole thesis rests on: *"if `phoenix status` is
-trusted, Phoenix becomes the coordination substrate; if it's wrong, the system
-dies."* Success is measured by Phoenix's own conscience (`phoenix selftest` + the
-fault-injection meta-eval), which is designed to be un-gameable.
+## The seven-primitives gap (what's left)
 
-## The one metric
+| Primitive | State entering the night | Tonight |
+|---|---|---|
+| Regenerative grain (ch12) | 🟡 measured (WS2 done) | mutation half: consolidate over-fragmented entities |
+| Pace layers + conservation (ch6/16) | 🟡 classified (WS3 done) | mutation half: conservation-layer regen refusal + attest override |
+| Deletion test (ch9) | 🔴 | **WS4** — the four-properties diagnostic |
+| Compaction (ch10–11) | 🔴 | **WS5** — `phoenix compact` proposals + mass budget |
+| Composition / layout (session finding) | 🟡 one mechanism | **WS1 core** — engine rooms + layout aggregate (hermetic; defer live demo) |
 
-Expand the fault-injection meta-eval to a corpus of **≥3 generated apps** and
-**≥15 injected faults** spanning **every constraint kind** (bound, membership,
-pattern, uniqueness, reference/FK, cardinality, expr/invariant) plus the 4
-structural faults (drift, missing, forbidden package, stale spec). Drive to:
+## Order (highest value, lowest risk first — no human to unblock overnight)
 
-- **false-green rate = 0** — HARD GATE. One false green fails the night.
-- **recall = 100%** — every injected fault is caught by `status`.
-- **false-red rate ≤ 5%** — clean baselines raise nothing spurious.
+1. **WS4 — deletion test** (`phoenix deletion-test`). Self-contained, new files + command,
+   no risk to existing behavior. Temp copies only (never mutate the real project).
+   Reports the four properties: boundary clarity, evaluation coverage, coupling depth,
+   replaceability. Feeds WS5.
+2. **WS5 — compaction loop** (`phoenix compact`, proposals-only). Detectors:
+   over-fragmented entities (from WS2), dead weight (from WS4), duplicate/overlapping
+   IUs, orphan canon. Mass budget in config. Never auto-applies.
+3. **WS3-mutation — conservation-layer regen refusal.** A regen of a `conservation:true`
+   IU is refused unless evals cover it or `--allow-conservation-change`; repair loop
+   skips conservation IUs with a named reason. Loud + journaled.
+4. **WS2-mutation — consolidate over-fragmented entities.** Merge same-head-entity
+   facets toward the grain ceiling, in the clusterer. GUARDED: only fires when an
+   entity heads > threshold IUs (small specs never trigger it), full-suite gated so
+   e2e IU-count assertions stay green.
+5. **WS1 core — composition.** Engine world-model (rooms + camera), the `layout`
+   aggregate (`declarePlacement` → deterministic cell assignment), `assemble()` strips
+   literal coords, `assessSpatialCoherence` asserts the composed invariants, flip
+   `browserGame.composes` to include `interactive-client`. Hermetic e2e; the full live
+   freeqworld bootstrap (demo capture) is DEFERRED and documented (it's a long/cost run
+   best done with a human watching).
+6. **WS0-T3/T6** (bootstrap decompose, eval-suite split) — parallelism plumbing;
+   deprioritized (payoff only for concurrent agents). Do only if everything else lands.
 
-## Hard gates — never violate, never game
+## Hard rules (unchanged, non-negotiable)
 
-1. `green-health` stays **100%** (`phoenix selftest`). A regressed green = failure.
-2. `phoenix selftest --strict` stays clean (no unflipped promotions).
-3. The full suite (~742) stays green. **No test deleted or weakened to pass.**
-4. A red is flipped to green **only by real capability**, verified by empirical
-   probing — never by editing the assertion. Ground truth for every injected fault
-   is known because *we injected it*, so a false green is unambiguous.
-5. The verdict stays a **total function**: when a property can't be statically
-   proven, `status` **abstains** (`indeterminate`) — it never emits OK by default.
+- Verifier frozen (`src/constraints/check*.ts`): widen reading, never rules.
+- No silent fallback/scope-narrowing: every degradation prints + journals.
+- Proposals never auto-edit intent or code (compact/deletion-test are analysis/proposal).
+- Deletion test operates on TEMP COPIES only — never mutates the real tree.
+- `npm test` + `node dist/cli.js selftest` green before every commit. E2E flake rule:
+  a file failing in the full run but passing twice isolated is load-flake; re-run once.
+- Each WS: design → implement → hermetic tests → green → commit. Story-first messages.
+- Backlog never empties; seed reds with fix designs for deferred pieces.
 
-## The work (priority ladder)
+## Progress log
 
-- **P0 — Reference (FK) kind** in `src/constraints/{model,extract,check}.ts`.
-  "must reference an existing X" → verified against the schema/migration/FK decl.
-- **P1 — Cardinality kind.** "at least one line item" / "1..N" relational counts.
-- **P2 — Expr/Invariant** ("if shipped then shipped_at set"; "balance ≥ 0") routed
-  to executable property evals via the oracle path (`checkProperty`). Static where
-  possible, executable where necessary, **abstain** where neither can decide.
-- **P3 — Flip the red.** `src/eval/suite.ts` `constraint.advanced-kinds` red →
-  green (24/24 green, green-health 100%, `--strict` clean).
-- **P4 — Extend the corpus.** Add constraint-class fault injectors to
-  `tests/e2e/status-fault-injection.test.ts` across the demo apps; hold
-  recall/precision gates at 100%.
+- [ ] WS4 deletion test
+- [ ] WS5 compaction
+- [ ] WS3-mutation conservation refusal
+- [ ] WS2-mutation consolidation
+- [ ] WS1 core composition
+- [ ] (stretch) WS0-T3/T6
+- [ ] NIGHT-REPORT.md summary
 
-## The magical proof (the thing to see in the morning)
-
-On `~/ledger`, `phoenix status` today reports 1 unprovable invariant. After P2 it
-must **catch the overdraft path** in `transaction.ts` as a real red — a concrete
-cross-module financial bug found from intent alone. Then add the guard and show
-`status` flip to green. Capture the before/after `status` output.
-
-## Deliverable (leave on disk for morning review)
-
-`NIGHT-REPORT.md` with:
-
-- selftest scorecard diff (before → after),
-- the fault-corpus table (app × fault-kind × caught?),
-- the Ledger overdraft before/after,
-- an honest **still-red / newly-discovered** section.
-
-Work on a branch, **one commit per capability**, each commit message stating the
-metric it moved. Do not talk to the human; leave the report and the branch.
+(Updated as work lands; see `git log` for the real trail.)
