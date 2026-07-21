@@ -53,7 +53,7 @@ and move on; **working, testable results over perfection**.
 
 ## Progress log
 
-- [ ] WS4 deletion test
+- [x] WS4 deletion test (ed / command + scorecard + 4 tests)
 - [ ] WS5 compaction
 - [ ] WS3-mutation conservation refusal
 - [ ] WS2-mutation consolidation

@@ -107,6 +107,7 @@ import type { ResolvedTarget } from './models/architecture.js';
 import { auditIU, auditAll } from './audit.js';
 import { classifyPaceLayers } from './pace-classify.js';
 import { assessPlanGrain } from './grain-policy.js';
+import { analyzeDeletion, deletionScorecard } from './deletion-test.js';
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
 import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
@@ -3911,6 +3912,53 @@ async function cmdInspect(args: string[]): Promise<void> {
 
 // ─── Replacement Audit (Fowler Ch. 4) ────────────────────────────────────────
 
+/**
+ * phoenix deletion-test <iu> | --all  — the ch9 diagnostic. Read-only: derives the four
+ * properties (boundary clarity, evaluation coverage, coupling depth, replaceability)
+ * from the reference graph + eval coverage. Never mutates the project.
+ */
+function cmdDeletionTest(args: string[]): void {
+  const { phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  if (ius.length === 0) { console.log(yellow('⚠ No Implementation Units found. Run `phoenix plan` first.')); return; }
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const evalStore = new EvaluationStore(phoenixDir);
+  const covered = (iu: ImplementationUnit): boolean => evalStore.coverage(iu).total_evaluations > 0;
+
+  console.log();
+  console.log(bold('🧪 Phoenix Deletion Test'));
+  console.log(dim('  "Could I delete this, regenerate it, and prove the system still works?" (book ch9)'));
+  console.log();
+
+  if (args.includes('--all')) {
+    const card = deletionScorecard(ius, canonNodes, covered);
+    const total = ius.length;
+    console.log(`  ${dim('Replaceability scorecard:')} ${green(`${card.replaceable} replaceable`)} · ${yellow(`${card.risky} risky`)} · ${red(`${card.unverifiable} unverifiable`)} ${dim(`(of ${total})`)}`);
+    const worst = card.reports.filter(r => r.replaceability !== 'replaceable').sort((a, b) => b.undeclaredConsumers.length - a.undeclaredConsumers.length).slice(0, 12);
+    for (const r of worst) {
+      const tag = r.replaceability === 'unverifiable' ? red('unverifiable') : yellow('risky');
+      console.log(`    ${tag} ${bold(r.iu)} ${dim(`— ${r.undeclaredConsumers.length} undeclared consumer(s), coupling depth ${r.couplingDepth}, ${r.evaluationCovered ? 'covered' : 'uncovered'}`)}`);
+    }
+    new Journal(phoenixDir).append({ type: 'deletion-test', inputs: [], outputs: [], meta: { deletion_scorecard: { replaceable: card.replaceable, risky: card.risky, unverifiable: card.unverifiable } } });
+    return;
+  }
+
+  const name = args.find(a => !a.startsWith('--'));
+  if (!name) { console.log(yellow('  Usage: phoenix deletion-test <iu-name> | --all')); return; }
+  const target = ius.find(iu => iu.name === name || iu.iu_id === name);
+  if (!target) { console.log(red(`  ✖ No IU named "${name}". Run phoenix status to list them.`)); return; }
+
+  const r = analyzeDeletion(target, ius, canonNodes, covered);
+  console.log(`  ${bold(r.iu)} — ${r.replaceability === 'replaceable' ? green(r.replaceability) : r.replaceability === 'risky' ? yellow(r.replaceability) : red(r.replaceability)}`);
+  console.log(`    ${dim('boundary:')} ${r.actualConsumers.length} actual consumer(s), ${r.declaredConsumers.length} declared${r.undeclaredConsumers.length ? red(`, ${r.undeclaredConsumers.length} UNDECLARED`) : ''}`);
+  console.log(`    ${dim('evaluation:')} ${r.evaluationCovered ? green('covered') : red('uncovered')}   ${dim('coupling depth:')} ${r.couplingDepth}${r.furthestConsumers.length ? dim(` (furthest: ${r.furthestConsumers.slice(0, 3).join(', ')})`) : ''}`);
+    for (const f of r.findings) {
+      const mark = f.severity === 'error' ? red('✖') : f.severity === 'warning' ? yellow('⚠') : dim('ℹ');
+      console.log(`    ${mark} ${dim(`[${f.property}]`)} ${f.message}`);
+    }
+  new Journal(phoenixDir).append({ type: 'deletion-test', inputs: [target.iu_id], outputs: [], meta: { deletion_test: { iu: r.iu, replaceability: r.replaceability, undeclared: r.undeclaredConsumers.length, coupling_depth: r.couplingDepth } } });
+}
+
 function cmdAudit(args: string[]): void {
   const { phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
@@ -4319,6 +4367,9 @@ async function main(): Promise<void> {
       break;
     case 'audit':
       cmdAudit(commandArgs);
+      break;
+    case 'deletion-test':
+      cmdDeletionTest(commandArgs);
       break;
     case 'inspect':
       await cmdInspect(commandArgs);

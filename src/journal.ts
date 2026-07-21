@@ -30,6 +30,7 @@ export type JournalEventType =
   | 'repair:template' // deterministic guard synthesis closed a mechanical finding (P1)
   | 'adequacy'      // Step 0: architecture shape derived, a fit resolved or halted
   | 'assembly-gate' // the assembled product was checked for coherence as a whole
+  | 'deletion-test' // the ch9 deletion diagnostic ran over an IU or the whole plan
   | 'evidence'      // evidence recorded for an IU
   | 'invalidate'    // a spec change marked IUs stale
   | 'label'         // a manual edit labeled (waiver/promotion)
