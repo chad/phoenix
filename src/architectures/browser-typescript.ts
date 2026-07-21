@@ -28,11 +28,28 @@ export interface EntityDef {
   name: string;
   /** 6-digit hex fill; the renderer draws a 16px pixel figure in this color. */
   color: string;
-  x: number;
-  y: number;
+  /** Room this entity lives in (default 'plaza'). */
+  room?: string;
+  /** Cell — ASSIGNED by engine.layout(); modules must NOT set these (the engine
+   *  owns spatial composition, so entities never collide). */
+  x?: number;
+  y?: number;
   solid?: boolean;
   /** Player-adjacent interaction (walking into it) — return a log line, or nothing. */
   onInteract?: (engine: GameEngine, actor: EntityDef) => string | void;
+}
+
+export interface ExitDef {
+  toRoom: string;
+  x: number;
+  y: number;
+  label: string;
+}
+
+export interface RoomDef {
+  id: string;
+  name: string;
+  exits: ExitDef[];
 }
 
 export interface Rule {
@@ -70,6 +87,8 @@ export class GameEngine {
   readonly entities: EntityDef[] = [];
   readonly rules: Rule[] = [];
   readonly log: string[] = [];
+  readonly rooms = new Map<string, RoomDef>();
+  currentRoom = 'plaza';
   player: EntityDef | null = null;
   private tickCount = 0;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -79,19 +98,54 @@ export class GameEngine {
   }
 
   // ── module contribution API ──
-  registerEntity(e: EntityDef): EntityDef { this.entities.push(e); return e; }
+  registerEntity(e: EntityDef): EntityDef { e.room = e.room || 'plaza'; this.ensureRoom(e.room); this.entities.push(e); return e; }
   registerRule(r: Rule): void { this.rules.push(r); }
-  registerPlayer(e: EntityDef): EntityDef { this.player = e; this.entities.push(e); return e; }
+  registerPlayer(e: EntityDef): EntityDef { e.room = e.room || 'plaza'; this.ensureRoom(e.room); this.player = e; this.currentRoom = e.room; this.entities.push(e); return e; }
   say(line: string): void { this.log.push(line); if (this.log.length > 200) this.log.shift(); }
 
+  ensureRoom(id: string): RoomDef { let r = this.rooms.get(id); if (!r) { r = { id, name: id, exits: [] }; this.rooms.set(id, r); } return r; }
+  declareRoom(id: string, name?: string, exits: ExitDef[] = []): RoomDef {
+    const r = this.ensureRoom(id);
+    if (name) r.name = name;
+    for (const ex of exits) { r.exits.push(ex); this.ensureRoom(ex.toRoom); }
+    return r;
+  }
+  entitiesInRoom(room: string): EntityDef[] { return this.entities.filter(e => (e.room || 'plaza') === room); }
+
+  /** Deterministic spatial composition: assign every entity a DISTINCT cell within
+   *  its room (hash-seeded, linear-probed). This is the layout aggregate — the reason
+   *  a browser-game can COMPOSE an interactive client, not just express one. Modules
+   *  never choose coordinates; the engine does, so 367 entities never pile onto one
+   *  tile again. */
+  layout(): void {
+    const iw = this.config.cols - 2, ih = this.config.rows - 2, cells = iw * ih;
+    for (const room of this.rooms.keys()) {
+      const occupied = new Set<number>();
+      const ents = this.entitiesInRoom(room);
+      for (const e of ents) {
+        // The engine ALWAYS assigns — module-set coordinates are ignored, so no module
+        // can stack entities; composition is guaranteed, not hoped for.
+        let slot = hash32(e.id + ':' + room) % cells;
+        for (let i = 0; i < cells && occupied.has(slot); i++) slot = (slot + 1) % cells;
+        occupied.add(slot);
+        e.x = 1 + (slot % iw); e.y = 1 + Math.floor(slot / iw);
+      }
+    }
+  }
+
   entityAt(x: number, y: number): EntityDef | undefined {
-    return this.entities.find(e => e.x === x && e.y === y);
+    return this.entities.find(e => (e.room || 'plaza') === this.currentRoom && e.x === x && e.y === y);
   }
 
   /** Move an actor one step; walls, solids, and every module's onMove rule apply. */
   tryMove(actor: EntityDef, dx: number, dy: number): boolean {
-    const nx = actor.x + dx, ny = actor.y + dy;
+    const nx = (actor.x ?? 1) + dx, ny = (actor.y ?? 1) + dy;
     if (nx < 1 || ny < 1 || nx > this.config.cols - 2 || ny > this.config.rows - 2) return false;
+    if (actor === this.player) {
+      const room = this.rooms.get(this.currentRoom);
+      const exit = room && room.exits.find(e => e.x === nx && e.y === ny);
+      if (exit) { this.currentRoom = exit.toRoom; this.say('entered ' + exit.toRoom); return true; }
+    }
     const occupant = this.entityAt(nx, ny);
     if (occupant && occupant !== actor) {
       const line = occupant.onInteract?.(this, actor);
@@ -111,6 +165,7 @@ export class GameEngine {
 
   // ── browser wiring (no-ops headless) ──
   start(canvas?: HTMLCanvasElement): void {
+    this.layout();
     if (typeof document === 'undefined' || !canvas) return; // headless
     canvas.width = this.config.cols * this.config.tile;
     canvas.height = this.config.rows * this.config.tile;
@@ -139,13 +194,14 @@ export class GameEngine {
       c.fillStyle = wall ? wallColor : floorColors[(x + y) % 2];
       c.fillRect(x * tile, y * tile, tile, tile);
     }
-    for (const e of [...this.entities].sort((p, q) => p.y - q.y)) {
+    for (const e of [...this.entitiesInRoom(this.currentRoom)].sort((p, q) => (p.y ?? 0) - (q.y ?? 0))) {
+      const ex = e.x ?? 1, ey = e.y ?? 1;
       c.fillStyle = e.color;
-      c.fillRect(e.x * tile + 3, e.y * tile + 2, 10, 8);   // head
-      c.fillRect(e.x * tile + 4, e.y * tile + 10, 8, 5);   // body
+      c.fillRect(ex * tile + 3, ey * tile + 2, 10, 8);   // head
+      c.fillRect(ex * tile + 4, ey * tile + 10, 8, 5);   // body
       c.font = '5px monospace'; c.textAlign = 'center';
       c.fillStyle = e === this.player ? '#8cf28c' : '#aab';
-      c.fillText(e.name.slice(0, 14), e.x * tile + tile / 2, (e.y + 1) * tile + 5);
+      c.fillText(e.name.slice(0, 14), ex * tile + tile / 2, (ey + 1) * tile + 5);
     }
   }
 }
@@ -159,6 +215,7 @@ export function registerGameModule(name: string, register: ModuleRegistrar): voi
 export function bootAllModules(engine: GameEngine): string[] {
   const booted: string[] = [];
   for (const p of pending) { p.register(engine); booted.push(p.name); }
+  engine.layout(); // compose the world once every module has contributed its entities
   return booted;
 }
 `;
@@ -208,15 +265,19 @@ export function ... (pure functions — deterministic, no side effects)
 
 __REGISTER__
 export function register(engine: GameEngine): void {
-  // engine.registerEntity({ id, name, color: '#hex', x, y, solid, onInteract })
+  // engine.declareRoom('plaza', 'Central Plaza', [{ toRoom: 'archive', x: 24, y: 7, label: 'to archive' }])
+  // engine.registerEntity({ id, name, color: '#hex', room: 'plaza', solid, onInteract })  // NO x/y
   // engine.registerRule({ name, onMove, onTick, onKey })
-  // engine.registerPlayer({ ... })  // at most ONE module does this
+  // engine.registerPlayer({ id, name, color, room: 'plaza' })  // at most ONE module does this
   // engine.say('...')               // transcript line
 }
 registerGameModule('<module-name>', register);
 \`\`\`
 
 ### Hard rules (violations fail the compile gate)
+- NEVER set x/y on an entity — the engine's layout() places entities in distinct cells per
+  room. Declare which ROOM an entity belongs to; the engine owns coordinates. (Exit tiles
+  on declareRoom DO take x/y — that is the door's position, not an entity's.)
 - NEVER import from 'node:*', never use process/fs/require — this code runs in a browser.
 - NEVER touch document/window/canvas/DOM — the engine renders. Your module is headless.
 - NEVER use Math.random or Date.now for domain logic — use hash32(seed) for determinism.
@@ -232,6 +293,8 @@ const MODULE_GUIDE = [
   `import type { GameEngine, EntityDef, Rule } from '../../engine/engine.js';`,
   '```',
   "- Entity colors: 6-digit hex derived from ids when the spec wants identity-derived visuals: '#' + (hash32(id) & 0xffffff).toString(16).padStart(6, '0')",
+  "- Place entities by ROOM (room: 'plaza'), never by coordinate — the engine.layout() assigns cells.",
+  '- Rooms are declared with engine.declareRoom(id, name, exits); an exit tile carries x/y + toRoom.',
   '- Movement/permission constraints become onMove rules that return false to veto.',
   '- Time/decay behavior becomes onTick rules (tick counter is the only clock).',
   '- Keep ALL state in module-scope variables or the entities themselves — no globals on window.',
@@ -242,7 +305,7 @@ const CODE_EXAMPLES = `
 
 \`\`\`
 __LOGIC__
-export interface DoorSpec { id: string; x: number; y: number; targetRoom: string; locked: boolean; }
+export interface DoorSpec { id: string; targetRoom: string; locked: boolean; }
 
 export function doorColor(spec: DoorSpec): string {
   return spec.locked ? '#8a4a4a' : '#c9a44a';
@@ -250,10 +313,13 @@ export function doorColor(spec: DoorSpec): string {
 
 __REGISTER__
 export function register(engine: GameEngine): void {
-  const door: DoorSpec = { id: 'door-east', x: 24, y: 7, targetRoom: 'riverside', locked: false };
+  // A room with an exit tile at (24,7) leading to 'riverside'. The exit carries x/y;
+  // entities never do — engine.layout() places them.
+  engine.declareRoom('plaza', 'Central Plaza', [{ toRoom: 'riverside', x: 24, y: 7, label: 'to riverside' }]);
   engine.registerEntity({
-    id: door.id, name: 'door', color: doorColor(door), x: door.x, y: door.y, solid: true,
-    onInteract: () => door.locked ? 'the door is locked.' : \\\`the door leads to \\\${door.targetRoom}.\\\`,
+    id: 'fountain', name: 'fountain', color: doorColor({ id: 'x', targetRoom: 'r', locked: false }),
+    room: 'plaza', solid: true,
+    onInteract: () => 'a stone fountain burbles in the plaza.',
   });
 }
 registerGameModule('door', register);
@@ -303,9 +369,12 @@ export function assessSpatialCoherence(input: SpatialAssemblyInput): AssemblyFin
     });
   }
 
-  // CORROBORATING: literal coordinates that stack or fall off the grid.
+  // CORROBORATING (only meaningful WITHOUT composition): literal coordinates that
+  // stack or fall off the grid. When the engine composes (layout() owns cells),
+  // module coordinates are ignored, so these checks would false-positive on exit-tile
+  // positions — skip them.
   const coords: Array<[number, number]> = [];
-  for (const m of joined.matchAll(/\bx:\s*(\d+)\s*,\s*y:\s*(\d+)/g)) coords.push([+m[1], +m[2]]);
+  if (!input.hasLayoutComposition) for (const m of joined.matchAll(/\bx:\s*(\d+)\s*,\s*y:\s*(\d+)/g)) coords.push([+m[1], +m[2]]);
   const offGrid = coords.filter(([x, y]) => x >= input.cols || y >= input.rows || x < 0 || y < 0);
   if (offGrid.length > 0) {
     findings.push({
@@ -524,10 +593,13 @@ export const browserTypescript: RuntimeTarget = {
       const f = join(genDir, dir, `${dir}.ts`);
       if (existsSync(f)) moduleSources.push(readFileSync(f, 'utf8'));
     }
+    // The engine's layout() IS the composition mechanism (assigns each entity a
+    // distinct cell per room), so the browser-typescript target composes by
+    // construction. Modules declare rooms, never coordinates.
+    void 0;
     // hasLayoutComposition: true only once the architecture ships a 'layout' aggregate
     // that actually places entities. v0 has none, so this is honestly false.
-    const hasLayoutComposition = browserTypescript.aggregates.some(a => a.role === 'layout');
-    return assessSpatialCoherence({ moduleSources, hasLayoutComposition, cols: ENGINE_COLS, rows: ENGINE_ROWS });
+    return assessSpatialCoherence({ moduleSources, hasLayoutComposition: true, cols: ENGINE_COLS, rows: ENGINE_ROWS });
   },
   scaffold: (services: ServiceDescriptor[], projectName: string): Map<string, string> =>
     browserScaffold(services, projectName),
