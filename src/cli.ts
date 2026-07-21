@@ -106,6 +106,7 @@ import type { ResolvedTarget } from './models/architecture.js';
 // Audit & Fowler gaps
 import { auditIU, auditAll } from './audit.js';
 import { classifyPaceLayers } from './pace-classify.js';
+import { assessPlanGrain } from './grain-policy.js';
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
 import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
@@ -1736,6 +1737,24 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
   for (const iu of ius) {
     console.log(`      ${dim('·')} ${iu.name} ${dim(`(${iu.risk_tier})`)} → ${iu.output_files.join(', ')}`);
   }
+  // Grain health (book ch12): the right grain is the smallest thing you can delete
+  // and prove works — flag fragments (nothing to verify) and monoliths (unbounded
+  // blast radius). Reported, not yet auto-corrected.
+  {
+    const grain = assessPlanGrain(ius, canonNodes);
+    const issues = grain.fragments.length + grain.monoliths.length + grain.overFragmented.length;
+    if (issues > 0) {
+      console.log(`    ${yellow('○')} Grain: ${grain.ok}/${ius.length} ok, ${grain.fragments.length} fragment(s), ${grain.monoliths.length} monolith(s), ${grain.overFragmented.length} over-fragmented entit${grain.overFragmented.length === 1 ? 'y' : 'ies'}`);
+      for (const m of grain.monoliths.slice(0, 4)) console.log(`      ${dim(`✖ ${m.name}: ${m.reason}`)}`);
+      for (const e of grain.overFragmented.slice(0, 4)) console.log(`      ${dim(`◈ "${e.entity}" spread across ${e.ius.length} IUs (${e.totalNodes} nodes) — consolidate toward one evaluable module`)}`);
+      new Journal(phoenixDir).append({
+        type: 'plan', inputs: [], outputs: [],
+        meta: { grain: { ok: grain.ok, fragments: grain.fragments.length, monoliths: grain.monoliths.length, over_fragmented: grain.overFragmented.length } },
+      });
+    } else {
+      console.log(`    ${green('✔')} Grain: all ${ius.length} units are well-grained (evaluable, bounded)`);
+    }
+  }
   console.log();
 
   // Architecture-fit gate: BEFORE codegen spends a token, say out loud which spec
@@ -1968,6 +1987,11 @@ function printTrustDashboard(
   console.log(`  ${dim('System State:')} ${stateLabel}`);
   console.log(`  ${dim('Canonical Nodes:')} ${canonNodes.length}`);
   console.log(`  ${dim('Implementation Units:')} ${ius.length}`);
+  {
+    const grain = assessPlanGrain(ius, canonNodes);
+    const bad = grain.fragments.length + grain.monoliths.length + grain.overFragmented.length;
+    console.log(`  ${dim('Grain:')} ${bad === 0 ? green(`all ${ius.length} well-grained`) : yellow(`${grain.ok}/${ius.length} ok`) + dim(` (${grain.fragments.length} fragment, ${grain.monoliths.length} monolith, ${grain.overFragmented.length} over-fragmented)`)}`);
+  }
   console.log(`  ${dim('Spec Clauses:')} ${allClauses.length}`);
 
   // Architecture fit — the dashboard must never imply the generated system covers
