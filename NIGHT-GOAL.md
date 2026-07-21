@@ -53,12 +53,14 @@ and move on; **working, testable results over perfection**.
 
 ## Progress log
 
-- [x] WS4 deletion test (ed / command + scorecard + 4 tests)
-- [ ] WS5 compaction
-- [ ] WS3-mutation conservation refusal
-- [ ] WS2-mutation consolidation
-- [ ] WS1 core composition
-- [ ] (stretch) WS0-T3/T6
-- [ ] NIGHT-REPORT.md summary
+- [x] WS4 deletion test — `phoenix deletion-test` + scorecard + 4 tests (2a0bc89)
+- [x] WS5 compaction — `phoenix compact` proposals-only + 5 tests (a73b1cc)
+- [x] WS3-mutation — conservation-layer regen refusal (bd9d909)
+- [~] WS2-mutation — DEFERRED: auto-merge is a semantic/grain judgment the book flags;
+      WS5 `compact` PROPOSES it for human adoption (the right place). Seeded follow-on.
+- [x] WS1 core — engine rooms + layout() + camera; browser-game composes
+      interactive-client; hermetic e2e proves a walkable multi-room world (6a0c527)
+- [ ] WS0-T3/T6 — DEFERRED: parallelism plumbing (payoff only for concurrent agents).
+- [x] NIGHT-REPORT-BOOK-PARITY.md written
 
-(Updated as work lands; see `git log` for the real trail.)
+(See `git log` for the real trail.)
