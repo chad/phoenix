@@ -105,6 +105,7 @@ import type { ResolvedTarget } from './models/architecture.js';
 
 // Audit & Fowler gaps
 import { auditIU, auditAll } from './audit.js';
+import { classifyPaceLayers } from './pace-classify.js';
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
 import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
@@ -1443,6 +1444,9 @@ function gateRegenResults(
   const evalStore = new EvaluationStore(phoenixDir);
   const nkStore = new NegativeKnowledgeStore(phoenixDir);
   const nk = nkStore.getActive(); // includes failures just recorded this run
+  // Classify pace layers from the canon graph so the gate reports a real layer
+  // (foundation/domain/service/surface + conservation), not "needs review".
+  const paceLayers = classifyPaceLayers(ius, new CanonicalStore(phoenixDir).getAllNodes());
   const verdicts: GateVerdict[] = [];
   for (const result of results) {
     const iu = ius.find(i => i.iu_id === result.iu_id);
@@ -1453,6 +1457,7 @@ function gateRegenResults(
       evalCoverage: evalStore.coverage(iu),
       negativeKnowledge: nk.filter(n => n.subject_id === iu.iu_id),
       previousMass: previousMasses.get(iu.iu_id),
+      paceLayer: paceLayers.get(iu.iu_id),
       mode: 'warn',
     });
     result.manifest.regen_metadata.readiness = verdict.readiness;
@@ -3899,9 +3904,10 @@ function cmdAudit(args: string[]): void {
     evalCoverages.set(iu.iu_id, evalStore.coverage(iu));
   }
 
-  // Load pace layers (from iu metadata or defaults)
-  const paceLayers = new Map<string, PaceLayerMetadata>();
-  // TODO: load from .phoenix/pace-layers.json when populated
+  // Classify pace layers from the canon graph (dependency weight + load-bearing
+  // invariants + conservation = the user-facing surface). Human overrides via attest
+  // would layer on top; auto-classification is the deterministic floor.
+  const paceLayers = classifyPaceLayers(ius, new CanonicalStore(phoenixDir).getAllNodes());
 
   const nk = nkStore.getActive();
   // Conceptual mass stamped by the regeneration gate into the manifest.
