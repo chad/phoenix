@@ -60,11 +60,27 @@ talking to a service.
 
 ## Progress log
 
-- [ ] MG5 behavioral labeling
-- [ ] MG3 anti-stub gate
-- [ ] MG1 integration-eval harness (keystone)
-- [ ] MG2 service-binding capability (hermetic core)
-- [ ] MG4 adapt integration intent
-- [ ] NIGHT-REPORT-FUNCTION.md
+- [x] MG3 anti-stub gate — detectStubs + bootstrap Stub Gate, 5 tests (22df60b)
+- [x] MG1 integration-eval harness (keystone) — ServiceClient + fixture + runner, 6 tests (f61dc7e)
+- [x] MG2 service-binding capability — real WebSocket scaffold + binder registry;
+      round-trip proven headless; realtime-presence now composed (cd4a78d)
+- [x] MG5 behavioral coverage — UNPROVEN completion + status line, 4 tests (77fb75e)
+- [x] MG4 adapt preserves integration intent — integration contracts, 1 test (7923b21)
+- [x] NIGHT-REPORT-FUNCTION.md written
 
-(Updated as work lands; `git log` is the real trail.)
+All five MG workstreams landed. The loop closes: adapt captures integration intent
+(MG4) → integration evals measure it (MG1) → the service-binding capability satisfies
+it (MG2) → the anti-stub gate keeps it real (MG3) → behavioral coverage reports it
+honestly (MG5).
+
+## Deferred (documented frontier)
+- Live end-to-end demo: the generated freeqworld actually connecting to a running
+  Freeq server. Needs a Freeq protocol ADAPTER over ServiceClient + a server + a
+  re-bootstrap (freeqworld-world was generated BEFORE MG2's prompt, so it has 0
+  bindings — behavioral coverage correctly reads UNPROVEN).
+- Auto-generating integration-eval CASES from MG4 contracts and running them in the
+  verifier as per-app evidence (the harness exists; wiring is the follow-on).
+- Generation producing correct bindings at scale (prompt teaches it; unproven on a
+  full LLM run).
+
+(`git log` is the real trail.)
