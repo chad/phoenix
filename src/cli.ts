@@ -110,6 +110,19 @@ import { assessPlanGrain } from './grain-policy.js';
 import { analyzeDeletion, deletionScorecard } from './deletion-test.js';
 import { proposeCompactions, type CompactionProposal } from './compaction-proposals.js';
 import { detectStubs } from './anti-stub.js';
+import { assessBehavioralCoverage } from './behavioral-coverage.js';
+
+/** Read every generated module's source (file + text) for the behavioral/stub gates. */
+function readGeneratedSources(projectRoot: string): Array<{ file: string; source: string }> {
+  const genDir = join(projectRoot, 'src', 'generated');
+  if (!existsSync(genDir)) return [];
+  const out: Array<{ file: string; source: string }> = [];
+  for (const dir of readdirSync(genDir)) {
+    const f = join(genDir, dir, `${dir}.ts`);
+    if (existsSync(f)) out.push({ file: `${dir}.ts`, source: readFileSync(f, 'utf8') });
+  }
+  return out;
+}
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
 import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
@@ -1957,11 +1970,18 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
   console.log();
   printTrustDashboard(phoenixDir, projectRoot, machine, ius, canonNodes, allClauses);
 
+  // Behavioral coverage (MG5): if the app must talk to a service but nothing binds,
+  // say so at completion — "compiles + composes" must never read as "functions".
+  const behavioral = assessBehavioralCoverage(canonNodes, readGeneratedSources(projectRoot));
+
   console.log();
   if (assemblyIncoherent) {
     console.log(yellow('  ◑ Bootstrap complete — but the ASSEMBLY GATE is RED.'));
     console.log(`    ${dim('Every module compiles; the assembled product is not yet coherent as the spec\'s system.')}`);
     console.log(`    ${dim('This is honest partial progress — not a finished product. See the Assembly Gate above.')}`);
+  } else if (behavioral.verdict === 'unproven' || behavioral.verdict === 'stub-risk') {
+    console.log(yellow('  ◑ Bootstrap complete — COMPILES and COMPOSES, but function is UNPROVEN.'));
+    console.log(`    ${dim(behavioral.message)}`);
   } else {
     console.log(green('  ✔ Bootstrap complete.'));
   }
@@ -2051,6 +2071,12 @@ function printTrustDashboard(
       } else {
         console.log(`  ${dim('Assembly Coherence:')} ${green('coherent')}`);
       }
+    }
+    // Behavioral coverage (MG5): does an app that must talk to a service actually do it?
+    const bc = assessBehavioralCoverage(canonNodes, readGeneratedSources(projectRoot));
+    if (bc.demandsIntegration) {
+      const color = bc.verdict === 'bound' ? green : bc.verdict === 'unproven' ? red : yellow;
+      console.log(`  ${dim('Behavioral Coverage:')} ${color(bc.verdict.toUpperCase())} ${dim(`— ${bc.serviceBindings} binding(s), ${bc.plausibleStubs} stub(s)`)}`);
     }
   }
 
