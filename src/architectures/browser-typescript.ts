@@ -284,6 +284,27 @@ registerGameModule('<module-name>', register);
 - NEVER import other generated modules — shared state lives in the engine world model.
 - Pure functions for every derivation the spec calls deterministic (same input = same output).
 - register(engine) must exist and end with registerGameModule('<name>', register).
+
+### LIVE DATA — connecting to the service (do NOT hardcode / seed)
+If this module deals with MESSAGES, CHANNELS, PRESENCE, or ANY data that comes from
+other users or an external service, it MUST connect to the service. Hardcoded or seeded
+data is a diorama, not an app — it will fail the behavioral/integration checks.
+\`\`\`
+import { registerServiceBinding } from '../../service/client.js';
+let boundEngine: GameEngine | null = null;
+export function register(engine: GameEngine): void { boundEngine = engine; /* rooms/entities */ }
+registerServiceBinding('<module-name>', (client) => {
+  client.subscribe('<channel>', (m) => {
+    const body = m.body as { text?: string };
+    boundEngine?.say(m.from + ': ' + (body.text ?? JSON.stringify(m.body)));
+  });
+});
+// to send a message: client.publish('<channel>', { text })
+\`\`\`
+The binder receives a live ServiceClient (a real WebSocket in production, a fixture
+under Phoenix's integration evals). Capture the engine in register() and use it inside
+the binder to reflect incoming messages into the world. A module about a Channel or
+Message that does NOT call registerServiceBinding is incomplete.
 `;
 
 const MODULE_GUIDE = [

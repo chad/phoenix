@@ -41,8 +41,8 @@ const CAPABILITY_PATTERNS: Array<{ capability: string; label: string; re: RegExp
   },
   {
     capability: 'realtime-presence',
-    label: 'real-time bidirectional presence (live positions, websockets)',
-    re: /\b(websocket|real[- ]?time|live (?:position|presence|cursor|update)|position (?:update|stream|broadcast)|presence (?:update|stream|channel)|updates? per second)\b/i,
+    label: 'live external integration (connect to a service; subscribe/publish; presence)',
+    re: /\b(websocket|web socket|real[- ]?time|live (?:position|presence|cursor|update|chat|data)|subscribe(?:s|d)?\s+to|publish(?:es|ed)?\s+to|over a socket|connect(?:s|ed|ing)?\s+to the (?:service|server|socket|channel)|real client|other (?:connected )?clients?|channel on the|position (?:update|stream|broadcast)|presence|updates? per second)\b/i,
   },
   {
     capability: 'audio-engine',
