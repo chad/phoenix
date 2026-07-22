@@ -109,6 +109,7 @@ import { classifyPaceLayers, filterConservationProtected } from './pace-classify
 import { assessPlanGrain } from './grain-policy.js';
 import { analyzeDeletion, deletionScorecard } from './deletion-test.js';
 import { proposeCompactions, type CompactionProposal } from './compaction-proposals.js';
+import { detectStubs } from './anti-stub.js';
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
 import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
@@ -1897,6 +1898,28 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
     llm, target: arch, manifestManager, sharedSchema: schemaPlan?.ddl, negativeKnowledge: nkByIU, onGenerationFailure,
   });
   if (arch) refreshBuildStatus(projectRoot, phoenixDir, arch);
+
+  // Anti-stub gate (MG3): reject code that ADVERTISES a live/network capability but
+  // performs none — the createWebSocketMovementTransport lie. Warn-first, journaled.
+  {
+    const genDir = join(projectRoot, 'src', 'generated');
+    if (existsSync(genDir)) {
+      const srcFiles: Array<{ file: string; source: string }> = [];
+      for (const dir of readdirSync(genDir)) {
+        const f = join(genDir, dir, `${dir}.ts`);
+        if (existsSync(f)) srcFiles.push({ file: `${dir}.ts`, source: readFileSync(f, 'utf8') });
+      }
+      const stubs = detectStubs(srcFiles);
+      if (stubs.length > 0) {
+        console.log(`  ${bold('🕵 Stub Gate')} ${dim('(does code that promises networking actually perform it?)')}`);
+        console.log(`    ${yellow('⚠')} ${stubs.length} plausible stub(s) — named a live capability, performed none:`);
+        for (const s of stubs.slice(0, 8)) console.log(`      ${dim(`✖ ${s.file}: ${s.advertises} — no network op`)}`);
+        if (stubs.length > 8) console.log(`      ${dim(`… and ${stubs.length - 8} more`)}`);
+        new Journal(phoenixDir).append({ type: 'assembly-gate', inputs: [], outputs: [], meta: { plausible_stubs: stubs.length, symbols: stubs.slice(0, 20).map(s => s.advertises) } });
+        console.log();
+      }
+    }
+  }
 
   // Assembly gate: the WHOLE must be coherent as the thing the spec describes, not
   // merely a set of modules that each typecheck. This is the gate the first game
