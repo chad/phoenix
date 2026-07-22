@@ -512,19 +512,92 @@ function extractBrowserContract(code: string): string | null {
 
 /** One client entry that imports every generated module (registration side effects)
  *  and boots the engine — the ASSEMBLED GAME, not a fleet of health endpoints. */
+// The service-binding scaffold (MG2) — HAND-AUTHORED real transport, never generated.
+// Modules bind to the ServiceClient interface; in the browser it is a real WebSocket,
+// offline it is an in-memory broker (local echo). The SAME binder runs under Phoenix's
+// integration evals (fixture broker), so "it connects" is verified, not hoped.
+const SERVICE_CLIENT_FILE = `export interface ServiceMessage { channel: string; from: string; body: unknown; }
+export interface ServiceClient {
+  readonly id: string;
+  subscribe(channel: string, handler: (m: ServiceMessage) => void): void;
+  publish(channel: string, body: unknown): void;
+}
+
+/** Offline / test transport: routes publishes to other subscribers in-process. */
+export class InMemoryBroker {
+  private subs = new Map<string, Array<{ id: string; handler: (m: ServiceMessage) => void }>>();
+  connect(id: string): ServiceClient {
+    const broker = this;
+    return {
+      id,
+      subscribe(channel, handler) {
+        const list = broker.subs.get(channel) || broker.subs.set(channel, []).get(channel)!;
+        list.push({ id, handler });
+      },
+      publish(channel, body) {
+        const msg: ServiceMessage = { channel, from: id, body };
+        for (const s of broker.subs.get(channel) || []) if (s.id !== id) s.handler(msg);
+      },
+    };
+  }
+}
+
+/** REAL transport: a WebSocket to the external service. */
+export function realWebSocketClient(url: string, id: string): ServiceClient {
+  const ws = new WebSocket(url);
+  const handlers = new Map<string, Array<(m: ServiceMessage) => void>>();
+  const outbox: string[] = [];
+  ws.addEventListener('open', () => { for (const m of outbox) ws.send(m); outbox.length = 0; });
+  ws.addEventListener('message', (ev: MessageEvent) => {
+    try { const m = JSON.parse(String(ev.data)) as ServiceMessage; for (const h of handlers.get(m.channel) || []) h(m); } catch { /* ignore */ }
+  });
+  const send = (o: unknown) => { const s = JSON.stringify(o); if (ws.readyState === 1) ws.send(s); else outbox.push(s); };
+  return {
+    id,
+    subscribe(channel, handler) {
+      const list = handlers.get(channel) || handlers.set(channel, []).get(channel)!;
+      list.push(handler);
+      send({ op: 'subscribe', channel });
+    },
+    publish(channel, body) { send({ op: 'publish', channel, from: id, body }); },
+  };
+}
+
+export type ServiceBinder = (client: ServiceClient) => void;
+const _bindings: Array<{ name: string; binder: ServiceBinder }> = [];
+/** Modules call this to wire themselves to the service. The binder is exactly what
+ *  Phoenix's integration evals run against the fixture broker. */
+export function registerServiceBinding(name: string, binder: ServiceBinder): void { _bindings.push({ name, binder }); }
+export function bootServiceBindings(client: ServiceClient): string[] {
+  for (const b of _bindings) b.binder(client);
+  return _bindings.map(b => b.name);
+}
+`;
+
 function browserScaffold(services: ServiceDescriptor[], projectName: string): Map<string, string> {
   const imports = services
     .flatMap(s => s.modules.map(m => ({ dir: s.dir, file: m.replace(/\.ts$/, '') })))
     .map(({ dir, file }) => `import '../generated/${dir}/${file}.js';`)
     .join('\n');
   const main = `// AUTO-GENERATED client entry — imports every module for its registration side
-// effect, then boots one shared engine on the page canvas.
+// effect, boots one shared engine, and connects to the service.
 ${imports}
 import { GameEngine, bootAllModules } from '../engine/engine.js';
+import { bootServiceBindings, realWebSocketClient, InMemoryBroker } from '../service/client.js';
 
 const engine = new GameEngine();
 const booted = bootAllModules(engine);
 engine.say(\`world booted: \${booted.length} module(s) — \${booted.join(', ')}\`);
+
+// Connect to the service: a REAL WebSocket when ?service=<url> is given, else an
+// in-memory broker (offline local echo). The SAME module bindings run either way, and
+// the same binders are what Phoenix's integration evals verified against the fixture.
+const svcUrl = (typeof location !== 'undefined') ? new URLSearchParams(location.search).get('service') : null;
+const broker = svcUrl ? null : new InMemoryBroker();
+const client = svcUrl ? realWebSocketClient(svcUrl, 'me') : broker!.connect('me');
+const bound = bootServiceBindings(client);
+if (bound.length) engine.say(\`service: \${svcUrl ? 'connected to ' + svcUrl : 'offline (in-memory)'} — \${bound.length} binding(s)\`);
+
 engine.start(typeof document !== 'undefined' ? (document.getElementById('world') as HTMLCanvasElement ?? undefined) : undefined);
 
 // Mirror the engine transcript into the page log, when a page exists.
@@ -541,12 +614,12 @@ if (typeof document !== 'undefined') {
   }, 250);
 }
 
-export { engine };
+export { engine, client, broker };
 `;
   return new Map([
     ['src/client/main.ts', main],
     ['index.html', INDEX_HTML.replaceAll('__PROJECT__', projectName)],
-  ]);
+      ]);
 }
 
 // ─── Export ──────────────────────────────────────────────────────────────────
@@ -570,6 +643,7 @@ export const browserTypescript: RuntimeTarget = {
 
   sharedFiles: {
     'src/engine/engine.ts': ENGINE_FILE,
+    'src/service/client.ts': SERVICE_CLIENT_FILE,
   },
 
   packageExtras: {

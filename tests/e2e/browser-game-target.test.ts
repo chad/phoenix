@@ -26,11 +26,16 @@ const iu = {
 // A plausible module: two rooms with an exit, several entities placed by ROOM (no x/y),
 // a player, and a veto rule. This is the shape the prompt now teaches.
 const LLM_RESPONSE = `
+import { registerServiceBinding } from '../../service/client.js';
+
 export function tint(id: string): string {
   return '#' + (hash32(id) & 0xffffff).toString(16).padStart(6, '0');
 }
 
+let boundEngine: GameEngine | null = null;
+
 export function register(engine: GameEngine): void {
+  boundEngine = engine;
   engine.declareRoom('plaza', 'Central Plaza', [{ toRoom: 'archive', x: 24, y: 7, label: 'to archive' }]);
   engine.declareRoom('archive', 'The Archive', []);
   engine.registerEntity({ id: 'fountain', name: 'fountain', color: tint('fountain'), room: 'plaza', solid: true, onInteract: () => 'a fountain burbles.' });
@@ -39,6 +44,16 @@ export function register(engine: GameEngine): void {
   engine.registerPlayer({ id: 'you', name: 'you', color: '#8cf28c', room: 'plaza' });
   engine.registerRule({ name: 'no-row-2', onMove: (_e, _a, _nx, ny) => ny !== 2 });
 }
+
+// LIVE data: subscribe to the #general channel; each message becomes a transcript line.
+// This is the ServiceBinder Phoenix's integration evals verify against the fixture.
+registerServiceBinding('chat', (client) => {
+  client.subscribe('general', (m) => {
+    const body = m.body as { text?: string };
+    boundEngine?.say('chat: ' + (body.text ?? JSON.stringify(m.body)));
+  });
+});
+
 registerGameModule('town', register);
 `;
 
@@ -102,6 +117,27 @@ describe('browser-game target', () => {
     // test above; here we just confirm assemble() keeps the module compilable.
     const code = rt.assemble(`export function register(engine: GameEngine): void {\n  engine.registerEntity({ id: 'x', name: 'x', color: '#fff', room: 'plaza' });\n}\nregisterGameModule('town', register);`, iu);
     expect(code).toContain("registerGameModule('town', register)");
+  });
+
+  it('a module CONNECTS to the service: a peer message round-trips into the world (MG2)', () => {
+    execSync('npx tsc', { cwd: projectRoot, stdio: 'pipe', timeout: 120_000 });
+    const out = execSync(`node --input-type=module -e "
+      import('${join(projectRoot, 'dist/client/main.js').replace(/\\/g, '/')}').then(({ engine, broker }) => {
+        console.log('offline-broker', !!broker);
+        const peer = broker.connect('nandi.uk');
+        peer.publish('general', { text: 'moin from a peer' });
+        console.log('received', engine.log.some(l => l.includes('chat: moin from a peer')));
+      }).catch(e => console.log('BOOT-FAIL', e.message));
+    "`, { stdio: 'pipe', timeout: 60_000 }).toString();
+    expect(out).toContain('offline-broker true');
+    expect(out).toContain('received true');   // the app actually consumed a live service message
+  }, 120_000);
+
+  it('the ServiceClient scaffold is a REAL transport, not a stub (anti-stub clean)', async () => {
+    const { detectStubs } = await import('../../src/anti-stub.js');
+    const svc = rt.sharedFiles['src/service/client.ts'];
+    expect(svc).toContain('new WebSocket');                         // real transport present
+    expect(detectStubs([{ file: 'service/client.ts', source: svc }])).toEqual([]);
   });
 
   it('assemble() bans node imports and guarantees registration', () => {

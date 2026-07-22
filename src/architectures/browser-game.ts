@@ -28,13 +28,14 @@ export const browserGame: Architecture = {
   // v0: no realtime-presence (no transport yet), no audio-engine. Declaring them
   // before they exist would re-create the exact silent gap this target was built
   // to close.
-  capabilities: ['interactive-client', 'domain-logic'],
-  // ...and now it COMPOSES an interactive client too: the engine's layout() assigns
-  // every entity a distinct cell within its room (deterministic, collision-free), and
-  // a camera shows one room at a time. That layout IS the composition mechanism the
-  // freeqworld soup lacked. realtime-presence and audio-engine remain out (no
-  // transport, no audio engine yet) — Step 0 still halts a spec that demands those.
-  composes: ['interactive-client', 'domain-logic'],
+  capabilities: ['interactive-client', 'domain-logic', 'realtime-presence'],
+  // ...and now it COMPOSES interactive-client (engine.layout() — deterministic,
+  // collision-free cells + camera) AND realtime-presence (a hand-authored real
+  // WebSocket ServiceClient + a binder registry the engine consumes; modules declare
+  // subscribe/publish, verified by Phoenix's integration evals against a fixture).
+  // audio-engine remains out (no audio engine yet) — Step 0 still halts a spec that
+  // demands it. The specific protocol (Freeq, etc.) is an app adapter over ServiceClient.
+  composes: ['interactive-client', 'domain-logic', 'realtime-presence'],
 
   systemPrompt: `## Architecture: Browser Game Client
 
