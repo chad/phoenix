@@ -1564,6 +1564,10 @@ async function cmdAdapt(args: string[]): Promise<void> {
     if (result.rescued.rules + result.rescued.vision > 0) {
       console.log(dim(`    Rescue pass recovered ${result.rescued.rules} rule(s) + ${result.rescued.vision} vision line(s) from first-pass drops.`));
     }
+    if (result.integrationContracts.length > 0) {
+      console.log(`    ${cyan('Integration contracts:')} ${result.integrationContracts.length} ${dim('(become integration evals — the app must connect, not just model)')}`);
+      for (const ic of result.integrationContracts.slice(0, 5)) console.log(dim(`      ⇄ ${ic.slice(0, 100)}`));
+    }
     if (c.dropped.length > 0) {
       console.log(yellow(`    Dropped intent (${c.dropped.length}) — cited by nothing, even after the rescue pass:`));
       for (const d of c.dropped.slice(0, 15)) console.log(yellow(`      · L${d.line}: ${d.text.slice(0, 100)}`));

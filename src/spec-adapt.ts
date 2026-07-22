@@ -67,6 +67,10 @@ export interface AdaptResult {
   derivedMarkdown: string;
   glossary: string;
   rules: AdaptedRule[];
+  /** Integration contracts (MG4): behavioral bindings to an external service that must
+   *  become integration evals, not entity constraints. Preserves the product thesis
+   *  ("rooms ARE channels") instead of dissolving it into data relations. */
+  integrationContracts: string[];
   coverage: AdaptCoverage;
   /** Second-pass salvage: rules/vision recovered from first-pass drops. */
   rescued: { rules: number; vision: number };
@@ -155,7 +159,8 @@ Rules for the rewrite:
 8. Never emit meta-commentary about the spec itself ("no thresholds are given…") as a bullet — if you cannot make a rule, classify the sentence as Vision or leave it uncited.
 9. Scope rules exactly as the source scopes them: a world-level or product-level goal must NOT be widened into a per-entity requirement ("the world should show X" never becomes "every room must show X").
 10. No double negatives ("must not fail to render") — state what MUST happen ("must render … as …").
-11. Keep the section's original heading as the first line. Output ONLY markdown for this section — no preamble, no fences.`;
+11. INTEGRATION CONTRACTS — when the spec says the system IS a client for an external service, or that an entity CORRESPONDS to a live service concept ("this is a real Freeq client", "rooms are channels", "messages are real events", "media becomes wall images"), that is the PRODUCT, not a data relation. Emit it under a "### Integration contracts" subsection as a behavioral binding: "- The <entity> must <subscribe to / publish to> the <service concept> so that <observable behavior>. <!-- integration --> <!-- from:LN -->". These become integration EVALS (round-trip tests against the service), not just entity constraints. Do NOT flatten "rooms ARE channels" into "a room references a channel".
+12. Keep the section's original heading as the first line. Output ONLY markdown for this section — no preamble, no fences.`;
 
 // ─── Derived-output parsing ──────────────────────────────────────────────────
 
@@ -413,5 +418,16 @@ export async function adaptSpec(
   }
 
   const derivedMarkdown = `${header}\n# Data model (derived)\n\n${glossary}\n\n${partsInOrder.join('\n\n')}\n`;
-  return { derivedMarkdown, glossary, rules: allRules, coverage, rescued, suspectRules, sourceSha, model: `${llm.name}/${llm.model}` };
+  // MG4: collect integration contracts (bindings to an external service) across all
+  // derived parts — the product thesis preserved as behavioral intent for integration evals.
+  const integrationContracts: string[] = [];
+  for (const part of partsInOrder) {
+    for (const line of part.split('\n')) {
+      if (/<!--\s*integration\s*-->/.test(line)) {
+        const text = line.replace(/^\s*[-*]\s+/, '').replace(FROM_COMMENT_RE, '').replace(/<!--\s*integration\s*-->/, '').trim();
+        if (text.length > 8) integrationContracts.push(text);
+      }
+    }
+  }
+  return { derivedMarkdown, glossary, rules: allRules, integrationContracts, coverage, rescued, suspectRules, sourceSha, model: `${llm.name}/${llm.model}` };
 }

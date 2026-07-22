@@ -251,3 +251,22 @@ describe('lintRule — the patterns a human review rejected once, flagged foreve
     expect(result.rules).toHaveLength(1); // still in the draft — flagged, not deleted
   });
 });
+
+describe('integration contracts (MG4) — the product thesis preserved, not dissolved', () => {
+  it('captures integration bindings emitted by the section transform', async () => {
+    const llm = new StubProvider((prompt, system) => {
+      if (system?.includes('converting one section') === false) return '# Data model\n- Room: name';
+      return [
+        '# World',
+        '- A room must have a unique name. <!-- from:L2 -->',
+        '### Integration contracts',
+        '- The room must subscribe to its channel on the Freeq service so messages appear as bubbles. <!-- integration --> <!-- from:L3 -->',
+      ].join('\n');
+    });
+    const result = await adaptSpec('s.md', '# World\nA room must have a unique name.\nRooms are channels.', llm);
+    expect(result.integrationContracts).toHaveLength(1);
+    expect(result.integrationContracts[0]).toMatch(/subscribe to its channel/);
+    // it is NOT counted as an ordinary rule/proposal
+    expect(result.coverage.proposedRules.join(' ')).not.toMatch(/subscribe to its channel/);
+  });
+});
