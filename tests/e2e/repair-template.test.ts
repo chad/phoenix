@@ -37,7 +37,6 @@ describe('e2e: template repair stage (deterministic, no LLM)', () => {
   let dir: string;
 
   beforeAll(() => {
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
     dir = mkdtempSync(join(tmpdir(), 'phoenix-tmpl-'));
     mkdirSync(join(dir, 'spec'), { recursive: true });
     writeFileSync(join(dir, 'spec', 'cards.md'), SPEC, 'utf8');

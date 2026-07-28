@@ -74,8 +74,7 @@ describe('e2e: selective invalidation', () => {
   let project: string;
 
   beforeAll(() => {
-    // Build once so we drive the real compiled CLI.
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
+    // dist/ is compiled once by tests/global-setup.ts; we drive the real compiled CLI.
     project = mkdtempSync(join(tmpdir(), 'phoenix-selective-'));
     mkdirSync(join(project, 'spec'), { recursive: true });
     writeFileSync(join(project, 'spec', 'app.md'), SPEC, 'utf8');

@@ -14,6 +14,7 @@ import type {
 import type { ImplementationUnit } from '../models/iu.js';
 import { cleanCodeResponse, validateInlineScripts, fixSqliteQuotes } from '../codegen-util.js';
 import { nodeScaffold } from '../scaffold.js';
+import { WEB_API_RUNTIME, WEB_API_TYPES, NODE_TS_DEV_PACKAGES } from '../toolchain.js';
 
 const TSC_LINE = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$/;
 
@@ -61,7 +62,25 @@ const dir = dirname(DB_PATH);
 if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
 const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+
+// Wait for a contended lock instead of failing instantly. Set first so it covers the
+// statements below and every later migration/write.
+db.pragma('busy_timeout = 5000');
+
+// Switching to WAL needs a brief EXCLUSIVE lock, and SQLite answers SQLITE_BUSY for a
+// journal-mode change WITHOUT honouring busy_timeout. That fires whenever several
+// processes open a COLD database at once — exactly what the generated test suite does,
+// one worker per test file. WAL is a persistent property of the file, so it is enough for
+// ONE process to win: read the mode first (a shared-lock read), and treat a lost race as
+// success rather than crashing the process on import.
+try {
+  if (db.pragma('journal_mode', { simple: true }) !== 'wal') {
+    db.pragma('journal_mode = WAL');
+  }
+} catch {
+  // A concurrent opener is mid-switch. The file ends up in WAL either way.
+}
+
 db.pragma('foreign_keys = ON');
 
 const migrations: Array<{ name: string; sql: string }> = [];
@@ -465,20 +484,11 @@ export const nodeTypescript: RuntimeTarget = {
   language: 'typescript',
   fileExtension: 'ts',
 
-  packages: {
-    'hono': '^4.6.0',
-    '@hono/node-server': '^1.13.0',
-    'better-sqlite3': '^11.7.0',
-    'zod': '^3.24.0',
-  },
+  // Versions come from src/toolchain.ts — one canonical pin, gated by
+  // tests/unit/toolchain.test.ts so literals cannot creep back in here.
+  packages: { ...WEB_API_RUNTIME },
 
-  devPackages: {
-    'typescript': '^5.4.0',
-    'vitest': '^2.0.0',
-    '@types/node': '^22.0.0',
-    '@types/better-sqlite3': '^7.6.0',
-    'tsx': '^4.0.0',
-  },
+  devPackages: { ...NODE_TS_DEV_PACKAGES, ...WEB_API_TYPES },
 
   moduleTemplate: MODULE_TEMPLATE,
   promptExtension: PROMPT_EXTENSION,

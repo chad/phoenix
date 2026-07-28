@@ -109,7 +109,6 @@ describe('e2e: status fault-injection meta-eval', () => {
   let golden: string;
 
   beforeAll(() => {
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
     golden = mkdtempSync(join(tmpdir(), 'phoenix-golden-'));
     mkdirSync(join(golden, 'spec'), { recursive: true });
     writeFileSync(join(golden, 'spec', 'shop.md'), SPEC, 'utf8');

@@ -14,8 +14,8 @@
     "start": "tsc && node dist/generated/game-engine/server.js"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "vitest": "^2.0.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "@types/node": "^25.9.5"
   }
 }

@@ -1,0 +1,139 @@
+# Dependency updates for Phoenix.
+#
+# The problem this file solves: without it, Dependabot opened one PR per package per
+# manifest. With a root manifest plus seven generated examples that all share the same
+# toolchain, a single vitest advisory became eight PRs, and the queue grew faster than
+# anyone drained it — twenty open PRs and eighty-three unaddressed advisories.
+#
+# Two rules make the queue tractable:
+#
+#   1. GROUP aggressively. The examples are generated artifacts that share one pinned
+#      toolchain (src/toolchain.ts), so their updates are one decision, not eight PRs.
+#   2. IGNORE major bumps for libraries the codegen templates call directly. A major on
+#      hono / zod / better-sqlite3 changes the API Phoenix *emits*; it needs a migration
+#      with a regenerated example, not an automerged patch. Those are raised deliberately.
+#
+# Note that a version bump in an example's package.json is NOT the real fix — the versions
+# are generated from src/toolchain.ts, and tests/unit/toolchain.test.ts fails if a literal
+# range reappears in an emitter. Treat example PRs as a signal to bump the canonical pin.
+
+version: 2
+
+updates:
+  # ── The compiler itself ────────────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+    groups:
+      # Build + test toolchain moves as one unit; a vitest bump drags vite/esbuild/rollup
+      # with it, and reviewing those separately is noise.
+      toolchain:
+        patterns: ['typescript', 'vitest', '@types/node', 'vite', 'esbuild', 'rollup', 'postcss']
+      # Everything else, still batched — this repo has three direct devDependencies.
+      remaining:
+        patterns: ['*']
+        exclude-patterns: ['typescript', 'vitest', '@types/node', 'vite', 'esbuild', 'rollup', 'postcss']
+
+  # ── Generated examples ─────────────────────────────────────────────────────────
+  # One grouped PR per example instead of one per package. Majors on codegen-facing
+  # runtime libraries are withheld: they are architecture migrations, not security bumps.
+  - package-ecosystem: npm
+    directory: /examples/phoenix-self
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, examples]
+    commit-message: { prefix: 'chore(deps)' }
+    groups:
+      example-deps:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /examples/pixel-wars
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, examples]
+    commit-message: { prefix: 'chore(deps)' }
+    groups:
+      example-deps:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /examples/settle-up
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, examples]
+    commit-message: { prefix: 'chore(deps)' }
+    groups:
+      example-deps:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /examples/taskflow
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, examples]
+    commit-message: { prefix: 'chore(deps)' }
+    groups:
+      example-deps:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /examples/tictactoe
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, examples]
+    commit-message: { prefix: 'chore(deps)' }
+    groups:
+      example-deps:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /examples/todo-app
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, examples]
+    commit-message: { prefix: 'chore(deps)' }
+    ignore:
+      - dependency-name: 'hono'
+        update-types: [version-update:semver-major]
+      - dependency-name: 'zod'
+        update-types: [version-update:semver-major]
+      - dependency-name: 'better-sqlite3'
+        update-types: [version-update:semver-major]
+    groups:
+      example-deps:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /examples/trail
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, examples]
+    commit-message: { prefix: 'chore(deps)' }
+    ignore:
+      - dependency-name: 'hono'
+        update-types: [version-update:semver-major]
+      - dependency-name: 'zod'
+        update-types: [version-update:semver-major]
+      - dependency-name: 'better-sqlite3'
+        update-types: [version-update:semver-major]
+    groups:
+      example-deps:
+        patterns: ['*']
+
+  # ── CI actions ─────────────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    labels: [dependencies, ci]
+    groups:
+      actions:
+        patterns: ['*']

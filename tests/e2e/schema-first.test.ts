@@ -38,7 +38,6 @@ describe('e2e: schema-first pipeline ordering', () => {
   let dir: string;
 
   beforeAll(() => {
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
     dir = mkdtempSync(join(tmpdir(), 'phoenix-schemafirst-'));
     mkdirSync(join(dir, 'spec'), { recursive: true });
     writeFileSync(join(dir, 'spec', 'shop.md'), SPEC, 'utf8');

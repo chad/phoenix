@@ -13,6 +13,7 @@ import type { RuntimeTarget, CompileError, ServiceDescriptor, AssemblyFinding } 
 import type { ImplementationUnit } from '../models/iu.js';
 import { cleanCodeResponse } from '../codegen-util.js';
 import { parseTscOutput } from './node-typescript.js';
+import { BROWSER_TS_DEV_PACKAGES } from '../toolchain.js';
 
 // ─── The engine scaffold (hand-authored, shipped verbatim — never generated) ──
 
@@ -652,10 +653,8 @@ export const browserTypescript: RuntimeTarget = {
   fileExtension: 'ts',
 
   packages: {},
-  devPackages: {
-    'typescript': '^5.4.0',
-    'vitest': '^2.0.0',
-  },
+  // Versions come from src/toolchain.ts. A browser target deliberately omits @types/node.
+  devPackages: { ...BROWSER_TS_DEV_PACKAGES },
 
   moduleTemplate: MODULE_TEMPLATE,
   promptExtension: PROMPT_EXTENSION,

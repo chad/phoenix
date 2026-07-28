@@ -1,0 +1,107 @@
+name: CI
+
+# Phoenix's entire claim is that its gates are executable rather than advisory. That claim
+# is empty if nothing runs them on a pull request, so this workflow is the floor: the suite
+# that produces the numbers we quote must go green before anything merges.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes the previous run on the same ref; the e2e suite is expensive.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The suite must never reach for a model. Every gate asserted here is deterministic, and
+  # a job that silently depended on an API key would be unreproducible for contributors.
+  PHOENIX_NO_LLM: '1'
+
+jobs:
+  build-and-test:
+    name: build + full suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck and compile
+        run: npm run build
+
+      # The e2e suites spawn the compiled CLI as child processes and boot real servers.
+      # tests/global-setup.ts compiles dist/ exactly once before any worker starts.
+      - name: Full test suite
+        run: npm test
+
+  audit:
+    name: no known advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # This gate exists because the alternative was measured: with no CI and ungrouped bot
+      # PRs, this repo reached 83 unaddressed advisories and 20 stale dependency PRs. Zero
+      # is cheap to hold and expensive to recover.
+      - name: Audit the compiler
+        run: npm audit --audit-level=moderate
+
+      # Phoenix hands these manifests to users. A vulnerable range in generated output is a
+      # Phoenix defect, not the user's problem — so the examples are gated too.
+      - name: Audit every generated example
+        run: |
+          status=0
+          for dir in examples/*/; do
+            [ -f "$dir/package.json" ] || continue
+            printf '\n=== %s ===\n' "$dir"
+            if ! (cd "$dir" && npm audit --audit-level=moderate); then
+              echo "::error title=Vulnerable generated example::$dir ships a package with a known advisory. Bump the canonical pin in src/toolchain.ts, then refresh the example lockfiles."
+              status=1
+            fi
+          done
+          exit $status
+
+  examples:
+    name: generated examples typecheck and pass their own tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # A generated app that does not compile and pass its own suite from a COLD checkout is
+      # the failure mode Phoenix exists to prevent. Cold is the important word: the
+      # SQLITE_BUSY race in the generated db.ts only ever reproduced on a fresh database.
+      - name: Install, typecheck, and test each example
+        run: |
+          status=0
+          for dir in examples/*/; do
+            [ -f "$dir/package.json" ] || continue
+            printf '\n=== %s ===\n' "$dir"
+            (
+              cd "$dir" || exit 1
+              npm install --no-audit --no-fund || exit 1
+              if [ -f tsconfig.json ]; then npx tsc --noEmit || exit 1; fi
+              rm -rf data
+              npx vitest run || exit 1
+            ) || { echo "::error title=Broken generated example::$dir failed to install, typecheck, or pass its tests."; status=1; }
+          done
+          exit $status

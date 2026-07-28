@@ -12,6 +12,7 @@
 import type { RuntimeTarget, ServiceDescriptor } from './models/architecture.js';
 import type { ImplementationUnit } from './models/iu.js';
 import { sha256 } from './semhash.js';
+import { NODE_TS_DEV_PACKAGES } from './toolchain.js';
 
 export type { ServiceDescriptor };
 
@@ -830,11 +831,9 @@ function generatePackageJson(
     pkg.dependencies = rt.packages;
     pkg.devDependencies = rt.devPackages;
   } else {
-    pkg.devDependencies = {
-      typescript: '^5.4.0',
-      vitest: '^2.0.0',
-      '@types/node': '^22.0.0',
-    };
+    // No runtime target: fall back to the canonical pin in src/toolchain.ts rather than
+    // a third hand-maintained copy of the same versions.
+    pkg.devDependencies = { ...NODE_TS_DEV_PACKAGES };
   }
 
   return JSON.stringify(pkg, null, 2) + '\n';

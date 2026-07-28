@@ -12,16 +12,16 @@
     "start": "tsx src/server.ts"
   },
   "dependencies": {
-    "hono": "^4.6.0",
-    "@hono/node-server": "^1.13.0",
-    "better-sqlite3": "^11.7.0",
-    "zod": "^3.24.0"
+    "hono": "^4.12.32",
+    "@hono/node-server": "^2.0.12",
+    "better-sqlite3": "^11.10.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "vitest": "^2.0.0",
-    "@types/node": "^22.0.0",
-    "@types/better-sqlite3": "^7.6.0",
-    "tsx": "^4.0.0"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "@types/node": "^25.9.5",
+    "@types/better-sqlite3": "^7.6.13",
+    "tsx": "^4.23.1"
   }
 }

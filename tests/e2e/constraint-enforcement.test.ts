@@ -52,7 +52,6 @@ describe('e2e: constraint enforcement (closes the §1 false-green)', () => {
   let tagModule: string | null;
 
   beforeAll(() => {
-    execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'ignore' });
     project = mkdtempSync(join(tmpdir(), 'phoenix-constraint-'));
     mkdirSync(join(project, 'spec'), { recursive: true });
     writeFileSync(join(project, 'spec', 'app.md'), SPEC, 'utf8');
