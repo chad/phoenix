@@ -194,10 +194,34 @@ Their skill-routing table is a genuinely good idea we do not have. But convert e
 audit to a gate that emits a number, not a report. That is the whole difference between
 the two projects, expressed as a work item.
 
-**R5 — Drain the dependency debt.**
-83 vulnerabilities and 20 open dependabot PRs on main. ORG-2 has husky + commitlint +
-`.unimportedrc` + `.madgerc` and a clean bot queue. This is not a technology gap, it is
-a seriousness gap, and it is visible to anyone who looks at the repo.
+**R5 — Drain the dependency debt.** ✅ **DONE.**
+83 advisories → 0, 20 bot PRs → 0, and CI now exists at all. Worth recording what the pass
+actually found, because almost none of it was about version numbers:
+
+- **There was no CI.** 1198 tests and nothing ran them. That was the real gap, not the vulns.
+- **`npm ci` was broken from a clean checkout** — the repo was not installable and nothing
+  reported it (npm 11 and npm 12 disagree about an optional prerelease peer).
+- **A suite flake**: five e2e files each ran `tsc` into the *shared* `dist/` from their own
+  `beforeAll` while sibling forks spawned `node dist/cli.js`, so tests intermittently
+  observed a truncated entrypoint. Now compiled once in `globalSetup`.
+- **Generated apps failed their own tests ~50% of the time from a cold database.**
+  `PRAGMA journal_mode = WAL` needs an exclusive lock and returns SQLITE_BUSY *without*
+  honouring `busy_timeout`. This is the most damning find — a correctness bug in shipped
+  output, invisible because nobody ran the examples cold. 12/12 clean now.
+- **A stale example** (`declaration: true`) had not typechecked on a fresh install for some
+  time. Caret ranges float, so that was already reaching users.
+- **TypeScript 7 is a migration, not a bump** — it fails our build with ~40 TS2591 errors.
+  CI caught that on the bot's own PR. Withheld deliberately, and tracked rather than dismissed.
+
+The durable fix was structural, not numeric: toolchain versions collapsed from three copies
+to one canonical pin (`src/toolchain.ts`), with `tests/unit/toolchain.test.ts` failing if a
+literal range reappears in an emitter, if a checked-in example drifts from the pin, or if the
+pin falls below an advisory floor already cleared. Dependabot is grouped so one advisory
+cannot become eight PRs again.
+
+Note what that is: **R4 applied to ourselves.** The hygiene process became a gate that emits
+a verdict instead of a convention someone has to remember. The two remaining open PRs are
+both genuine outside contributions.
 
 **R6 — Decide the OSS/commercial boundary before we need to.**
 They have already drawn theirs. AGPL for the core is a deliberate, aggressive choice —
