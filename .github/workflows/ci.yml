@@ -39,7 +39,30 @@ jobs:
       # differently — so `npm ci` from a clean checkout was broken and nobody knew. The lock
       # is now verified against npm 11 and 12, and leaving this unpinned keeps CI as the
       # early warning for the next npm that changes resolution.
-      - run: npm ci
+      - name: Install from the lockfile
+        id: install
+        run: npm ci
+
+      # `npm ci`'s own error names the missing package but not the cause, and the cause is
+      # unintuitive enough to have already cost one debugging cycle. Say it plainly.
+      - name: Explain a lockfile mismatch
+        if: failure() && steps.install.outcome == 'failure'
+        run: |
+          cat <<'MSG'
+          ::error title=Lockfile out of sync::npm ci could not install from package-lock.json.
+
+          The usual cause is an older npm having rewritten the lockfile. npm 11 and npm 12
+          disagree about optional prerelease peers (@emnapi/core / @emnapi/runtime, wasm
+          fallbacks under vitest -> vite -> rolldown): npm 11 omits them, npm 12 requires
+          them at top level. A lock written by npm 11 therefore fails `npm ci` under npm 12.
+
+          Fix: regenerate with npm 12 or newer, and do not run an older npm afterwards.
+
+            rm -rf node_modules package-lock.json && npx npm@12 install
+
+          package.json declares engines.npm >= 12 for exactly this reason.
+          MSG
+          exit 1
 
       - name: Typecheck and compile
         run: npm run build
