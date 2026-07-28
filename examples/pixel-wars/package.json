@@ -15,9 +15,9 @@
     "start": "npx tsx server.mts"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10",
-    "@types/node": "^25.9.5",
+    "@types/node": "^26.1.2",
     "tsx": "^4.23.1"
   }
 }
