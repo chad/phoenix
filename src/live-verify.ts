@@ -16,12 +16,27 @@
  * stays frozen: this consumes constraints read-only and changes no checker.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { StructuredConstraint } from './constraints/model.js';
 import type { ImplementationUnit } from './models/iu.js';
 import {
   runGatedLiveEval, bootApp, type AppHandle, type BootSpec, type LivePlan, type GatedLiveResult, type PrepareResult,
 } from './live-harness.js';
 import { parseTableSchemas, seedForTarget, singularize, type SeedPlanInput, type TableSchema } from './live-seed.js';
+import { parseRouteContract, type RouteContract } from './route-contract.js';
+
+/**
+ * The boot spec a project's runtime target implies: the command the harness boots and
+ * the migrations file the seeder reads. TODAY this returns the node-typescript
+ * constants for every target — the live oracle's node coupling, and the seam the
+ * cross-runtime live-parity red probes. The fix resolves per runtime (uvicorn +
+ * `src/generated/_migrations.py` for python-fastapi, with DB_PATH isolation).
+ */
+export function bootSpecForTarget(target: string | undefined): { command: string[]; migrationsFile: string } {
+  void target; // runtime-blind today — the red defines the required behavior.
+  return { command: ['npx', 'tsx', 'src/server.ts'], migrationsFile: 'src/generated/_migrations.ts' };
+}
 
 /** Slugify an entity/IU name to its mounted route prefix (mirrors scaffold's rule). */
 export function routeSlug(name: string): string {
@@ -123,6 +138,7 @@ export function buildSeedPrepare(
   ius: ImplementationUnit[],
   entity: string,
   governedField: string,
+  projectRoot?: string,
 ): ((app: AppHandle) => Promise<PrepareResult>) | undefined {
   if (!schemaDdl) return undefined;
   const tables: TableSchema[] = parseTableSchemas(schemaDdl);
@@ -134,7 +150,26 @@ export function buildSeedPrepare(
     const iu = ius.find(u => singularize(u.name) === singularize(table));
     return iu ? routeSlug(iu.name) : null;
   };
-  const input: SeedPlanInput = { tables, constraints, routeFor };
+  // The route-contract overlay (P2): acceptance facts that live only in the generated
+  // module's Zod create-schema (named-const enums, CSV refines, route-level requiredness)
+  // — parsed once per table, cached, and only ever used to make seeding MORE valid.
+  const contractCache = new Map<string, RouteContract | undefined>();
+  const contractFor = (table: string): RouteContract | undefined => {
+    if (!projectRoot) return undefined;
+    if (contractCache.has(table)) return contractCache.get(table);
+    let contract: RouteContract | undefined;
+    const iu = ius.find(u => singularize(u.name) === singularize(table));
+    const f = iu?.output_files[0];
+    if (f) {
+      const full = join(projectRoot, f);
+      if (existsSync(full)) {
+        try { contract = parseRouteContract(readFileSync(full, 'utf8')); } catch { contract = undefined; }
+      }
+    }
+    contractCache.set(table, contract);
+    return contract;
+  };
+  const input: SeedPlanInput = { tables, constraints, routeFor, contractFor };
   return async (app: AppHandle): Promise<PrepareResult> => {
     const r = await seedForTarget(app, input, targetTable, governedField);
     return r.ok ? { ok: true, seed: r.seed } : { ok: false, reason: r.reason };
@@ -178,7 +213,7 @@ export async function runLiveVerification(
   const results: LiveVerifyReport['results'] = [];
   const upgraded: string[] = [];
   for (const ev of evals) {
-    const prepare = buildSeedPrepare(opts.schemaDdl, opts.constraints ?? [], opts.ius ?? [], ev.entity, ev.governedField);
+    const prepare = buildSeedPrepare(opts.schemaDdl, opts.constraints ?? [], opts.ius ?? [], ev.entity, ev.governedField, projectRoot);
     const result = await runGatedLiveEval({ bootSpec: bootSpec(), plan: ev.plan, targetFile: ev.targetFile, prepare });
     results.push({ label: ev.label, constraintId: ev.constraintId, result });
     if (result.status === 'pass' && result.gated) upgraded.push(ev.constraintId);

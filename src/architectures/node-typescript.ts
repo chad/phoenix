@@ -279,7 +279,16 @@ function tscCompile(projectRoot: string): CompileError[] {
     return [];
   } catch (err: unknown) {
     const e = err as { stdout?: Buffer; stderr?: Buffer };
-    return parseTscOutput((e.stdout?.toString() ?? '') + (e.stderr?.toString() ?? ''));
+    const raw = (e.stdout?.toString() ?? '') + (e.stderr?.toString() ?? '');
+    const errors = parseTscOutput(raw);
+    // tsc failed but produced no parseable TS errors — a broken toolchain (e.g. the
+    // fake npx 'tsc' package when node_modules is missing) must be a loud failure,
+    // never an empty (green) list. "Compiles" earned by a missing compiler is the
+    // same false green this whole system exists to kill.
+    if (errors.length === 0) {
+      return [{ file: '(toolchain)', line: 0, col: 0, code: 'TSC-EXEC', message: raw.trim().split('\n')[0] ?? 'tsc failed with no parseable output', raw: raw.slice(0, 200) }];
+    }
+    return errors;
   }
 }
 

@@ -20,11 +20,17 @@ import { CONFIG } from './experiment-config.js';
 export interface LLMCanonOptions {
   /** Enable self-consistency with k samples (default: 1 = no self-consistency) */
   selfConsistencyK?: number;
+  /** Invoked when any candidate fails to normalize via the LLM and keeps its
+   *  deterministic rule form instead. A silent downgrade is a trust violation —
+   *  the caller surfaces this (CLI warning + journal receipt), so a user paying
+   *  for tokens never gets rule-based output presented as LLM extraction.
+   *  `fellBack === attempted` means the graph is entirely rule-based. */
+  onFallback?: (err: Error, info: { fellBack: number; attempted: number }) => void;
 }
 
 /**
  * Extract canonical nodes using rule-based extraction + LLM normalization.
- * Falls back to pure rule-based on any LLM failure.
+ * Falls back to pure rule-based on any LLM failure — LOUDLY, via onFallback.
  */
 export async function extractCanonicalNodesLLM(
   clauses: Clause[],
@@ -40,9 +46,15 @@ export async function extractCanonicalNodesLLM(
 
   try {
     const k = options?.selfConsistencyK ?? 1;
-    const normalized = await normalizeCandidates(candidates, llm, k);
+    const stats = { fellBack: 0, attempted: 0, firstError: undefined as Error | undefined };
+    const normalized = await normalizeCandidates(candidates, llm, k, stats);
+    if (stats.fellBack > 0 && options?.onFallback) {
+      const err = stats.firstError ?? new Error('unusable normalizer response');
+      options.onFallback(err, { fellBack: stats.fellBack, attempted: stats.attempted });
+    }
     return resolveGraph(normalized, clauses);
-  } catch {
+  } catch (e) {
+    options?.onFallback?.(e instanceof Error ? e : new Error(String(e)), { fellBack: candidates.length, attempted: candidates.length });
     return resolveGraph(candidates, clauses);
   }
 }
@@ -51,15 +63,16 @@ async function normalizeCandidates(
   candidates: CandidateNode[],
   llm: LLMProvider,
   k: number = 1,
+  stats?: { fellBack: number; attempted: number; firstError?: Error },
 ): Promise<CandidateNode[]> {
-  const results: CandidateNode[] = [];
+  // Per-candidate normalization is independent — the pool is safe: results are written
+  // by index, so output order (and therefore resolveGraph's input order) is identical
+  // to the sequential run. The 150-token calls are latency-bound; concurrency is the
+  // difference between a minute and half an hour on a large adapted spec.
+  const POOL = 6;
+  const results: CandidateNode[] = new Array(candidates.length);
 
-  for (const c of candidates) {
-    if (c.type === CanonicalType.CONTEXT) {
-      results.push(c);
-      continue;
-    }
-
+  async function normalizeOne(c: CandidateNode): Promise<CandidateNode> {
     try {
       const prompt = `Rewrite this ${c.type} statement in canonical form:\n"${c.statement}"`;
 
@@ -73,35 +86,48 @@ async function normalizeCandidates(
         const normalized = parseNormalizerResponse(response);
         if (normalized && normalized.length > 5) {
           const newId = sha256([c.type, normalized, c.source_clause_ids[0]].join('\x00'));
-          results.push({ ...c, candidate_id: newId, statement: normalized, extraction_method: 'llm' });
-        } else {
-          results.push(c);
+          return { ...c, candidate_id: newId, statement: normalized, extraction_method: 'llm' };
         }
-      } else {
-        // Self-consistency: generate k samples, select lexical medoid
-        const samples: string[] = [];
-        for (let i = 0; i < k; i++) {
-          const response = await llm.generate(prompt, {
-            system: CONFIG.LLM_NORMALIZER_SYSTEM,
-            temperature: i === 0 ? CONFIG.LLM_NORMALIZER_TEMPERATURE : CONFIG.LLM_CONSISTENCY_TEMPERATURE,
-            maxTokens: CONFIG.LLM_NORMALIZER_MAX_TOKENS,
-          });
-          const parsed = parseNormalizerResponse(response);
-          if (parsed && parsed.length > 5) samples.push(parsed);
-        }
-
-        if (samples.length === 0) {
-          results.push(c);
-        } else {
-          const medoid = selectMedoid(samples);
-          const newId = sha256([c.type, medoid, c.source_clause_ids[0]].join('\x00'));
-          results.push({ ...c, candidate_id: newId, statement: medoid, extraction_method: 'llm' });
-        }
+        if (stats) { stats.fellBack++; stats.firstError ??= new Error('unusable normalizer response'); }
+        return c;
       }
-    } catch {
-      results.push(c);
+
+      // Self-consistency: generate k samples, select lexical medoid
+      const samples: string[] = [];
+      for (let i = 0; i < k; i++) {
+        const response = await llm.generate(prompt, {
+          system: CONFIG.LLM_NORMALIZER_SYSTEM,
+          temperature: i === 0 ? CONFIG.LLM_NORMALIZER_TEMPERATURE : CONFIG.LLM_CONSISTENCY_TEMPERATURE,
+          maxTokens: CONFIG.LLM_NORMALIZER_MAX_TOKENS,
+        });
+        const parsed = parseNormalizerResponse(response);
+        if (parsed && parsed.length > 5) samples.push(parsed);
+      }
+
+      if (samples.length === 0) {
+        if (stats) { stats.fellBack++; stats.firstError ??= new Error('no usable self-consistency sample'); }
+        return c;
+      }
+      const medoid = selectMedoid(samples);
+      const newId = sha256([c.type, medoid, c.source_clause_ids[0]].join('\x00'));
+      return { ...c, candidate_id: newId, statement: medoid, extraction_method: 'llm' };
+    } catch (e) {
+      if (stats) { stats.fellBack++; stats.firstError ??= e instanceof Error ? e : new Error(String(e)); }
+      return c;
     }
   }
+
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < candidates.length) {
+      const i = next++;
+      const c = candidates[i];
+      if (c.type === CanonicalType.CONTEXT) { results[i] = c; continue; }
+      if (stats) stats.attempted++;
+      results[i] = await normalizeOne(c);
+    }
+  }
+  await Promise.all(Array.from({ length: POOL }, worker));
 
   return results;
 }

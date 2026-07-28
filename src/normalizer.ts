@@ -19,6 +19,10 @@ export function normalizeText(raw: string): string {
   // Remove fenced code blocks entirely (preserve that code existed but not its content)
   text = text.replace(/```[\s\S]*?```/g, '(code block)');
 
+  // Remove HTML comments — they are author-to-author notes (and Phoenix's own
+  // provenance annotations in derived specs), never requirement content.
+  text = text.replace(/<!--[\s\S]*?-->/g, '');
+
   // Remove markdown heading markers
   text = text.replace(/^#{1,6}\s+/gm, '');
 

@@ -58,6 +58,8 @@ import { computeInvalidation, iuKey, dependentsToRegenerate } from './invalidati
 import { InvalidationStore } from './store/invalidation-store.js';
 import { CanonStabilityStore } from './canon-stability.js';
 import { Journal } from './journal.js';
+import { adaptSpec } from './spec-adapt.js';
+import { resolveArchitectureAdequacy, formatAdequacy } from './architecture-adequacy.js';
 import { deriveEvaluations, checkEvaluation, checkProperty } from './evals.js';
 import { mineEntityAttributes, extractConstraints } from './constraints/extract.js';
 import { deriveProjectLivePlans, runLiveVerification } from './live-verify.js';
@@ -103,8 +105,27 @@ import type { ResolvedTarget } from './models/architecture.js';
 
 // Audit & Fowler gaps
 import { auditIU, auditAll } from './audit.js';
+import { classifyPaceLayers, filterConservationProtected } from './pace-classify.js';
+import { assessPlanGrain } from './grain-policy.js';
+import { analyzeDeletion, deletionScorecard } from './deletion-test.js';
+import { proposeCompactions, type CompactionProposal } from './compaction-proposals.js';
+import { detectStubs } from './anti-stub.js';
+import { assessBehavioralCoverage } from './behavioral-coverage.js';
+
+/** Read every generated module's source (file + text) for the behavioral/stub gates. */
+function readGeneratedSources(projectRoot: string): Array<{ file: string; source: string }> {
+  const genDir = join(projectRoot, 'src', 'generated');
+  if (!existsSync(genDir)) return [];
+  const out: Array<{ file: string; source: string }> = [];
+  for (const dir of readdirSync(genDir)) {
+    const f = join(genDir, dir, `${dir}.ts`);
+    if (existsSync(f)) out.push({ file: `${dir}.ts`, source: readFileSync(f, 'utf8') });
+  }
+  return out;
+}
 import type { AuditResult, ReadinessLevel } from './audit.js';
 import { EvaluationStore } from './store/evaluation-store.js';
+import { proposeSpecFixes, renderSpecProposals } from './spec-proposals.js';
 import { NegativeKnowledgeStore } from './store/negative-knowledge-store.js';
 import { failedGenerationKnowledge } from './models/negative-knowledge.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
@@ -1440,6 +1461,9 @@ function gateRegenResults(
   const evalStore = new EvaluationStore(phoenixDir);
   const nkStore = new NegativeKnowledgeStore(phoenixDir);
   const nk = nkStore.getActive(); // includes failures just recorded this run
+  // Classify pace layers from the canon graph so the gate reports a real layer
+  // (foundation/domain/service/surface + conservation), not "needs review".
+  const paceLayers = classifyPaceLayers(ius, new CanonicalStore(phoenixDir).getAllNodes());
   const verdicts: GateVerdict[] = [];
   for (const result of results) {
     const iu = ius.find(i => i.iu_id === result.iu_id);
@@ -1450,6 +1474,7 @@ function gateRegenResults(
       evalCoverage: evalStore.coverage(iu),
       negativeKnowledge: nk.filter(n => n.subject_id === iu.iu_id),
       previousMass: previousMasses.get(iu.iu_id),
+      paceLayer: paceLayers.get(iu.iu_id),
       mode: 'warn',
     });
     result.manifest.regen_metadata.readiness = verdict.readiness;
@@ -1480,7 +1505,112 @@ function reportRegenGate(verdicts: GateVerdict[], indent = '  '): void {
   console.log();
 }
 
-async function cmdBootstrap(): Promise<void> {
+/**
+ * phoenix adapt — draft an operational spec from any-shape spec, with provenance.
+ * The LLM drafts; the human adopts. The source is never touched: the draft lands in
+ * spec.adapted/ with every rule citing its source lines, and the coverage report names
+ * both failure modes (dropped intent / invented intent) in the open.
+ */
+async function cmdAdapt(args: string[]): Promise<void> {
+  const { projectRoot, phoenixDir } = requirePhoenixRoot();
+  const onlySpec = args.find(a => a.startsWith('--spec='))?.split('=')[1];
+  const force = args.includes('--force');
+
+  const llm = resolveProvider(phoenixDir);
+  if (!llm) {
+    console.error(red('✖ adapt needs an LLM provider (set ANTHROPIC_API_KEY, OPENAI_API_KEY, or MOONSHOT_API_KEY).'));
+    return;
+  }
+
+  const specFiles = findSpecFiles(projectRoot).filter(f => !onlySpec || basename(f) === onlySpec);
+  if (specFiles.length === 0) {
+    console.log(yellow(onlySpec ? `⚠ No spec file named ${onlySpec} under spec/.` : '⚠ No spec files found in spec/ directory.'));
+    return;
+  }
+
+  console.log(bold('📝 Phoenix Adapt — the LLM drafts, the human adopts'));
+  console.log(dim(`  LLM: ${llm.name}/${llm.model}`));
+  console.log();
+
+  const outDir = join(projectRoot, 'spec.adapted');
+  mkdirSync(outDir, { recursive: true });
+
+  for (const specFile of specFiles) {
+    const docName = basename(specFile);
+    const outPath = join(outDir, docName);
+    // Decide up front — an existing draft under review must not be clobbered by a
+    // checkpoint mid-run, and skipping BEFORE the run spends zero LLM budget.
+    if (existsSync(outPath) && !force) {
+      console.log(yellow(`  ⚠ ${relative(projectRoot, outPath)} exists — re-run with --force to overwrite. Skipping ${docName}.`));
+      continue;
+    }
+    const source = readFileSync(specFile, 'utf8');
+    console.log(bold(`  ${docName}`));
+    const result = await adaptSpec(docName, source, llm, {
+      onProgress: (msg) => console.log(dim(`    ⏳ ${msg}`)),
+      // Persist partial work after every section — a crashed run loses nothing completed.
+      checkpoint: (parts, gloss) => {
+        const partial = `<!-- PHOENIX-DERIVED DRAFT (PARTIAL — run still in progress) -->\n\n# Data model (derived)\n\n${gloss}\n\n${parts.filter(p => p.length > 0).join('\n\n')}\n`;
+        writeFileSync(outPath, partial, 'utf8');
+      },
+    });
+
+    writeFileSync(outPath, result.derivedMarkdown, 'utf8');
+
+    const c = result.coverage;
+    const pct = c.sourceNormatives.length > 0 ? Math.round((c.covered / c.sourceNormatives.length) * 100) : 100;
+    console.log(`    ${green('✔')} draft → ${relative(projectRoot, outPath)}`);
+    console.log(`    Obligations → rules: ${c.covered}/${c.sourceNormatives.length} (${pct}%)  ·  preserved as vision: ${c.vision.length}  ·  proposed (invented — endorse or delete): ${c.proposedRules.length}`);
+    if (result.rescued.rules + result.rescued.vision > 0) {
+      console.log(dim(`    Rescue pass recovered ${result.rescued.rules} rule(s) + ${result.rescued.vision} vision line(s) from first-pass drops.`));
+    }
+    if (result.integrationContracts.length > 0) {
+      console.log(`    ${cyan('Integration contracts:')} ${result.integrationContracts.length} ${dim('(become integration evals — the app must connect, not just model)')}`);
+      for (const ic of result.integrationContracts.slice(0, 5)) console.log(dim(`      ⇄ ${ic.slice(0, 100)}`));
+    }
+    if (c.dropped.length > 0) {
+      console.log(yellow(`    Dropped intent (${c.dropped.length}) — cited by nothing, even after the rescue pass:`));
+      for (const d of c.dropped.slice(0, 15)) console.log(yellow(`      · L${d.line}: ${d.text.slice(0, 100)}`));
+      if (c.dropped.length > 15) console.log(dim(`      … and ${c.dropped.length - 15} more in the draft header`));
+    } else {
+      console.log(green('    Dropped intent: none — every source obligation is cited by a rule or preserved as vision.'));
+    }
+    if (c.unboundSpans.length > 0) {
+      console.log(red(`    Hallucinated line references (${c.unboundSpans.length}) — provenance spans outside the source; treat those rules as proposed:`));
+      for (const [a, b] of c.unboundSpans.slice(0, 5)) console.log(red(`      · L${a}-L${b}`));
+    }
+    if (result.suspectRules.length > 0) {
+      console.log(yellow(`    Suspect rules (${result.suspectRules.length}) — flagged by the lint, review with extra care:`));
+      for (const s of result.suspectRules.slice(0, 10)) console.log(yellow(`      · [${s.reason}] ${s.text.slice(0, 90)}`));
+      if (result.suspectRules.length > 10) console.log(dim(`      … and ${result.suspectRules.length - 10} more`));
+    }
+    console.log();
+
+    new Journal(phoenixDir).append({
+      type: 'adapt-spec',
+      inputs: [docName],
+      outputs: [relative(projectRoot, outPath)],
+      meta: {
+        model_id: result.model,
+        source_sha: result.sourceSha,
+        obligations_total: c.sourceNormatives.length,
+        obligations_covered: c.covered,
+        obligations_vision: c.vision.length,
+        obligations_dropped: c.dropped.length,
+        rules_proposed: c.proposedRules.length,
+        rescued_rules: result.rescued.rules,
+        rescued_vision: result.rescued.vision,
+        rules_suspect: result.suspectRules.length,
+        spans_unbound: c.unboundSpans.length,
+      },
+    });
+  }
+
+  console.log(dim('  The source spec was not modified. To adopt: review the draft, move the source out of'));
+  console.log(dim('  spec/ (keep it — it is the intent record), move the draft in, then `phoenix canonicalize`.'));
+}
+
+async function cmdBootstrap(args: string[] = []): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
 
   console.log(bold('🔥 Phoenix Bootstrap'));
@@ -1523,8 +1653,11 @@ async function cmdBootstrap(): Promise<void> {
     allClauses.push(...specStore.getClauses(docId));
   }
 
-  // Extract canonical nodes (LLM-enhanced when available)
-  const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly);
+  // Extract canonical nodes (LLM-enhanced when available; a failed LLM pass warns —
+  // never a silent downgrade to rule extraction)
+  const canonNodes = await extractCanonicalNodesLLM(allClauses, llmEarly, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM normalization failed — using deterministic rule extraction ${dim(`(${e.message})`)}`),
+  });
   canonStore.replaceNodes(canonNodes);
   // Seed the canonical-stability baseline (first run; nothing to compare yet).
   new CanonStabilityStore(phoenixDir).update(canonNodes);
@@ -1551,22 +1684,68 @@ async function cmdBootstrap(): Promise<void> {
   console.log(`    ${green('✔')} System state: ${cyan(machine.getState())}`);
   console.log();
 
-  // Load architecture from config (before planning so output paths match the target).
+  // Step 0: Architecture adequacy. Derive the system's SHAPE from the canon graph and
+  // resolve an architecture that can both EXPRESS and COMPOSE it — BEFORE planning or
+  // generating anything. Refuses to build against an architecture it knows cannot
+  // produce the thing (the freeqworld cascade started exactly there).
   const configPath = join(phoenixDir, 'config.json');
-  let arch: ResolvedTarget | null = null;
+  let configuredArch: string | null = null;
   if (existsSync(configPath)) {
-    try {
-      const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      if (config.architecture) {
-        arch = resolveTarget(config.architecture);
-        if (arch) console.log(`  ${dim('Architecture:')} ${cyan(arch.architecture.name)} / ${cyan(arch.runtime.name)}`);
-      }
-    } catch { /* ignore */ }
+    try { configuredArch = JSON.parse(readFileSync(configPath, 'utf8')).architecture ?? null; } catch { /* ignore */ }
   }
+  const acceptInadequate = args.includes('--accept-inadequate-architecture');
+  // Normalize legacy/alias names (e.g. 'sqlite-web-api', 'web-api/python-fastapi') to the
+  // canonical architecture name the adequacy registry is keyed by.
+  const configuredCanonical = configuredArch ? (resolveTarget(configuredArch)?.architecture.name ?? configuredArch) : null;
+  const adequacy = resolveArchitectureAdequacy(canonNodes, configuredCanonical);
+  console.log(`  ${bold('🧭 Architecture')} ${dim('(Step 0 — derive the shape, resolve a fit)')}`);
+  for (const line of formatAdequacy(adequacy)) {
+    const c = line.startsWith('✔') ? green : line.startsWith('✖') ? red : line.startsWith('The architecture') || line.startsWith('Author') || line.startsWith('To generate') ? yellow : dim;
+    console.log(`    ${c(line)}`);
+  }
+
+  let arch: ResolvedTarget | null = null;
+  const isAdequate = adequacy.verdict === 'selected' || adequacy.verdict === 'chosen-adequate';
+  if (!isAdequate && !acceptInadequate) {
+    // HALT — do not generate against an inadequate architecture.
+    new Journal(phoenixDir).append({
+      type: 'adequacy', inputs: [], outputs: [],
+      meta: { architecture_adequacy: adequacy.verdict, configured: configuredArch, needed: adequacy.needed },
+    });
+    console.log();
+    console.log(red('  ■ Bootstrap halted at Step 0 — no adequate architecture.'));
+    console.log(`    ${dim('Author the architecture above (or pass --accept-inadequate-architecture to generate known-incoherent output).')}`);
+    return;
+  }
+  // Resolve the arch string: a chosen-adequate config keeps the human's exact target
+  // (runtime and all); a derived selection uses the canonical name; an override falls
+  // back to the configured target or the nearest base.
+  const useArchName = adequacy.verdict === 'chosen-adequate'
+    ? configuredArch
+    : adequacy.selected ?? configuredArch ?? adequacy.needed?.closest ?? null;
+  if (useArchName) {
+    arch = resolveTarget(useArchName);
+    // Persist a spec-derived selection so status/regen agree on the target.
+    if (arch && !configuredArch) {
+      try {
+        const cfg = existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')) : {};
+        cfg.architecture = useArchName;
+        writeFileSync(configPath, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+      } catch { /* best effort */ }
+    }
+    const tag = adequacy.selected ? '' : dim(' (inadequate — proceeding by override; output will be incoherent)');
+    if (arch) console.log(`  ${dim('Architecture:')} ${cyan(arch.architecture.name)} / ${cyan(arch.runtime.name)}${tag}`);
+  }
+  new Journal(phoenixDir).append({
+    type: 'adequacy', inputs: [], outputs: [],
+    meta: { architecture_adequacy: adequacy.verdict, selected: useArchName, configured: configuredArch, accepted_inadequate: acceptInadequate && !adequacy.selected },
+  });
 
   // Step 3: Plan IUs — semantic domain clustering (LLM) when available
   console.log(`  ${dim('Phase C:')} IU planning`);
-  const ius = await planIUsAuto(canonNodes, allClauses, llmEarly, arch);
+  const ius = await planIUsAuto(canonNodes, allClauses, llmEarly, arch, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM clustering failed — module boundaries come from the tag heuristic ${dim(`(${e.message})`)}`),
+  });
   saveIUs(phoenixDir, ius);
   new Journal(phoenixDir).append({
     type: 'plan',
@@ -1578,7 +1757,30 @@ async function cmdBootstrap(): Promise<void> {
   for (const iu of ius) {
     console.log(`      ${dim('·')} ${iu.name} ${dim(`(${iu.risk_tier})`)} → ${iu.output_files.join(', ')}`);
   }
+  // Grain health (book ch12): the right grain is the smallest thing you can delete
+  // and prove works — flag fragments (nothing to verify) and monoliths (unbounded
+  // blast radius). Reported, not yet auto-corrected.
+  {
+    const grain = assessPlanGrain(ius, canonNodes);
+    const issues = grain.fragments.length + grain.monoliths.length + grain.overFragmented.length;
+    if (issues > 0) {
+      console.log(`    ${yellow('○')} Grain: ${grain.ok}/${ius.length} ok, ${grain.fragments.length} fragment(s), ${grain.monoliths.length} monolith(s), ${grain.overFragmented.length} over-fragmented entit${grain.overFragmented.length === 1 ? 'y' : 'ies'}`);
+      for (const m of grain.monoliths.slice(0, 4)) console.log(`      ${dim(`✖ ${m.name}: ${m.reason}`)}`);
+      for (const e of grain.overFragmented.slice(0, 4)) console.log(`      ${dim(`◈ "${e.entity}" spread across ${e.ius.length} IUs (${e.totalNodes} nodes) — consolidate toward one evaluable module`)}`);
+      new Journal(phoenixDir).append({
+        type: 'plan', inputs: [], outputs: [],
+        meta: { grain: { ok: grain.ok, fragments: grain.fragments.length, monoliths: grain.monoliths.length, over_fragmented: grain.overFragmented.length } },
+      });
+    } else {
+      console.log(`    ${green('✔')} Grain: all ${ius.length} units are well-grained (evaluable, bounded)`);
+    }
+  }
   console.log();
+
+  // Architecture-fit gate: BEFORE codegen spends a token, say out loud which spec
+  // demands this target cannot express — already reported and gated by Step 0's
+  // adequacy resolution ABOVE (expression + composition axes). No second fit report
+  // here: one architecture verdict, delivered before planning, not two.
 
   // Step 4: Generate code
   const llm = resolveProvider(phoenixDir);
@@ -1632,16 +1834,16 @@ async function cmdBootstrap(): Promise<void> {
     siblingContracts: loadExistingContracts(projectRoot, ius, arch),
     sharedSchema: schemaPlan?.ddl,
     onGenerationFailure,
+    // Concurrency-safe progress: whole lines on completion (start/done pairs interleave).
     onProgress: (iu, status, msg) => {
-      if (status === 'start') process.stdout.write(`    ⏳ ${iu.name}…`);
-      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
-      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
+      if (status === 'done') console.log(`    ${green('✔')} ${iu.name}`);
+      else if (status === 'error') console.log(`    ${red('✖')} ${iu.name} ${dim(msg || 'failed, using stub')}`);
     },
   };
 
   const manifestManager = new ManifestManager(phoenixDir);
   const previousMasses = loadPreviousMasses(manifestManager);
-  const regenResults = await generateAll(ius, regenCtx);
+  const regenResults = await generateAll(ius, regenCtx, { concurrency: 4 });
 
   // Lift shared aggregate artifacts (migrations) out of the modules into one file with
   // per-IU regions. In schema-first mode the pre-planned schema is AUTHORITATIVE: its
@@ -1714,6 +1916,53 @@ async function cmdBootstrap(): Promise<void> {
   });
   if (arch) refreshBuildStatus(projectRoot, phoenixDir, arch);
 
+  // Anti-stub gate (MG3): reject code that ADVERTISES a live/network capability but
+  // performs none — the createWebSocketMovementTransport lie. Warn-first, journaled.
+  {
+    const genDir = join(projectRoot, 'src', 'generated');
+    if (existsSync(genDir)) {
+      const srcFiles: Array<{ file: string; source: string }> = [];
+      for (const dir of readdirSync(genDir)) {
+        const f = join(genDir, dir, `${dir}.ts`);
+        if (existsSync(f)) srcFiles.push({ file: `${dir}.ts`, source: readFileSync(f, 'utf8') });
+      }
+      const stubs = detectStubs(srcFiles);
+      if (stubs.length > 0) {
+        console.log(`  ${bold('🕵 Stub Gate')} ${dim('(does code that promises networking actually perform it?)')}`);
+        console.log(`    ${yellow('⚠')} ${stubs.length} plausible stub(s) — named a live capability, performed none:`);
+        for (const s of stubs.slice(0, 8)) console.log(`      ${dim(`✖ ${s.file}: ${s.advertises} — no network op`)}`);
+        if (stubs.length > 8) console.log(`      ${dim(`… and ${stubs.length - 8} more`)}`);
+        new Journal(phoenixDir).append({ type: 'assembly-gate', inputs: [], outputs: [], meta: { plausible_stubs: stubs.length, symbols: stubs.slice(0, 20).map(s => s.advertises) } });
+        console.log();
+      }
+    }
+  }
+
+  // Assembly gate: the WHOLE must be coherent as the thing the spec describes, not
+  // merely a set of modules that each typecheck. This is the gate the first game
+  // bootstrap lacked — the one that would have said "this is soup" instead of "✔".
+  let assemblyIncoherent = false;
+  if (arch?.runtime.assemblyGate) {
+    const findings = arch.runtime.assemblyGate(projectRoot, ius);
+    const errors = findings.filter(f => f.severity === 'error');
+    assemblyIncoherent = errors.length > 0;
+    console.log(`  ${bold('🧩 Assembly Gate')} ${dim('(is the whole a coherent product, not just compiling parts?)')}`);
+    if (findings.length === 0) {
+      console.log(`    ${green('✔')} assembled product is coherent`);
+    } else {
+      for (const f of findings) {
+        const tag = f.severity === 'error' ? red('✖') : yellow('⚠');
+        console.log(`    ${tag} ${dim(`[${f.code}]`)} ${f.message}`);
+        console.log(`      ${dim('→ ' + f.hint)}`);
+      }
+      new Journal(phoenixDir).append({
+        type: 'assembly-gate', inputs: [], outputs: [],
+        meta: { assembly_gate: assemblyIncoherent ? 'incoherent' : 'warnings', findings: findings.map(f => ({ code: f.code, severity: f.severity })) },
+      });
+    }
+    console.log();
+  }
+
   // A full bootstrap regenerates everything, so any prior staleness is resolved.
   new InvalidationStore(phoenixDir).clearAll();
 
@@ -1725,8 +1974,21 @@ async function cmdBootstrap(): Promise<void> {
   console.log();
   printTrustDashboard(phoenixDir, projectRoot, machine, ius, canonNodes, allClauses);
 
+  // Behavioral coverage (MG5): if the app must talk to a service but nothing binds,
+  // say so at completion — "compiles + composes" must never read as "functions".
+  const behavioral = assessBehavioralCoverage(canonNodes, readGeneratedSources(projectRoot));
+
   console.log();
-  console.log(green('  ✔ Bootstrap complete.'));
+  if (assemblyIncoherent) {
+    console.log(yellow('  ◑ Bootstrap complete — but the ASSEMBLY GATE is RED.'));
+    console.log(`    ${dim('Every module compiles; the assembled product is not yet coherent as the spec\'s system.')}`);
+    console.log(`    ${dim('This is honest partial progress — not a finished product. See the Assembly Gate above.')}`);
+  } else if (behavioral.verdict === 'unproven' || behavioral.verdict === 'stub-risk') {
+    console.log(yellow('  ◑ Bootstrap complete — COMPILES and COMPOSES, but function is UNPROVEN.'));
+    console.log(`    ${dim(behavioral.message)}`);
+  } else {
+    console.log(green('  ✔ Bootstrap complete.'));
+  }
   console.log(`    State: ${cyan(machine.getState())}`);
   console.log(`    Run ${cyan('phoenix status')} to see the trust dashboard.`);
 }
@@ -1774,7 +2036,53 @@ function printTrustDashboard(
   console.log(`  ${dim('System State:')} ${stateLabel}`);
   console.log(`  ${dim('Canonical Nodes:')} ${canonNodes.length}`);
   console.log(`  ${dim('Implementation Units:')} ${ius.length}`);
+  {
+    const grain = assessPlanGrain(ius, canonNodes);
+    const bad = grain.fragments.length + grain.monoliths.length + grain.overFragmented.length;
+    console.log(`  ${dim('Grain:')} ${bad === 0 ? green(`all ${ius.length} well-grained`) : yellow(`${grain.ok}/${ius.length} ok`) + dim(` (${grain.fragments.length} fragment, ${grain.monoliths.length} monolith, ${grain.overFragmented.length} over-fragmented)`)}`);
+  }
   console.log(`  ${dim('Spec Clauses:')} ${allClauses.length}`);
+
+  // Architecture fit — the dashboard must never imply the generated system covers
+  // spec demands the target cannot express.
+  {
+    let statusArchName: string | null = null;
+    try {
+      const cfg = JSON.parse(readFileSync(join(phoenixDir, 'config.json'), 'utf8'));
+      if (cfg.architecture) statusArchName = resolveTarget(cfg.architecture)?.architecture.name ?? cfg.architecture;
+    } catch { /* default scaffold */ }
+    // One architecture verdict, two axes (express + compose) — derived from Step 0's
+    // adequacy resolver, not a separate fit report.
+    const adq = resolveArchitectureAdequacy(canonNodes, statusArchName);
+    const adequate = adq.verdict === 'selected' || adq.verdict === 'chosen-adequate';
+    if (adequate) {
+      console.log(`  ${dim('Architecture Fit:')} ${green('all demanded capabilities expressible & composable')}${adq.selected ? dim(` (${adq.selected})`) : ''}`);
+    } else {
+      const cand = adq.candidates.find(c => c.name === (statusArchName ?? adq.needed?.closest));
+      const gaps = cand ? [...cand.expressionGaps, ...cand.compositionGaps] : adq.demanded;
+      const total = gaps.reduce((s, d) => s + d.nodeCount, 0);
+      console.log(`  ${dim('Architecture Fit:')} ${red(`${total} requirement(s) OUT OF TARGET`)} ${dim(`(${gaps.map(d => d.capability).join(', ')})`)}`);
+    }
+    // Assembly coherence — the whole product, not the parts.
+    const statusArch = statusArchName ? resolveTarget(statusArchName) : null;
+    if (statusArch?.runtime.assemblyGate) {
+      const af = statusArch.runtime.assemblyGate(projectRoot, ius);
+      const errs = af.filter(f => f.severity === 'error');
+      if (errs.length > 0) {
+        console.log(`  ${dim('Assembly Coherence:')} ${red(`${errs.length} error(s)`)} ${dim(`(${errs.map(f => f.code).join(', ')})`)}`);
+      } else if (af.length > 0) {
+        console.log(`  ${dim('Assembly Coherence:')} ${yellow(`${af.length} warning(s)`)}`);
+      } else {
+        console.log(`  ${dim('Assembly Coherence:')} ${green('coherent')}`);
+      }
+    }
+    // Behavioral coverage (MG5): does an app that must talk to a service actually do it?
+    const bc = assessBehavioralCoverage(canonNodes, readGeneratedSources(projectRoot));
+    if (bc.demandsIntegration) {
+      const color = bc.verdict === 'bound' ? green : bc.verdict === 'unproven' ? red : yellow;
+      console.log(`  ${dim('Behavioral Coverage:')} ${color(bc.verdict.toUpperCase())} ${dim(`— ${bc.serviceBindings} binding(s), ${bc.plausibleStubs} stub(s)`)}`);
+    }
+  }
 
   // Canon type breakdown
   const typeBreakdown: Record<string, number> = {};
@@ -2497,7 +2805,9 @@ async function cmdPlan(): Promise<void> {
       if (cfg.architecture) planArch = resolveTarget(cfg.architecture);
     } catch { /* ignore */ }
   }
-  const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir), planArch);
+  const ius = await planIUsAuto(canonNodes, allClauses, resolveProvider(phoenixDir), planArch, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM clustering failed — module boundaries come from the tag heuristic ${dim(`(${e.message})`)}`),
+  });
   saveIUs(phoenixDir, ius);
 
   new Journal(phoenixDir).append({
@@ -2579,6 +2889,27 @@ async function cmdRegen(args: string[]): Promise<void> {
   const canonStore = new CanonicalStore(phoenixDir);
   const canonNodes = canonStore.getAllNodes();
 
+  // Conservation-layer protection (book ch16): the user-facing surface is where
+  // external trust lives; regenerating it without evals that pin the conserved
+  // behavior is how "it's an echo of what I wanted" happens. Refuse an uncovered
+  // conservation IU unless the human explicitly allows the change.
+  {
+    const consEvalStore = new EvaluationStore(phoenixDir);
+    const { allowed, refused } = filterConservationProtected(
+      targetIUs,
+      classifyPaceLayers(ius, canonNodes),
+      iu => consEvalStore.coverage(iu).total_evaluations > 0,
+      args.includes('--allow-conservation-change'),
+    );
+    targetIUs = allowed;
+    if (refused.length > 0) {
+      console.log(`  ${yellow('⚠ conservation layer protected')} — refusing ${refused.length} uncovered conservation IU(s): ${dim(refused.map(i => i.name).join(', '))}`);
+      console.log(`    ${dim('external trust lives in the user-facing surface (ch16). Add evals covering the conserved behavior, or pass --allow-conservation-change.')}`);
+      new Journal(phoenixDir).append({ type: 'regen', inputs: [], outputs: [], meta: { conservation_refused: refused.map(i => i.name) } });
+    }
+    if (targetIUs.length === 0) { console.log(green('  ✔ Nothing to regenerate after conservation protection.')); return; }
+  }
+
   console.log(bold('⚡ Code Regeneration'));
   if (llm) {
     console.log(`  ${dim(`Provider: ${llm.name}/${llm.model}`)}`);
@@ -2613,10 +2944,10 @@ async function cmdRegen(args: string[]): Promise<void> {
     negativeKnowledge: nkByIU,
     siblingContracts: loadExistingContracts(projectRoot, ius, regenArch),
     onGenerationFailure,
+    // Concurrency-safe progress: whole lines on completion (start/done pairs interleave).
     onProgress: (iu, status, msg) => {
-      if (status === 'start') process.stdout.write(`  ⏳ ${iu.name}…`);
-      else if (status === 'done') process.stdout.write(` ${green('✔')}\n`);
-      else if (status === 'error') process.stdout.write(` ${red('✖')} ${dim(msg || 'failed, using stub')}\n`);
+      if (status === 'done') console.log(`  ${green('✔')} ${iu.name}`);
+      else if (status === 'error') console.log(`  ${red('✖')} ${iu.name} ${dim(msg || 'failed, using stub')}`);
     },
   };
 
@@ -2627,7 +2958,7 @@ async function cmdRegen(args: string[]): Promise<void> {
   // contract change after regeneration and pull in dependents that would break.
   const oldContracts = loadExistingContracts(projectRoot, targetIUs, regenArch);
 
-  const results = await generateAll(targetIUs, regenCtx);
+  const results = await generateAll(targetIUs, regenCtx, { concurrency: 4 });
 
   // Contract-aware dependent regeneration: if a regenerated IU's contract CHANGED,
   // regenerate its transitive dependents against the new contract — otherwise a
@@ -2749,6 +3080,54 @@ async function cmdRegen(args: string[]): Promise<void> {
  */
 async function cmdRepair(args: string[]): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
+
+  if (args.includes('--spec')) {
+    // P2 — the spec talks back: PROPOSE rewordings for binding defects and unverified
+    // obligations, each validated by re-running the frozen extractor on the proposed
+    // line. Read-only: intent is human-sovereign, phoenix never edits the spec. (Entity
+    // mining keys off planned IUs, like status — run `phoenix plan` first for the full
+    // picture; without IUs it degrades to honest no-confident-proposals.)
+    const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+    const specStore = new SpecStore(phoenixDir);
+    const allClauses: Clause[] = [];
+    const specLines = new Map<string, string[]>();
+    for (const specFile of findSpecFiles(projectRoot)) {
+      allClauses.push(...specStore.getClauses(relative(projectRoot, specFile)));
+      specLines.set(relative(projectRoot, specFile), readFileSync(specFile, 'utf8').split('\n'));
+    }
+    const ius = loadIUs(phoenixDir);
+    // trackedByEval — identical to status, so an obligation a durable eval already
+    // verifies is not re-proposed here.
+    const iuSourceById = new Map<string, string>();
+    for (const u of ius) {
+      const f = u.output_files[0];
+      const full = f ? join(projectRoot, f) : '';
+      if (full && existsSync(full)) iuSourceById.set(u.iu_id, readFileSync(full, 'utf8'));
+    }
+    const canonById = new Map(canonNodes.map(n => [n.canon_id, n]));
+    const trackedByEval = new Set<string>();
+    for (const iu of ius) {
+      const src = iuSourceById.get(iu.iu_id);
+      if (!src) continue;
+      for (const e of deriveEvaluations(iu, canonNodes)) {
+        if (e.canon_ids.length !== 1) continue;
+        const r = checkEvaluation(e, src, canonById);
+        if (r.status === 'pass' || r.status === 'fail') trackedByEval.add(e.canon_ids[0]);
+      }
+    }
+    const proposals = proposeSpecFixes({ ius, canonNodes, clauses: allClauses, specLines, trackedByEval });
+    if (args.includes('--json')) { console.log(JSON.stringify(proposals, null, 2)); return; }
+    console.log(bold('📜 Phoenix Spec Proposals') + '  ' + dim('(validated rewordings — phoenix never edits the spec)'));
+    console.log();
+    console.log(`  ${proposals.filter(p => p.kind === 'rewording').length} validated rewording(s) · ${proposals.filter(p => p.kind === 'informational').length} informational · ${proposals.filter(p => p.kind === 'no-confident-proposal').length} without a confident proposal`);
+    console.log();
+    console.log(renderSpecProposals(proposals).split('\n').map(l => '  ' + l).join('\n'));
+    console.log();
+    console.log(dim('  Application path: edit the spec line(s) above, then `phoenix canonicalize && phoenix status`.'));
+    console.log(dim('  The human is sovereign over intent — a proposal is a suggestion, never an edit.'));
+    return;
+  }
+
   const ius = loadIUs(phoenixDir);
   if (ius.length === 0) {
     console.log(yellow('⚠ No IUs planned. Run `phoenix bootstrap` first.'));
@@ -3176,7 +3555,9 @@ async function cmdUpgrade(args: string[]): Promise<void> {
   console.log();
 
   // Run the new pipeline (fresh extraction) without saving.
-  const newNodes = await extractCanonicalNodesLLM(allClauses, llm);
+  const newNodes = await extractCanonicalNodesLLM(allClauses, llm, {
+    onFallback: (e) => console.log(`  ${yellow('⚠')} LLM normalization failed — using deterministic rule extraction ${dim(`(${e.message})`)}`),
+  });
 
   const oldCfg = {
     pipeline_id: 'current', model_id: 'stored', promptpack_version: 'stored',
@@ -3241,7 +3622,15 @@ async function cmdCanonicalize(): Promise<void> {
   }
   console.log();
 
-  const canonNodes = await extractCanonicalNodesLLM(allClauses, llm);
+  // The fallback must never be silent: a user paying for tokens gets a warning and
+  // the journal records which extraction actually produced the graph.
+  let extraction: 'llm-normalized' | 'llm-partial' | 'rule' | 'rule-fallback' = llm ? 'llm-normalized' : 'rule';
+  const canonNodes = await extractCanonicalNodesLLM(allClauses, llm, {
+    onFallback: (e, info) => {
+      extraction = info.fellBack >= info.attempted ? 'rule-fallback' : 'llm-partial';
+      console.log(`  ${yellow('⚠')} LLM normalization fell back to rule form for ${info.fellBack}/${info.attempted} candidates ${dim(`(${e.message})`)}`);
+    },
+  });
   canonStore.replaceNodes(canonNodes);
 
   // Canonical stability (PRD §20): how much did re-canonicalization churn the
@@ -3252,7 +3641,7 @@ async function cmdCanonicalize(): Promise<void> {
     type: 'canonicalize',
     inputs: allClauses.map(c => c.clause_id),
     outputs: canonNodes.map(n => n.canon_id),
-    meta: { node_count: canonNodes.length, stability_retention: stability.retention, model_id: llm ? `${llm.name}/${llm.model}` : 'rule' },
+    meta: { node_count: canonNodes.length, stability_retention: stability.retention, model_id: llm ? `${llm.name}/${llm.model}` : 'rule', extraction },
   });
 
   console.log(`  ${green('✔')} ${canonNodes.length} canonical nodes extracted from ${allClauses.length} clauses`);
@@ -3598,6 +3987,107 @@ async function cmdInspect(args: string[]): Promise<void> {
 
 // ─── Replacement Audit (Fowler Ch. 4) ────────────────────────────────────────
 
+/**
+ * phoenix deletion-test <iu> | --all  — the ch9 diagnostic. Read-only: derives the four
+ * properties (boundary clarity, evaluation coverage, coupling depth, replaceability)
+ * from the reference graph + eval coverage. Never mutates the project.
+ */
+/**
+ * phoenix compact — propose reductions of conceptual mass (book ch10–11). Proposals
+ * only: never merges/deletes on its own (that is regeneration + eval re-run, a
+ * deliberate human act — the same discipline as repair --spec).
+ */
+function cmdCompact(_args: string[]): void {
+  const { phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  if (ius.length === 0) { console.log(yellow('⚠ No Implementation Units found. Run `phoenix plan` first.')); return; }
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const evalStore = new EvaluationStore(phoenixDir);
+  const covered = (iu: ImplementationUnit): boolean => evalStore.coverage(iu).total_evaluations > 0;
+
+  let budgetIUs: number | undefined;
+  try { budgetIUs = JSON.parse(readFileSync(join(phoenixDir, 'config.json'), 'utf8')).mass_budget_ius; } catch { /* none */ }
+
+  const { proposals, mass } = proposeCompactions(ius, canonNodes, covered, { budgetIUs });
+
+  console.log();
+  console.log(bold('🧹 Phoenix Compaction'));
+  console.log(dim('  Proposals to reduce conceptual mass — phoenix never merges or deletes on its own.'));
+  console.log();
+  const massLine = `${mass.ius} IUs · ${mass.nodes} normative nodes`
+    + (mass.budgetIUs !== undefined ? ` · budget ${mass.budgetIUs} IUs ${mass.overBudget ? red('(OVER)') : green('(ok)')}` : '');
+  console.log(`  ${dim('Mass:')} ${massLine}`);
+  console.log();
+
+  if (proposals.length === 0) { console.log(green('  ✔ No compaction proposals — the system is lean.')); return; }
+
+  const byKind: Record<string, CompactionProposal[]> = {};
+  for (const p of proposals) (byKind[p.kind] ??= []).push(p);
+  const titles: Record<string, string> = {
+    'merge-over-fragmented': 'Over-fragmented entities (consolidate)',
+    'dead-weight': 'Dead weight (delete or cover)',
+    'orphan-canon': 'Orphan intent (attach or prune)',
+  };
+  for (const [kind, ps] of Object.entries(byKind)) {
+    console.log(`  ${bold(titles[kind] ?? kind)} — ${ps.length}`);
+    for (const p of ps.slice(0, 10)) {
+      console.log(`    ${yellow('◈')} ${bold(p.subject)}`);
+      console.log(`      ${dim('evidence:')} ${p.evidence}`);
+      console.log(`      ${dim('action:')}   ${p.action}`);
+      console.log(`      ${dim('verify:')}   ${p.verification}`);
+    }
+    if (ps.length > 10) console.log(`    ${dim(`… and ${ps.length - 10} more`)}`);
+    console.log();
+  }
+  console.log(dim('  A proposal is a suggestion. Adopt it deliberately — the human is sovereign over the system\'s shape.'));
+  new Journal(phoenixDir).append({
+    type: 'compact', inputs: [], outputs: [],
+    meta: { mass: mass, proposals: proposals.length, by_kind: Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, v.length])) },
+  });
+}
+
+function cmdDeletionTest(args: string[]): void {
+  const { phoenixDir } = requirePhoenixRoot();
+  const ius = loadIUs(phoenixDir);
+  if (ius.length === 0) { console.log(yellow('⚠ No Implementation Units found. Run `phoenix plan` first.')); return; }
+  const canonNodes = new CanonicalStore(phoenixDir).getAllNodes();
+  const evalStore = new EvaluationStore(phoenixDir);
+  const covered = (iu: ImplementationUnit): boolean => evalStore.coverage(iu).total_evaluations > 0;
+
+  console.log();
+  console.log(bold('🧪 Phoenix Deletion Test'));
+  console.log(dim('  "Could I delete this, regenerate it, and prove the system still works?" (book ch9)'));
+  console.log();
+
+  if (args.includes('--all')) {
+    const card = deletionScorecard(ius, canonNodes, covered);
+    const total = ius.length;
+    console.log(`  ${dim('Replaceability scorecard:')} ${green(`${card.replaceable} replaceable`)} · ${yellow(`${card.risky} risky`)} · ${red(`${card.unverifiable} unverifiable`)} ${dim(`(of ${total})`)}`);
+    const worst = card.reports.filter(r => r.replaceability !== 'replaceable').sort((a, b) => b.undeclaredConsumers.length - a.undeclaredConsumers.length).slice(0, 12);
+    for (const r of worst) {
+      const tag = r.replaceability === 'unverifiable' ? red('unverifiable') : yellow('risky');
+      console.log(`    ${tag} ${bold(r.iu)} ${dim(`— ${r.undeclaredConsumers.length} undeclared consumer(s), coupling depth ${r.couplingDepth}, ${r.evaluationCovered ? 'covered' : 'uncovered'}`)}`);
+    }
+    new Journal(phoenixDir).append({ type: 'deletion-test', inputs: [], outputs: [], meta: { deletion_scorecard: { replaceable: card.replaceable, risky: card.risky, unverifiable: card.unverifiable } } });
+    return;
+  }
+
+  const name = args.find(a => !a.startsWith('--'));
+  if (!name) { console.log(yellow('  Usage: phoenix deletion-test <iu-name> | --all')); return; }
+  const target = ius.find(iu => iu.name === name || iu.iu_id === name);
+  if (!target) { console.log(red(`  ✖ No IU named "${name}". Run phoenix status to list them.`)); return; }
+
+  const r = analyzeDeletion(target, ius, canonNodes, covered);
+  console.log(`  ${bold(r.iu)} — ${r.replaceability === 'replaceable' ? green(r.replaceability) : r.replaceability === 'risky' ? yellow(r.replaceability) : red(r.replaceability)}`);
+  console.log(`    ${dim('boundary:')} ${r.actualConsumers.length} actual consumer(s), ${r.declaredConsumers.length} declared${r.undeclaredConsumers.length ? red(`, ${r.undeclaredConsumers.length} UNDECLARED`) : ''}`);
+  console.log(`    ${dim('evaluation:')} ${r.evaluationCovered ? green('covered') : red('uncovered')}   ${dim('coupling depth:')} ${r.couplingDepth}${r.furthestConsumers.length ? dim(` (furthest: ${r.furthestConsumers.slice(0, 3).join(', ')})`) : ''}`);
+    for (const f of r.findings) {
+      const mark = f.severity === 'error' ? red('✖') : f.severity === 'warning' ? yellow('⚠') : dim('ℹ');
+      console.log(`    ${mark} ${dim(`[${f.property}]`)} ${f.message}`);
+    }
+  new Journal(phoenixDir).append({ type: 'deletion-test', inputs: [target.iu_id], outputs: [], meta: { deletion_test: { iu: r.iu, replaceability: r.replaceability, undeclared: r.undeclaredConsumers.length, coupling_depth: r.couplingDepth } } });
+}
+
 function cmdAudit(args: string[]): void {
   const { phoenixDir } = requirePhoenixRoot();
   const ius = loadIUs(phoenixDir);
@@ -3615,9 +4105,10 @@ function cmdAudit(args: string[]): void {
     evalCoverages.set(iu.iu_id, evalStore.coverage(iu));
   }
 
-  // Load pace layers (from iu metadata or defaults)
-  const paceLayers = new Map<string, PaceLayerMetadata>();
-  // TODO: load from .phoenix/pace-layers.json when populated
+  // Classify pace layers from the canon graph (dependency weight + load-bearing
+  // invariants + conservation = the user-facing surface). Human overrides via attest
+  // would layer on top; auto-classification is the deterministic floor.
+  const paceLayers = classifyPaceLayers(ius, new CanonicalStore(phoenixDir).getAllNodes());
 
   const nk = nkStore.getActive();
   // Conceptual mass stamped by the regeneration gate into the manifest.
@@ -3892,6 +4383,7 @@ ${bold('Implementation:')}
                          ${dim('--all    Regenerate every IU (ignore the invalidation set)')}
                          ${dim('--stubs  Force stub generation (skip LLM)')}
   ${cyan('repair')} [--rounds=N]   Repair loop: feed verifier findings into targeted regeneration
+  ${cyan('repair')} --spec       Propose validated spec rewordings for defects/obligations (read-only)
                          ${dim('Bounded (default 3 rounds); the verifier is frozen — code changes only')}
   ${cyan('verify')} --live       Live oracle: boot the real app, run mutation-gated invariant evals
                          ${dim('Aggregate/state/temporal invariants the static path can only abstain on')}
@@ -3938,7 +4430,10 @@ async function main(): Promise<void> {
       cmdInit(commandArgs);
       break;
     case 'bootstrap':
-      await cmdBootstrap();
+      await cmdBootstrap(commandArgs);
+      break;
+    case 'adapt':
+      await cmdAdapt(commandArgs);
       break;
     case 'status':
       cmdStatus();
@@ -4001,6 +4496,12 @@ async function main(): Promise<void> {
       break;
     case 'audit':
       cmdAudit(commandArgs);
+      break;
+    case 'deletion-test':
+      cmdDeletionTest(commandArgs);
+      break;
+    case 'compact':
+      cmdCompact(commandArgs);
       break;
     case 'inspect':
       await cmdInspect(commandArgs);

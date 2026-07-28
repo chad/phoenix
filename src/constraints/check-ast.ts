@@ -34,6 +34,7 @@ import {
   checkUniqueness,
   checkExpr,
 } from './check.js';
+import { checkConstraintPydantic } from './pydantic.js';
 
 export interface ConstraintCheck {
   result: CheckResult;
@@ -230,6 +231,12 @@ export function checkCardinalityAst(c: StructuredConstraint, source: string | nu
  * and abstain discipline as the regex `checkConstraint`.
  */
 export function checkConstraintAst(c: StructuredConstraint, source: string | null): ConstraintCheck {
+  // Per-runtime reader hook (cross-runtime parity): Pydantic sources bypass the Zod
+  // syntax tree entirely and go to the pydantic dialect reader for the kinds it owns.
+  if (source != null) {
+    const py = checkConstraintPydantic(c, source);
+    if (py) return py;
+  }
   switch (c.assertion.kind) {
     case 'bound': return checkBoundAst(c, source);
     case 'membership': return checkMembershipAst(c, source);

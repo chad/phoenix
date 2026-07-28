@@ -62,3 +62,57 @@ describe('clusterCanonNodesLLM (semantic)', () => {
     expect(total).toBe(7);
   });
 });
+
+describe('phrasing-artifact anchors (the adapted-spec lesson)', () => {
+  it("never names a cluster 'include'/'equal'/'able' — requirement phrasing is not a domain", () => {
+    seq = 0;
+    const nodes = [
+      node(CanonicalType.REQUIREMENT, 'the room must include a name', ['room', 'include', 'name']),
+      node(CanonicalType.REQUIREMENT, 'the room must include a topic', ['room', 'include', 'topic']),
+      node(CanonicalType.REQUIREMENT, 'the avatar hash must equal the recomputed hash', ['avatar', 'equal', 'hash']),
+      node(CanonicalType.REQUIREMENT, 'the avatar must be able to render offline', ['avatar', 'able', 'render']),
+    ];
+    const anchors = clusterCanonNodes(nodes).map(c => c.anchor);
+    for (const junk of ['include', 'equal', 'able']) expect(anchors).not.toContain(junk);
+  });
+});
+
+describe('clusterCanonNodesLLM — loud fallback and the two-stage path', () => {
+  it('a garbage LLM reply falls back to rules LOUDLY (onFallback fires)', async () => {
+    const bad: LLMProvider = { name: 'fake', model: 't', generate: async () => 'not json at all' };
+    let heard: string | null = null;
+    const clusters = await clusterCanonNodesLLM(corpus(), bad, { onFallback: (e) => { heard = e.message; } });
+    expect(heard).not.toBeNull();               // the downgrade is announced
+    expect(clusters.length).toBeGreaterThan(0); // and the rule clusterer still delivers
+  });
+
+  it('large graphs go two-stage: discover module names, then assign in batches', async () => {
+    seq = 0;
+    // 160 nodes (> LLM_SINGLE_CALL_MAX) across two entities.
+    const nodes: CanonicalNode[] = [];
+    for (let i = 0; i < 80; i++) nodes.push(node(CanonicalType.REQUIREMENT, `the room must satisfy rule ${i}`, ['room']));
+    for (let i = 0; i < 80; i++) nodes.push(node(CanonicalType.REQUIREMENT, `the avatar must satisfy rule ${i}`, ['avatar']));
+
+    const calls: string[] = [];
+    const llm: LLMProvider = {
+      name: 'fake', model: 't',
+      generate: async (prompt: string) => {
+        calls.push(prompt);
+        if (prompt.includes('Name the domain modules')) return '["room", "avatar"]';
+        // Assignment batch: numbers are global — route by statement content.
+        const nums = [...prompt.matchAll(/^(\d+)\. \[\w+\] the (\w+)/gm)];
+        const room = nums.filter(m => m[2] === 'room').map(m => +m[1]);
+        const avatar = nums.filter(m => m[2] === 'avatar').map(m => +m[1]);
+        return JSON.stringify({ room, avatar });
+      },
+    };
+    const clusters = await clusterCanonNodesLLM(nodes, llm);
+    expect(calls.length).toBeGreaterThanOrEqual(3); // 1 discovery + ≥2 assignment batches
+    const total = clusters.reduce((s, c) => s + c.nodes.length, 0);
+    expect(total).toBe(160);                        // nothing lost
+    // Every cluster anchors on a real module (or a bounded split of one).
+    for (const c of clusters) expect(/^(room|avatar)/.test(c.anchor)).toBe(true);
+    // Oversized groups were split to a bounded grain.
+    for (const c of clusters) expect(c.nodes.length).toBeLessThanOrEqual(24);
+  });
+});
