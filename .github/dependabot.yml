@@ -31,6 +31,21 @@ updates:
     commit-message:
       prefix: chore(deps)
       prefix-development: chore(deps-dev)
+    # Compiler and test-runner majors are migrations, not updates, and CI proved it: the first
+    # grouped PR here proposed TypeScript 7 and failed `npm run build` with ~40 TS2591 errors
+    # (the native compiler no longer picks up @types/node the way 5.x did). That is real work
+    # with a tsconfig change behind it, and it belongs in a deliberate PR that also moves the
+    # generated-project pin in src/toolchain.ts. Withheld here so it is scheduled rather than
+    # arriving as a red PR nobody can merge.
+    #
+    # This is deferral, not dismissal — TypeScript 7 and @types/node 26 are tracked work.
+    ignore:
+      - dependency-name: 'typescript'
+        update-types: [version-update:semver-major]
+      - dependency-name: 'vitest'
+        update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     groups:
       # Build + test toolchain moves as one unit; a vitest bump drags vite/esbuild/rollup
       # with it, and reviewing those separately is noise.
