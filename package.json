@@ -14,6 +14,10 @@
     "test:watch": "vitest",
     "phoenix": "node dist/cli.js"
   },
+  "engines": {
+    "node": ">=22.13.0",
+    "npm": ">=11.0.0"
+  },
   "devDependencies": {
     "@types/node": "^25.9.5",
     "typescript": "^5.9.3",
