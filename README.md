@@ -38,6 +38,7 @@ git clone https://github.com/chad/phoenix.git
 cd phoenix
 npm install
 npm run build
+npm link
 
 # Create a project with the sqlite-web-api architecture
 mkdir my-app && cd my-app
