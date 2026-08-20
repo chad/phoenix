@@ -1,0 +1,19 @@
+{
+  "id": "todo-api",
+  "title": "Task API — CRUD, validation, and a live summary",
+  "arch": "sqlite-web-api",
+  "intent": "A small HTTP task-tracking service: create, list, read, update and delete tasks, and report how many are done.",
+  "perSampleMs": 180000,
+  "runtime": {
+    "command": ["npx", "tsx", "src/server.ts"],
+    "healthPath": "/health",
+    "readyTimeoutMs": 60000,
+    "brief": "Write a TypeScript project whose entrypoint is `src/server.ts`, started with `npx tsx src/server.ts` from the project root.\n- Listen on the port in the environment variable PORT (always set; do not pick your own).\n- Persist to a SQLite file at the path in the environment variable DB_PATH (always set; create the schema on startup if it is missing).\n- The only dependencies available are: hono, @hono/node-server, better-sqlite3, zod, and the Node standard library. Nothing else is installed and no install step will run.\n- Do not write a package.json, a lockfile, or a tsconfig.json; the runtime is already configured.\n- The process must stay running and answer requests until it is killed.",
+    "dependencies": {
+      "hono": "^4.12.32",
+      "@hono/node-server": "^2.0.12",
+      "better-sqlite3": "^11.10.0",
+      "zod": "^3.25.76"
+    }
+  }
+}

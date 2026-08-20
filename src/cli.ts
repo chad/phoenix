@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join, resolve, relative, basename, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Stores
 import { SpecStore } from './store/spec-store.js';
@@ -130,6 +131,11 @@ import { NegativeKnowledgeStore } from './store/negative-knowledge-store.js';
 import { failedGenerationKnowledge } from './models/negative-knowledge.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { PaceLayerMetadata } from './models/pace-layer.js';
+import { loadCases } from './bench/case.js';
+import { ARMS, isArmName, type ArmName } from './bench/arms.js';
+import { loadEntries, treeState, type Resolution } from './bench/results.js';
+import { renderHtml, renderTerminal } from './bench/report.js';
+import { runBench, BenchRefusal } from './bench/run.js';
 
 // Models
 import type { Clause } from './models/clause.js';
@@ -4351,6 +4357,104 @@ async function cmdEval(args: string[]): Promise<void> {
   }
 }
 
+// ─── bench: the pipeline measured against the same model with the pipeline removed ───
+
+/**
+ * The bench answers the one question `phoenix selftest` structurally cannot: how much of
+ * the working application is the pipeline, and how much is a capable model being capable?
+ *
+ * It draws samples on three arms (phoenix / baseline / intent), judges all of them with
+ * the same boot-and-assert oracle, and appends an immutable record. It prints every rate
+ * beside its 95% Wilson interval, and it refuses to run rather than record a number
+ * nobody can cite.
+ */
+async function cmdBench(args: string[]): Promise<void> {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const flag = (name: string): string | undefined =>
+    args.find(a => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
+  const casesDir = flag('cases') ?? join(repoRoot, 'bench', 'cases');
+  const resultsDir = flag('results') ?? join(repoRoot, 'bench', 'results');
+  const all = loadCases(casesDir);
+
+  // `bench report` — read the append-only results; measure nothing new.
+  if (args[0] === 'report') {
+    const entries = loadEntries(resultsDir);
+    const htmlFlag = args.includes('--html') || args.some(a => a.startsWith('--html='));
+    if (htmlFlag) {
+      const out = flag('html') ?? join(repoRoot, 'bench', 'site', 'index.html');
+      const { commit } = treeState(repoRoot);
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, renderHtml(entries, { generatedAt: new Date().toISOString(), commit }), 'utf8');
+      console.log(green(`✔ wrote ${out}`) + dim(` — ${entries.length} recorded run(s)`));
+      return;
+    }
+    console.log(renderTerminal(entries));
+    return;
+  }
+
+  if (args.includes('--list')) {
+    console.log(bold('Bench cases') + dim(` (${casesDir})`));
+    for (const c of all) {
+      console.log(`  ${cyan(c.id.padEnd(14))} ${c.title}`);
+      console.log(`  ${''.padEnd(14)} ${dim(`${c.checks.length} checks · arch ${c.arch} · fixture ${c.digest}`)}`);
+    }
+    if (all.length === 0) console.log(dim('  (none)'));
+    return;
+  }
+
+  const selected = args.filter(a => !a.startsWith('-'));
+  const cases = selected.length > 0
+    ? all.filter(c => selected.includes(c.id))
+    : all;
+  for (const want of selected) {
+    if (!all.some(c => c.id === want)) {
+      console.error(red(`✖ unknown bench case: ${want}`));
+      console.error(dim('  Run `phoenix bench --list`.'));
+      process.exit(1);
+    }
+  }
+
+  const armFlag = flag('arm');
+  const arms = (armFlag ? armFlag.split(',') : [...ARMS]).map(a => a.trim());
+  for (const a of arms) {
+    if (!isArmName(a)) {
+      console.error(red(`✖ unknown arm: ${a}`) + dim(` — one of ${ARMS.join(', ')}`));
+      process.exit(1);
+    }
+  }
+
+  const resFlag = (flag('res') ?? 'coarse') as Resolution;
+  if (!['smoke', 'coarse', 'fine', 'unstated'].includes(resFlag)) {
+    console.error(red(`✖ unknown resolution: ${resFlag}`) + dim(' — smoke | coarse | fine'));
+    process.exit(1);
+  }
+  const nFlag = flag('n');
+
+  try {
+    const entries = await runBench({
+      repoRoot,
+      resultsDir,
+      workDir: flag('work') ?? join(repoRoot, '.phoenix-bench'),
+      cases,
+      arms: arms as ArmName[],
+      resolution: resFlag,
+      samples: nFlag ? Number(nFlag) : undefined,
+      allowDirty: args.includes('--dirty'),
+      dry: args.includes('--dry'),
+      keep: Number(flag('keep') ?? 20),
+      log: (line: string) => console.log(line),
+    });
+    if (entries.length > 0) console.log(renderTerminal(loadEntries(resultsDir)));
+  } catch (e) {
+    if (e instanceof BenchRefusal) {
+      console.error(red(`✖ ${e.message}`));
+      console.error(dim(`  ${e.fix}`));
+      process.exit(1);
+    }
+    throw e;
+  }
+}
+
 function cmdVersion(): void {
   console.log(`Phoenix VCS v${VERSION}`);
 }
@@ -4411,6 +4515,9 @@ ${bold('Inspection:')}
 ${bold('Meta:')}
   ${cyan('selftest')} [--json]     Phoenix's own capability eval — the Red/Green scorecard
                          ${dim('--strict also fails on promotions (reds that now pass)')}
+  ${cyan('bench')} [case…]         Measure the pipeline against the same model without it
+                         ${dim('--arm=phoenix,baseline,intent  --res=smoke|coarse|fine  -n')}
+                         ${dim('bench report [--html]  — read the append-only results')}
   ${cyan('version')}               Show version
   ${cyan('help')}                  Show this help
 
@@ -4490,6 +4597,9 @@ async function main(): Promise<void> {
     case 'selftest':
     case 'capabilities':
       await cmdEval(commandArgs);
+      break;
+    case 'bench':
+      await cmdBench(commandArgs);
       break;
     case 'attest':
       cmdAttest(commandArgs);

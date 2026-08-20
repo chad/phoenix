@@ -1,0 +1,186 @@
+[
+  {
+    "name": "health answers 200",
+    "method": "GET",
+    "path": "/health",
+    "status": 200
+  },
+  {
+    "name": "an empty service lists no tasks",
+    "method": "GET",
+    "path": "/tasks",
+    "status": 200,
+    "json": [{ "path": "", "op": "type", "value": "array" }, { "path": "length", "op": "equals", "value": 0 }]
+  },
+  {
+    "name": "an empty service reports 0% complete",
+    "method": "GET",
+    "path": "/stats",
+    "status": 200,
+    "json": [
+      { "path": "total", "op": "equals", "value": 0 },
+      { "path": "completed", "op": "equals", "value": 0 },
+      { "path": "completion_percent", "op": "equals", "value": 0 }
+    ]
+  },
+  {
+    "name": "create returns 201",
+    "method": "POST",
+    "path": "/tasks",
+    "body": { "title": "Write the bench" },
+    "status": 201,
+    "json": [{ "path": "title", "op": "equals", "value": "Write the bench" }],
+    "save": { "id": "id" }
+  },
+  {
+    "name": "a created task carries an integer id",
+    "method": "GET",
+    "path": "/tasks/{id}",
+    "status": 200,
+    "json": [{ "path": "id", "op": "type", "value": "number" }]
+  },
+  {
+    "name": "priority defaults to normal",
+    "method": "GET",
+    "path": "/tasks/{id}",
+    "status": 200,
+    "json": [{ "path": "priority", "op": "equals", "value": "normal" }]
+  },
+  {
+    "name": "completed defaults to JSON false",
+    "method": "GET",
+    "path": "/tasks/{id}",
+    "status": 200,
+    "json": [{ "path": "completed", "op": "equals", "value": false }]
+  },
+  {
+    "name": "a created task carries created_at",
+    "method": "GET",
+    "path": "/tasks/{id}",
+    "status": 200,
+    "json": [{ "path": "created_at", "op": "notEmpty" }]
+  },
+  {
+    "name": "the list shows the created task",
+    "method": "GET",
+    "path": "/tasks",
+    "status": 200,
+    "json": [{ "path": "length", "op": "equals", "value": 1 }, { "path": "[0].title", "op": "equals", "value": "Write the bench" }]
+  },
+  {
+    "name": "update sets completed",
+    "method": "PATCH",
+    "path": "/tasks/{id}",
+    "body": { "completed": true },
+    "status": 200,
+    "json": [{ "path": "completed", "op": "equals", "value": true }]
+  },
+  {
+    "name": "the update persisted",
+    "method": "GET",
+    "path": "/tasks/{id}",
+    "status": 200,
+    "json": [{ "path": "completed", "op": "equals", "value": true }]
+  },
+  {
+    "name": "stats reflect the completion immediately",
+    "method": "GET",
+    "path": "/stats",
+    "status": 200,
+    "json": [
+      { "path": "total", "op": "equals", "value": 1 },
+      { "path": "completed", "op": "equals", "value": 1 },
+      { "path": "completion_percent", "op": "equals", "value": 100 }
+    ]
+  },
+  {
+    "name": "a second task can carry an explicit priority",
+    "method": "POST",
+    "path": "/tasks",
+    "body": { "title": "Ship the bench", "priority": "urgent" },
+    "status": 201,
+    "json": [{ "path": "priority", "op": "equals", "value": "urgent" }],
+    "save": { "second": "id" }
+  },
+  {
+    "name": "stats round the completion percentage",
+    "method": "GET",
+    "path": "/stats",
+    "status": 200,
+    "json": [
+      { "path": "total", "op": "equals", "value": 2 },
+      { "path": "completed", "op": "equals", "value": 1 },
+      { "path": "completion_percent", "op": "equals", "value": 50 }
+    ]
+  },
+  {
+    "name": "an empty title is rejected",
+    "method": "POST",
+    "path": "/tasks",
+    "body": { "title": "" },
+    "status": 400
+  },
+  {
+    "name": "an over-long title is rejected",
+    "method": "POST",
+    "path": "/tasks",
+    "body": { "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+    "status": 400
+  },
+  {
+    "name": "a priority outside the allowed set is rejected",
+    "method": "POST",
+    "path": "/tasks",
+    "body": { "title": "Bad priority", "priority": "critical" },
+    "status": 400
+  },
+  {
+    "name": "rejected writes changed nothing",
+    "method": "GET",
+    "path": "/stats",
+    "status": 200,
+    "json": [{ "path": "total", "op": "equals", "value": 2 }]
+  },
+  {
+    "name": "reading a missing task is 404",
+    "method": "GET",
+    "path": "/tasks/987654",
+    "status": 404
+  },
+  {
+    "name": "updating a missing task is 404",
+    "method": "PATCH",
+    "path": "/tasks/987654",
+    "body": { "title": "ghost" },
+    "status": 404
+  },
+  {
+    "name": "delete returns 204",
+    "method": "DELETE",
+    "path": "/tasks/{second}",
+    "status": 204
+  },
+  {
+    "name": "a deleted task is gone",
+    "method": "GET",
+    "path": "/tasks/{second}",
+    "status": 404
+  },
+  {
+    "name": "deleting a missing task is 404",
+    "method": "DELETE",
+    "path": "/tasks/987654",
+    "status": 404
+  },
+  {
+    "name": "stats reflect the deletion",
+    "method": "GET",
+    "path": "/stats",
+    "status": 200,
+    "json": [
+      { "path": "total", "op": "equals", "value": 1 },
+      { "path": "completed", "op": "equals", "value": 1 },
+      { "path": "completion_percent", "op": "equals", "value": 100 }
+    ]
+  }
+]

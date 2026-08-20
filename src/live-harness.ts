@@ -79,6 +79,35 @@ function freePort(): Promise<number> {
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 /**
+ * Every app this harness has booted and not yet stopped.
+ *
+ * A harness that boots real servers must never leave one running: an orphan holds a
+ * port, a temp database and (under a bench) a few hundred megabytes, and it does it
+ * silently. The exit hook is the backstop for the paths that never reach `stop()` —
+ * a thrown assertion, a Ctrl-C, a crash.
+ */
+const LIVE_CHILDREN = new Set<ReturnType<typeof spawn>>();
+
+function killGroup(child: ReturnType<typeof spawn>): void {
+  if (child.pid === undefined) return;
+  try {
+    // Negative pid = the whole process group, so a launcher's grandchildren die with it.
+    process.kill(-child.pid, 'SIGKILL');
+  } catch {
+    try { child.kill('SIGKILL'); } catch { /* already gone */ }
+  }
+}
+
+let exitHookInstalled = false;
+function installExitHook(): void {
+  if (exitHookInstalled) return;
+  exitHookInstalled = true;
+  process.on('exit', () => {
+    for (const child of LIVE_CHILDREN) killGroup(child);
+  });
+}
+
+/**
  * Boot the app as a child process on a free port with an isolated DB, and wait until
  * its health route answers 200. Throws BootError (with captured stderr) if it never
  * becomes healthy or exits early — the caller turns that into an honest abstention.
@@ -89,23 +118,36 @@ export async function bootApp(spec: BootSpec): Promise<AppHandle> {
   const healthPath = spec.healthPath ?? '/health';
   const timeout = spec.readyTimeoutMs ?? 10_000;
 
+  // `detached` puts the app in its OWN process group. The boot command is usually a
+  // launcher (`npx tsx …`, `uvicorn …`) that spawns the real server as a grandchild:
+  // killing the launcher alone leaves that server running, holding the port and holding
+  // the stdio pipes open — which is how a harness ends up with orphaned servers and a
+  // process that never exits. Stopping kills the group.
   const child = spawn(spec.command[0], spec.command.slice(1), {
     cwd: spec.projectRoot,
     env: { ...process.env, DB_PATH: dbPath, PORT: String(port), ...spec.env },
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
   });
+  LIVE_CHILDREN.add(child);
   let stderr = '';
   child.stderr?.on('data', d => { stderr += d.toString(); });
   child.stdout?.on('data', () => { /* drain so the pipe never blocks the child */ });
 
+  installExitHook();
   const state: { exited: { code: number | null } | null } = { exited: null };
-  child.on('exit', code => { state.exited = { code }; });
+  child.on('exit', code => { state.exited = { code }; LIVE_CHILDREN.delete(child); });
 
   const baseUrl = `http://127.0.0.1:${port}`;
   const stop = async (): Promise<void> => {
-    if (state.exited) return;
-    child.kill('SIGKILL');
+    killGroup(child);
     for (let i = 0; i < 40 && !state.exited; i++) await sleep(25);
+    // Release the pipes explicitly. A killed launcher's grandchild can hold the write
+    // end open, and a live read handle keeps the event loop alive forever after.
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+    child.unref();
+    LIVE_CHILDREN.delete(child);
   };
 
   const deadline = Date.now() + timeout;

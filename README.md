@@ -128,6 +128,11 @@ phoenix why <file>            # Trace a generated file back to the spec lines th
 phoenix journal [--verify]    # Show/verify the append-only, hash-chained provenance chain
 phoenix inspect               # Interactive pipeline visualization
 phoenix bot "<command>"       # Bots that execute real operations (SpecBot/ImplBot/PolicyBot)
+
+# Measurement
+phoenix selftest              # Phoenix's own capability eval — the Red/Green scorecard
+phoenix bench [--res=…]       # The pipeline vs. the same model WITHOUT it (see bench/)
+phoenix bench report [--html] # Read the append-only results; measure nothing new
 ```
 
 Set `PHOENIX_NO_LLM=1` to force deterministic stub generation (offline / reproducible runs).
@@ -186,6 +191,37 @@ Change one spec line and `phoenix ingest` classifies the change (A/B/C/D), then 
 
 Every transformation appends a hash-chained event to `.phoenix/journal.jsonl`. `phoenix why <file>` traces any generated file back through its IU, model, and promptpack to the exact spec lines that produced it; `phoenix journal --verify` proves the chain is intact. Durable evaluations (`phoenix evals`) derived from the canonical graph give regeneration an oracle, and are recorded as risk-tiered evidence. The truthfulness of `phoenix status` itself is measured by a fault-injection CI harness (precision + recall over seeded faults).
 
+## Measurement: the bench
+
+`phoenix selftest` asks *"does Phoenix still do what Phoenix claims?"*. It cannot answer the
+question a sceptic asks first: **how much of the working application is the pipeline, and how
+much is a capable model being capable?**
+
+`phoenix bench` answers that one. It produces the same application three ways, judges all three
+with the same oracle — boot it for real, drive it over HTTP, assert — and records every run:
+
+| Arm | What produced the code |
+|---|---|
+| `phoenix` | the full pipeline as shipped, driven through the compiled CLI |
+| `baseline` | the same spec text, the same model, one call, no pipeline |
+| `intent` | one sentence and the runtime contract — nothing else |
+
+Every rate is printed beside its 95% Wilson interval, because `4/5` and `40/50` are the same
+rate and different facts. Overlapping intervals mean *these runs do not distinguish these
+rates* — never that one arm is better. Smoke runs, dirty-tree runs and runs with no declared
+sample size stay visible in the results and are excluded from every aggregate. The results are
+append-only JSONL under `bench/results/`, and [`bench/site/index.html`](bench/site/index.html)
+is generated from them.
+
+```bash
+phoenix bench --dry           # what the run costs, spends nothing
+phoenix bench --res=coarse    # 5 samples on every arm
+phoenix bench report --html   # rebuild the page from the recorded runs
+```
+
+See [bench/README.md](bench/README.md) for the discipline, the refusals, and what a run must be
+before it may be cited.
+
 ## Status
 
 Alpha. The full pipeline works end-to-end — spec to working app with complete, verifiable traceability. The `sqlite-web-api` architecture target generates functional CRUD APIs with web UIs from behavioral specs.
@@ -198,6 +234,38 @@ What's next:
 - Running generated evaluations against a live app (integration-level oracle) in addition to the structural check
 - Multi-file spec projects with cross-references
 - Freeq transport for the bots
+
+## Acknowledgements
+
+**[Sedum](https://github.com/livecodelife/sedum)** by [@livecodelife](https://github.com/livecodelife)
+— and its [published eval results](https://livecodelife.github.io/sedum/) — are the direct
+inspiration for `phoenix bench`.
+
+Sedum makes the opposite bet to Phoenix about where a model belongs: its model *selects* from a
+closed, team-authored vocabulary of code-injection actions and everything after that response is
+deterministic, where Phoenix lets the model synthesize and puts the determinism in the gates,
+the oracle and the provenance chain. Reasonable people can disagree about that, and we do.
+
+What is not up for disagreement is Sedum's *measurement* discipline, which was ahead of ours in
+every respect that matters:
+
+- **A ladder of arms, not a single number.** Sedum reports its own tool beside a `baseline` arm
+  (the record without the action catalog) and an `intent` arm (one sentence). It publishes the
+  runs where the baseline is indistinguishable from the tool. A rate with no control is
+  unfalsifiable, and we had no control at all.
+- **Every rate with its interval.** 95% Wilson, the fraction never printed alone, no p-values,
+  and an explicit refusal to turn overlapping intervals into a verdict.
+- **Sample size as a property of the question** — smoke / coarse / fine, with a run below its
+  declared size refused rather than recorded.
+- **Honest exclusions that stay visible.** Smoke, dirty-tree and unstated runs are kept in the
+  append-only log, shown on the page, and counted in nothing.
+- **Refusing to print a number that is constant by construction**, and saying why instead.
+- **Behaviour split three ways** — working / disagreed / broke — because a service that never
+  booted and one that booted and answered wrongly are different findings.
+
+Phoenix's bench adopts all of it. The arms, the interval discipline, the citability flags, the
+fixture digest, the plan-before-you-spend planner and the "this page adds no measurement of its
+own" stance are Sedum's ideas applied to a different pipeline. Thank you.
 
 ## License
 

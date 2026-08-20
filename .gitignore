@@ -7,3 +7,6 @@ examples/*/data/
 
 # Adversarial review scratch (throwaway repro scripts)
 .adversarial/
+
+# Bench workspace (disposable build state; results live in bench/results/)
+.phoenix-bench/
