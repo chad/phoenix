@@ -54,6 +54,14 @@ A fourth, **unreachable**, means the call never reached the model. It is exclude
 every denominator — an unreachable endpoint is not a producer that chose badly — and the
 count is always printed beside the rate that excluded it.
 
+### What the oracle cannot see
+
+An application that mounts nothing still passes every assertion of the form *"a missing
+thing is missing"* — everything it answers is 404. The oracle is not wrong to count those;
+they were the assertions that were made. The mitigation belongs in the case: keep positive
+assertions in the majority, and read `checks passed` next to `works` rather than instead of
+it. See [FINDINGS.md](FINDINGS.md) for the run where this actually happened.
+
 ## Reading a rate
 
 `28/30 [0.78, 0.98]` is one number, not two. The bracket is a 95% Wilson score interval.

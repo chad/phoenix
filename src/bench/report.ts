@@ -101,16 +101,19 @@ function wrap(s: string, width: number): string {
 export function renderHtml(entries: readonly BenchEntry[], meta: { generatedAt: string; commit: string }): string {
   const aggs = aggregate(entries);
   const data = JSON.stringify({ entries, aggs, meta }).replace(/</g, '\\u003c');
+  const current = currentDigests(entries);
 
-  const aggRows = aggs.map(a => `
-      <tr>
+  const aggRows = [...aggs]
+    .sort((a, b) => Number(current.get(b.case) === b.fixture_digest) - Number(current.get(a.case) === a.fixture_digest))
+    .map(a => `
+      <tr class="${current.get(a.case) === a.fixture_digest ? '' : 'superseded'}">
         <td>${esc(a.case)}</td><td class="mono">${esc(a.model)}</td>
         <td><span class="arm arm-${a.arm}">${a.arm}</span></td>
         <td class="num">${fmt(a)}</td>
         <td class="num">${esc(formatInterval(a.checks))}</td>
         <td class="num">${a.eligible}</td>
         <td class="small">${a.working} working · ${a.disagreed} disagreed · ${a.broke} broke${a.unreachable ? ` · ${a.unreachable} unreachable (excluded)` : ''}</td>
-        <td class="mono small">${esc(a.fixture_digest)}</td>
+        <td class="mono small">${esc(a.fixture_digest)}${current.get(a.case) === a.fixture_digest ? '' : '<br><span class="flag">superseded</span>'}</td>
       </tr>`).join('');
 
   const runRows = [...entries].reverse().map(e => {
@@ -174,6 +177,7 @@ th { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(-
 .flag { font-size:11px; padding:1px 6px; border-radius:8px; background:#fff6e0; border:1px solid #f0dca8; }
 .ok { font-size:11px; color:#2b7a3d; }
 tr.notcitable td { opacity:.62; }
+tr.superseded td { opacity:.62; }
 .callout { border-left:3px solid var(--accent); padding:2px 0 2px 16px; margin:20px 0; color:var(--ink); }
 ul { max-width:74ch; } li { margin-bottom:10px; }
 dl { max-width:74ch; } dt { font-weight:600; margin-top:14px; } dd { margin:2px 0 0; color:var(--dim); }
@@ -218,7 +222,9 @@ one arm is better.</p>
 
 <h2>Citable runs, pooled</h2>
 <p class="small">Pooled by case, fixture digest, arm and model. Never across models and never across digests —
-two runs with different digests were not asked the same question.</p>
+two runs with different digests were not asked the same question. A <span class="flag">superseded</span> row was drawn
+against an older version of the case; it is kept because deleting a number that has been read is how a results log
+stops being one.</p>
 <table>
   <thead><tr><th>Case</th><th>Model</th><th>Arm</th><th>Works</th><th>Checks passed</th><th>n</th><th>Outcomes</th><th>Fixture</th></tr></thead>
   <tbody>${aggRows || '<tr><td colspan="8" class="small">No citable runs yet.</td></tr>'}</tbody>
@@ -258,10 +264,14 @@ excluded from every aggregate and every comparison above.</p>
 <ul>${DISCLOSURES.map(d => `<li>${esc(d)}</li>`).join('')}</ul>
 
 <h2>What this page cannot show</h2>
-<p>It cannot show <em>why</em> a sample worked. The oracle asserts against HTTP behaviour, so a pipeline that
-produced the right responses for the wrong reasons scores the same as one that understood the spec. Phoenix's own
-provenance claims — selective invalidation, drift, the trust surface — are not measured here at all; they are
-measured by <code>phoenix selftest</code>, which is a different instrument answering a different question.</p>
+<p>It cannot show <em>why</em> a sample worked. The oracle asserts against HTTP behaviour, so a producer that
+returned the right responses for the wrong reasons scores the same as one that understood the spec. The sharpest
+form of this: an application that mounts nothing at all still passes every assertion of the form “a missing thing
+is missing”, because everything it answers is 404. Read <em>checks passed</em> next to <em>works</em>, never
+instead of it, and keep positive assertions in the majority when writing a case.</p>
+<p>Phoenix's own provenance claims — selective invalidation, drift, the trust surface — are not measured here at
+all; they are measured by <code>phoenix selftest</code>, which is a different instrument answering a different
+question.</p>
 <p>It also cannot show a rate that would be constant by construction. The intent arm is given no file list, so an
 "authorized paths" rate on that arm would be 1.00 forever; a perfect score that cannot be anything else ends a
 question instead of inviting one, so it is not drawn.</p>
@@ -276,6 +286,16 @@ question instead of inviting one, so it is not drawn.</p>
 <script id="bench-data" type="application/json">${data}</script>
 </body></html>
 `;
+}
+
+/** The digest each case was most recently run against — older ones are superseded, not wrong. */
+function currentDigests(entries: readonly BenchEntry[]): Map<string, string> {
+  const latest = new Map<string, { at: string; digest: string }>();
+  for (const e of entries) {
+    const prev = latest.get(e.case);
+    if (!prev || e.at > prev.at) latest.set(e.case, { at: e.at, digest: e.fixture_digest });
+  }
+  return new Map([...latest].map(([c, v]) => [c, v.digest]));
 }
 
 function esc(s: string): string {

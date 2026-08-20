@@ -222,6 +222,20 @@ phoenix bench report --html   # rebuild the page from the recorded runs
 See [bench/README.md](bench/README.md) for the discipline, the refusals, and what a run must be
 before it may be cited.
 
+### The first thing it found
+
+On `todo-api` (coarse, n=5, claude-sonnet-5) the pipeline scored **0/5 [0.00, 0.43]** against a
+**5/5 [0.57, 1.00]** single call to the same model. Every Phoenix sample failed the same way:
+the spec states `POST /tasks` and `GET /stats`, and the generated server mounts `/task` and
+`/task-summary`, because the mount path comes from the implementation unit's *name* rather than
+from the interface the spec declares. The app typechecks, boots, and `phoenix status` is green.
+
+That is a conservation-layer bug — the interface is the durable asset and the pipeline treated
+it as a derived detail — and it is exactly the class of failure `phoenix selftest` cannot see,
+because every capability it asserts is about Phoenix's internals. Full write-up, including the
+false passes that made the number look less bad than it was, in
+[bench/FINDINGS.md](bench/FINDINGS.md).
+
 ## Status
 
 Alpha. The full pipeline works end-to-end — spec to working app with complete, verifiable traceability. The `sqlite-web-api` architecture target generates functional CRUD APIs with web UIs from behavioral specs.
@@ -229,6 +243,10 @@ Alpha. The full pipeline works end-to-end — spec to working app with complete,
 Implemented: A/B/C/D classification + D-rate trust loop, selective invalidation, two-layer identity (stable anchors + content hashes) with a canonical-stability metric, evidence collection with artifact-hash staleness, drift labeling, IU dependency graph + IU-level boundary enforcement, cascade, durable-evaluation generation, an append-only hash-chained provenance journal with `phoenix why`, shadow-pipeline upgrades, executing bots, and a fault-injection meta-eval of the trust dashboard.
 
 What's next:
+- **Honour the interface the spec declares** — route mounting is derived from IU names today, which
+  is what the bench caught first (see [bench/FINDINGS.md](bench/FINDINGS.md))
+- **Bench cases that ask a harder question** — a spec too large for one call, and a change-then-regenerate
+  case where selective invalidation is the thing being measured
 - More architecture targets (Express + Postgres, Cloudflare Workers + D1, CLI apps)
 - Incremental (per-clause) canonicalization to make the whole cycle selective, not just regen
 - Running generated evaluations against a live app (integration-level oracle) in addition to the structural check
