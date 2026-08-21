@@ -75,6 +75,45 @@ next to `works` rather than instead of it.
 
 ---
 
+## 2026-08-21 · both cases · phoenix `14dd469` · claude-sonnet-5 · coarse (n=5)
+
+The run after the interface fix, and the first run of the harder case.
+
+| Case | Arm | Works | Checks passed |
+|---|---|---|---|
+| `todo-api` | `phoenix` | 0/5 [0.00, 0.43] | **70/120 [0.49, 0.67]** (was 25/120 at `db405ca`) |
+| `todo-api` | `baseline` | 5/5 [0.57, 1.00] | 120/120 [0.97, 1.00] |
+| `todo-api` | `intent` | 0/5 [0.00, 0.43] | 49/120 [0.32, 0.50] |
+| `library-api` | `phoenix` | 0/5 [0.00, 0.43] | 66/204 [0.26, 0.39] (4 disagreed, 1 broke) |
+| `library-api` | `baseline` | 5/5 [0.57, 1.00] | 255/255 [0.99, 1.00] |
+| `library-api` | `intent` | 0/5 [0.00, 0.43] | 88/255 [0.29, 0.41] |
+
+**The interface fix moved the number it was supposed to move**: `todo-api`'s check rate went
+from 25/120 [0.15, 0.29] to 70/120 [0.49, 0.67] with the fixture unchanged — disjoint intervals,
+and the only thing that changed was the commit. That is what per-commit pooling is for.
+
+**It did not move the rate anybody cares about.** `works` is still 0/5, because `works` requires
+*every* assertion, and each case now fails on something else:
+
+- `todo-api`, 5/5 samples: the spec says priority is one of *urgent, high, normal, low*; the
+  generated enum is `['high','normal','low']`. A member of a declared set was dropped somewhere
+  between canonicalization and codegen, so `POST /tasks {"priority":"urgent"}` is rejected as
+  invalid. Four checks fall with it, three by cascade (the rejected create leaves the `{second}`
+  binding unsaved).
+- `library-api`, 4/5 samples: the book resource is wrong from its first request onward.
+  1/5 samples never booted at all — `SqliteError: near "when": syntax error`, generated DDL that
+  SQLite will not parse, which the compile gate cannot see because it is a *string*.
+
+**The baseline one-shots both cases.** 255/255 checks on a 51-check, three-entity spec with
+derived availability counts, a borrowing limit and 409-vs-400 semantics. That is the honest
+context for every number above: at this size, a frontier model does not need a pipeline, so
+these cases cannot show pipeline value even in principle — they can only show pipeline *damage*,
+which they are currently doing. A case that could show value has to be one a single call cannot
+hold, or has to measure the thing the pipeline is actually for: what happens on the *second*
+spec, when one line changes.
+
+---
+
 ## 2026-08-20 · fixture `9fc6564bd1448cda` (superseded)
 
 The first coarse run, drawn before the runtime contract stated the health route. Its
