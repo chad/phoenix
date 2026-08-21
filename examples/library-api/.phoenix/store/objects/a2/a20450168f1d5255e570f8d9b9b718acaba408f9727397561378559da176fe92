@@ -1,0 +1,36 @@
+{
+  "canon_id": "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+  "type": "REQUIREMENT",
+  "statement": "The system assigns every member a stable unique integer identifier that external systems can reference.",
+  "confidence": 0.5,
+  "source_clause_ids": [
+    "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+  ],
+  "linked_canon_ids": [
+    "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e"
+  ],
+  "link_types": {
+    "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d": "refines",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines"
+  },
+  "tags": [
+    "member",
+    "stable",
+    "unique",
+    "integer",
+    "identifier",
+    "external",
+    "systems",
+    "reference"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "dd2106df90d6edce5830a535f18cdc60e19ccc5e02a4e158a8911604f91b027a"
+}

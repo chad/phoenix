@@ -1,0 +1,46 @@
+{
+  "canon_id": "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+  "type": "CONSTRAINT",
+  "statement": "The system cannot allow borrowing of a book with no available copies.",
+  "confidence": 0.3,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c"
+  ],
+  "link_types": {
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines"
+  },
+  "tags": [
+    "book",
+    "available",
+    "copies",
+    "cannot",
+    "borrowed",
+    "conflict"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "0f5909b8a33bf69b07f29fa11bc06046f4f457e1eb04a47dc24e784799561192"
+}

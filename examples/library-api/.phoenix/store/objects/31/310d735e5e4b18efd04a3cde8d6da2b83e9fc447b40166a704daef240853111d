@@ -1,0 +1,27 @@
+{
+  "canon_id": "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d",
+  "type": "CONTEXT",
+  "statement": "other systems drive it over http.",
+  "confidence": 1,
+  "source_clause_ids": [
+    "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+  ],
+  "linked_canon_ids": [
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+    "f977437b8ae66264326a49a1e501d878fbd5819a4722b73b6d8f07374a629d1d"
+  ],
+  "link_types": {
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+    "f977437b8ae66264326a49a1e501d878fbd5819a4722b73b6d8f07374a629d1d": "refines"
+  },
+  "tags": [
+    "systems",
+    "drive",
+    "over",
+    "http"
+  ],
+  "extraction_method": "rule",
+  "canon_anchor": "60f9a6e34107d3e994b68bfd49bdddabf62868687f7011febfca4d7392f66b75"
+}

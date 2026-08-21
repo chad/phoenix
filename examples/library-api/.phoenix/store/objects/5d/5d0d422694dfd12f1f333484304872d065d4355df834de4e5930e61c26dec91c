@@ -1,0 +1,37 @@
+{
+  "canon_id": "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+  "type": "CONTEXT",
+  "statement": "users can list every member",
+  "confidence": 1,
+  "source_clause_ids": [
+    "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+  ],
+  "linked_canon_ids": [
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905"
+  ],
+  "link_types": {
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines"
+  },
+  "tags": [
+    "users",
+    "list",
+    "member"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "1b5180957325dcc9b099b0ffaaad4a1f5a7a93bd1f2851d94a8ceac436c5a684"
+}

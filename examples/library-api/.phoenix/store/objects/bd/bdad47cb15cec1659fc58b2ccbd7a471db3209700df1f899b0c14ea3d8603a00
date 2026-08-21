@@ -1,0 +1,37 @@
+{
+  "canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "type": "CONTEXT",
+  "statement": "library loans",
+  "confidence": 1,
+  "source_clause_ids": [
+    "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+  ],
+  "linked_canon_ids": [
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+    "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1"
+  ],
+  "link_types": {
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+    "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d": "refines",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines"
+  },
+  "tags": [
+    "library",
+    "loans"
+  ],
+  "extraction_method": "rule",
+  "canon_anchor": "8fdb418588018de01b8996919774ac9e8c67840bcaac7e40fbbebba98813aea2"
+}

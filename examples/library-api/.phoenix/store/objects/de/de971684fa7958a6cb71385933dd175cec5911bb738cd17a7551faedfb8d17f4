@@ -1,0 +1,50 @@
+{
+  "canon_id": "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+  "type": "CONTEXT",
+  "statement": "post /loans — borrows a book from a json body of { \"book_id\": n, \"member_id\": n }; returns 201",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5",
+    "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab"
+  ],
+  "link_types": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines",
+    "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e": "refines",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "refines"
+  },
+  "tags": [
+    "post",
+    "loans",
+    "borrows",
+    "book",
+    "json",
+    "body",
+    "bookid",
+    "memberid",
+    "returns",
+    "201"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "ad944900cf20238fb5ef98a60c76311d253154420b49d0460b84ddc0f514bc8f"
+}

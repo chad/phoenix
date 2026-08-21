@@ -1,0 +1,256 @@
+[
+  {
+    "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+    "kind": "module",
+    "name": "book",
+    "risk_tier": "high",
+    "contract": {
+      "description": "The system assigns every book a stable unique integer identifier that external systems can reference.",
+      "inputs": [],
+      "outputs": [],
+      "invariants": [
+        "The book's title and author must not be empty.",
+        "The system never allows two books to share the same ISBN; the system treats a repeat ISBN as a conflict, not a validation error.",
+        "The copy count must be a whole number of at least 1.",
+        "The number of copies currently out on loan must never be negative.",
+        "The system displays only books that have at least one copy available in the list.",
+        "The system displays books with at least one copy available."
+      ]
+    },
+    "source_canon_ids": [
+      "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+      "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+      "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+      "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+      "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+      "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+      "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+    ],
+    "dependencies": [],
+    "boundary_policy": {
+      "code": {
+        "allowed_ius": [],
+        "allowed_packages": [],
+        "forbidden_ius": [],
+        "forbidden_packages": [],
+        "forbidden_paths": []
+      },
+      "side_channels": {
+        "databases": [],
+        "queues": [],
+        "caches": [],
+        "config": [],
+        "external_apis": [],
+        "files": []
+      }
+    },
+    "enforcement": {
+      "dependency_violation": {
+        "severity": "error"
+      },
+      "side_channel_violation": {
+        "severity": "warning"
+      }
+    },
+    "evidence_policy": {
+      "required": [
+        "typecheck",
+        "lint",
+        "boundary_validation",
+        "unit_tests",
+        "property_tests",
+        "threat_note",
+        "static_analysis"
+      ]
+    },
+    "output_files": [
+      "src/generated/book/book.ts"
+    ]
+  },
+  {
+    "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+    "kind": "module",
+    "name": "loan",
+    "risk_tier": "high",
+    "contract": {
+      "description": "The system assigns every loan a stable unique integer identifier.. The user returns a loan, the system records the return date, and the system makes the copy available again.. The POST /loans/:id/return endpoint returns 200 and the returned loan.",
+      "inputs": [],
+      "outputs": [],
+      "invariants": [
+        "The system cannot allow borrowing of a book with no available copies."
+      ]
+    },
+    "source_canon_ids": [
+      "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+      "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+      "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+      "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+      "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+      "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+      "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+      "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+    ],
+    "dependencies": [],
+    "boundary_policy": {
+      "code": {
+        "allowed_ius": [],
+        "allowed_packages": [],
+        "forbidden_ius": [],
+        "forbidden_packages": [],
+        "forbidden_paths": []
+      },
+      "side_channels": {
+        "databases": [],
+        "queues": [],
+        "caches": [],
+        "config": [],
+        "external_apis": [],
+        "files": []
+      }
+    },
+    "enforcement": {
+      "dependency_violation": {
+        "severity": "error"
+      },
+      "side_channel_violation": {
+        "severity": "warning"
+      }
+    },
+    "evidence_policy": {
+      "required": [
+        "typecheck",
+        "lint",
+        "boundary_validation",
+        "unit_tests",
+        "property_tests",
+        "threat_note",
+        "static_analysis"
+      ]
+    },
+    "output_files": [
+      "src/generated/loan/loan.ts"
+    ]
+  },
+  {
+    "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+    "kind": "module",
+    "name": "member",
+    "risk_tier": "high",
+    "contract": {
+      "description": "The system assigns every member a stable unique integer identifier that external systems can reference.. A member's email address must contain an @ symbol.. The system returns 204 for DELETE /members/:id, returns 404 if no such member exists, or returns 409 if the member holds an active loan.",
+      "inputs": [],
+      "outputs": [],
+      "invariants": [
+        "The member's name must not be empty.",
+        "A member's name must not exceed 120 characters.",
+        "A member's email address must not be empty.",
+        "The system must never allow two members to share the same email address, and the system must reject a registration that repeats an existing email address.",
+        "Removing a member never deletes that member's returned loan history."
+      ]
+    },
+    "source_canon_ids": [
+      "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+      "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+      "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+      "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+      "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+      "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+      "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+      "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+      "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+      "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+      "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+    ],
+    "dependencies": [],
+    "boundary_policy": {
+      "code": {
+        "allowed_ius": [],
+        "allowed_packages": [],
+        "forbidden_ius": [],
+        "forbidden_packages": [],
+        "forbidden_paths": []
+      },
+      "side_channels": {
+        "databases": [],
+        "queues": [],
+        "caches": [],
+        "config": [],
+        "external_apis": [],
+        "files": []
+      }
+    },
+    "enforcement": {
+      "dependency_violation": {
+        "severity": "error"
+      },
+      "side_channel_violation": {
+        "severity": "warning"
+      }
+    },
+    "evidence_policy": {
+      "required": [
+        "typecheck",
+        "lint",
+        "boundary_validation",
+        "unit_tests",
+        "property_tests",
+        "threat_note",
+        "static_analysis"
+      ]
+    },
+    "output_files": [
+      "src/generated/member/member.ts"
+    ]
+  },
+  {
+    "iu_id": "4becec2b5cf6add402c248133e7f6f49e68798896fc7549465238e4627867613",
+    "kind": "module",
+    "name": "summary",
+    "risk_tier": "low",
+    "contract": {
+      "description": "The summary reflects every change immediately.",
+      "inputs": [],
+      "outputs": [],
+      "invariants": []
+    },
+    "source_canon_ids": [
+      "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633"
+    ],
+    "dependencies": [],
+    "boundary_policy": {
+      "code": {
+        "allowed_ius": [],
+        "allowed_packages": [],
+        "forbidden_ius": [],
+        "forbidden_packages": [],
+        "forbidden_paths": []
+      },
+      "side_channels": {
+        "databases": [],
+        "queues": [],
+        "caches": [],
+        "config": [],
+        "external_apis": [],
+        "files": []
+      }
+    },
+    "enforcement": {
+      "dependency_violation": {
+        "severity": "error"
+      },
+      "side_channel_violation": {
+        "severity": "warning"
+      }
+    },
+    "evidence_policy": {
+      "required": [
+        "typecheck",
+        "lint",
+        "boundary_validation"
+      ]
+    },
+    "output_files": [
+      "src/generated/summary/summary.ts"
+    ]
+  }
+]

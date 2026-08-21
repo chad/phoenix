@@ -1,0 +1,3410 @@
+{
+  "nodes": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": {
+      "canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "type": "CONTEXT",
+      "statement": "library loans",
+      "confidence": 1,
+      "source_clause_ids": [
+        "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+      ],
+      "linked_canon_ids": [
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1"
+      ],
+      "link_types": {
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines"
+      },
+      "tags": [
+        "library",
+        "loans"
+      ],
+      "extraction_method": "rule",
+      "canon_anchor": "8fdb418588018de01b8996919774ac9e8c67840bcaac7e40fbbebba98813aea2"
+    },
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": {
+      "canon_id": "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+      "type": "CONTEXT",
+      "statement": "a lending service for a small library.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines"
+      },
+      "tags": [
+        "lending",
+        "service",
+        "small",
+        "library"
+      ],
+      "extraction_method": "rule",
+      "canon_anchor": "e72c745559300c7cd24b39b9ba2c09144dd5e6d248a1cba7379642b507c1bcce"
+    },
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": {
+      "canon_id": "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+      "type": "CONTEXT",
+      "statement": "it tracks members, the books the library owns, and the loans between them.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines"
+      },
+      "tags": [
+        "tracks",
+        "members",
+        "books",
+        "library",
+        "owns",
+        "loans",
+        "between",
+        "them"
+      ],
+      "extraction_method": "rule",
+      "canon_anchor": "7d872d4db6db3f4d2dace415d9625c55ccc015f78d506f0f66b616f81a8a5ffc"
+    },
+    "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d": {
+      "canon_id": "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d",
+      "type": "CONTEXT",
+      "statement": "other systems drive it over http.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+      ],
+      "linked_canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "f977437b8ae66264326a49a1e501d878fbd5819a4722b73b6d8f07374a629d1d"
+      ],
+      "link_types": {
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+        "f977437b8ae66264326a49a1e501d878fbd5819a4722b73b6d8f07374a629d1d": "refines"
+      },
+      "tags": [
+        "systems",
+        "drive",
+        "over",
+        "http"
+      ],
+      "extraction_method": "rule",
+      "canon_anchor": "60f9a6e34107d3e994b68bfd49bdddabf62868687f7011febfca4d7392f66b75"
+    },
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": {
+      "canon_id": "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+      "type": "CONTEXT",
+      "statement": "members",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6"
+      ],
+      "link_types": {
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines"
+      },
+      "tags": [
+        "members"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "fd3986dbfb2215b12108a88cc654821f99bd4e5f1191cf6ace7f2d3fc8f7c820"
+    },
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": {
+      "canon_id": "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+      "type": "CONTEXT",
+      "statement": "a member has a name, an email address, and the date they joined",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87"
+      ],
+      "link_types": {
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "defines",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": "refines"
+      },
+      "tags": [
+        "member",
+        "name",
+        "email",
+        "address",
+        "date",
+        "they",
+        "joined"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "a304dc13fbc14d0e78517295826639192489c303005ddb54af5361c48012b613"
+    },
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": {
+      "canon_id": "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+      "type": "REQUIREMENT",
+      "statement": "The system assigns every member a stable unique integer identifier that external systems can reference.",
+      "confidence": 0.5,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e"
+      ],
+      "link_types": {
+        "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d": "refines",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines"
+      },
+      "tags": [
+        "member",
+        "stable",
+        "unique",
+        "integer",
+        "identifier",
+        "external",
+        "systems",
+        "reference"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "dd2106df90d6edce5830a535f18cdc60e19ccc5e02a4e158a8911604f91b027a"
+    },
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": {
+      "canon_id": "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+      "type": "CONTEXT",
+      "statement": "users can register a member by providing a name and an email address",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad"
+      ],
+      "link_types": {
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines"
+      },
+      "tags": [
+        "users",
+        "register",
+        "member",
+        "providing",
+        "name",
+        "email",
+        "address"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "15e94f4c640e07fb2af66593787025c221bb3e1a3da3ca8be296528b75be1d49"
+    },
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": {
+      "canon_id": "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+      "type": "CONSTRAINT",
+      "statement": "The member's name must not be empty.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13"
+      ],
+      "link_types": {
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "constrains",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines"
+      },
+      "tags": [
+        "members",
+        "name",
+        "empty"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "abb2a2453d0b5dd883f775a43e8794ab77de7ba93b1ae9dd3eae9436f8f1b622"
+    },
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": {
+      "canon_id": "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+      "type": "CONSTRAINT",
+      "statement": "A member's name must not exceed 120 characters.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "link_types": {
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "constrains",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines"
+      },
+      "tags": [
+        "members",
+        "name",
+        "exceed",
+        "120",
+        "characters"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "cdae3bf0e413b8bcdd57fd6a3edf1f60817dc5bb1c32b530dc7f862c19bd0e79"
+    },
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": {
+      "canon_id": "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+      "type": "REQUIREMENT",
+      "statement": "A member's email address must contain an @ symbol.",
+      "confidence": 0.5,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "link_types": {
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "constrains",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "invariant_of",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "defines",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines"
+      },
+      "tags": [
+        "members",
+        "email",
+        "address",
+        "contain"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "9300680931ae404e41ce13ae6edbad803de475b008c52031a73b5dbcd239cb0c"
+    },
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": {
+      "canon_id": "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+      "type": "CONSTRAINT",
+      "statement": "A member's email address must not be empty.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13"
+      ],
+      "link_types": {
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "constrains",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "defines",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines"
+      },
+      "tags": [
+        "members",
+        "email",
+        "address",
+        "empty"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "73268c9f62e044ab2b32952d788269cb3669335a29d241a4ad2c6f3568009198"
+    },
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": {
+      "canon_id": "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+      "type": "INVARIANT",
+      "statement": "The system must never allow two members to share the same email address, and the system must reject a registration that repeats an existing email address.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db"
+      ],
+      "link_types": {
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "relates_to",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "defines",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines"
+      },
+      "tags": [
+        "two",
+        "members",
+        "never",
+        "share",
+        "same",
+        "email",
+        "address",
+        "registration",
+        "repeats",
+        "existing"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "9fb3688451e791042f31741861a532bc5ccb5667115a948032f86610d4d02e7d"
+    },
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": {
+      "canon_id": "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+      "type": "DEFINITION",
+      "statement": "Email is a conflict, not a validation error.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee"
+      ],
+      "link_types": {
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": "defines",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "defines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "defines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "defines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines"
+      },
+      "tags": [
+        "email",
+        "conflict",
+        "validation",
+        "error"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "8668da36ba3991f71e846f23b2956902dc6e4744864e12e292d442a60602b186"
+    },
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": {
+      "canon_id": "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+      "type": "CONTEXT",
+      "statement": "users can list every member",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905"
+      ],
+      "link_types": {
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines"
+      },
+      "tags": [
+        "users",
+        "list",
+        "member"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "1b5180957325dcc9b099b0ffaaad4a1f5a7a93bd1f2851d94a8ceac436c5a684"
+    },
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": {
+      "canon_id": "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+      "type": "CONTEXT",
+      "statement": "users can read a single member, including how many loans that member currently has out",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines"
+      },
+      "tags": [
+        "users",
+        "read",
+        "single",
+        "member",
+        "including",
+        "how",
+        "many",
+        "loans",
+        "currently",
+        "out"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "79063342730e4aaa1917b57c954f4b911a87645ea9d034ffa3eaec5c6af3729e"
+    },
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": {
+      "canon_id": "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+      "type": "CONTEXT",
+      "statement": "users can remove a member only when that member has no active loan; removing a member who still",
+      "confidence": 1,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3"
+      ],
+      "link_types": {
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines"
+      },
+      "tags": [
+        "users",
+        "remove",
+        "member",
+        "only",
+        "active",
+        "loan",
+        "removing",
+        "who",
+        "still"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "a8a8a16943d808b8a2c8010550a78d9b6071fa58088d89eab44d43ff341a4fae"
+    },
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": {
+      "canon_id": "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+      "type": "DEFINITION",
+      "statement": "One \"has\" relationship constitutes one conflict.",
+      "confidence": 0.5,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "link_types": {
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "defines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "defines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "defines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "defines"
+      },
+      "tags": [
+        "one",
+        "conflict"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "cca6cd82139c45e4efa98604d0cbfda06e5faf9693ed17c8c969bb9f33e5003b"
+    },
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": {
+      "canon_id": "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+      "type": "INVARIANT",
+      "statement": "Removing a member never deletes that member's returned loan history.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+      ],
+      "linked_canon_ids": [
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "invariant_of",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "invariant_of"
+      },
+      "tags": [
+        "removing",
+        "member",
+        "never",
+        "delete",
+        "members",
+        "returned",
+        "loan",
+        "history"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "424845fd523568c49648d382116dd1ef46a90e17adb4dc6211933ae8b8b06b2d"
+    },
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": {
+      "canon_id": "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+      "type": "CONTEXT",
+      "statement": "books",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6"
+      ],
+      "link_types": {
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines"
+      },
+      "tags": [
+        "books"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "7facb3f18b4fb11135773e55c9894faba277b084778cd9bf95e3b9ecb9c757fc"
+    },
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": {
+      "canon_id": "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+      "type": "CONTEXT",
+      "statement": "a book has a title, an author, an isbn, and a count of how many copies the library owns",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a"
+      ],
+      "link_types": {
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines"
+      },
+      "tags": [
+        "book",
+        "title",
+        "author",
+        "isbn",
+        "count",
+        "how",
+        "many",
+        "copies",
+        "library",
+        "owns"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "61dc219bc04646aa8aae0119dff20da1de04fe4e35ef31ff8e6052c65184faf9"
+    },
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": {
+      "canon_id": "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+      "type": "REQUIREMENT",
+      "statement": "The system assigns every book a stable unique integer identifier that external systems can reference.",
+      "confidence": 0.5,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d",
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b"
+      ],
+      "link_types": {
+        "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d": "refines",
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines"
+      },
+      "tags": [
+        "book",
+        "stable",
+        "unique",
+        "integer",
+        "identifier",
+        "external",
+        "systems",
+        "reference"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "484dc335f6e04e8f8c271e5648271ce3cfa6202f3a537dddd6db4b8118b86417"
+    },
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": {
+      "canon_id": "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+      "type": "CONTEXT",
+      "statement": "users can add a book by providing a title, an author, an isbn, and a copy count",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512"
+      ],
+      "link_types": {
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines"
+      },
+      "tags": [
+        "users",
+        "add",
+        "book",
+        "providing",
+        "title",
+        "author",
+        "isbn",
+        "copy",
+        "count"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "1d10ac890b545d09789cbd69ec5f51e4fa37476613be8049b5ceb1ee38a65974"
+    },
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": {
+      "canon_id": "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+      "type": "CONSTRAINT",
+      "statement": "The book's title and author must not be empty.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23"
+      ],
+      "link_types": {
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines"
+      },
+      "tags": [
+        "books",
+        "title",
+        "author",
+        "empty"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "7d3f512d5148469c706e24b8fec37aff7da4d7e27a535e6838815a565e37f378"
+    },
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": {
+      "canon_id": "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+      "type": "INVARIANT",
+      "statement": "The system never allows two books to share the same ISBN; the system treats a repeat ISBN as a conflict, not a validation error.",
+      "confidence": 0.3,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23"
+      ],
+      "link_types": {
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "constrains",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines"
+      },
+      "tags": [
+        "two",
+        "books",
+        "never",
+        "share",
+        "same",
+        "isbn",
+        "repeat",
+        "conflict",
+        "validation",
+        "error"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "cc1b204a8adf5a09aca32ed1f431de6bf1cbc7390756daf513d577bf024a4f1d"
+    },
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": {
+      "canon_id": "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+      "type": "CONSTRAINT",
+      "statement": "The copy count must be a whole number of at least 1.",
+      "confidence": 0.5,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "link_types": {
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "constrains",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines"
+      },
+      "tags": [
+        "copy",
+        "count",
+        "whole",
+        "number",
+        "least"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "ba773a2eb302f3fdfbbf288b2c9082d6391d8a21efe97c098ba0723c4c47b81a"
+    },
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": {
+      "canon_id": "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+      "type": "CONTEXT",
+      "statement": "users can list every book",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b"
+      ],
+      "link_types": {
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines"
+      },
+      "tags": [
+        "users",
+        "list",
+        "book"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "9800f19a3d8908de7ba53f8427c2526f5372efbfa183715958eaad1a3b6d2504"
+    },
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": {
+      "canon_id": "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+      "type": "CONTEXT",
+      "statement": "users can read a single book, including how many of its copies are currently available",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512"
+      ],
+      "link_types": {
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines"
+      },
+      "tags": [
+        "users",
+        "read",
+        "single",
+        "book",
+        "including",
+        "how",
+        "many",
+        "copies",
+        "currently",
+        "available"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "a01be2ffc35aa107a20eab7d21add2715418aa2e9e7b7ece50c935e13afb0973"
+    },
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": {
+      "canon_id": "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+      "type": "CONTEXT",
+      "statement": "the available count is the number of copies the library owns minus the number of copies",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines"
+      },
+      "tags": [
+        "available",
+        "count",
+        "number",
+        "copies",
+        "library",
+        "owns",
+        "minus"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "9bb3605a2d7a141f1c90afe0fe4aa5e9e6072cf4027a078fa197565564bc6f34"
+    },
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": {
+      "canon_id": "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+      "type": "INVARIANT",
+      "statement": "The number of copies currently out on loan must never be negative.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee"
+      ],
+      "link_types": {
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "invariant_of",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines"
+      },
+      "tags": [
+        "currently",
+        "out",
+        "loan",
+        "never",
+        "negative"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "5f537925a907514e8e1b8389f1ce8243fc36825ac13471025524dbf64d56125d"
+    },
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": {
+      "canon_id": "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+      "type": "CONSTRAINT",
+      "statement": "The system displays only books that have at least one copy available in the list.",
+      "confidence": 0.6666666666666666,
+      "source_clause_ids": [
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+      ],
+      "linked_canon_ids": [
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a"
+      ],
+      "link_types": {
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "constrains",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines"
+      },
+      "tags": [
+        "users",
+        "list",
+        "only",
+        "books",
+        "least",
+        "one",
+        "copy",
+        "available"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "90093c9b887f9febc320dadc52e4b098e38df35ab6e7d4dd6a5d0092a1f0e829"
+    },
+    "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d": {
+      "canon_id": "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d",
+      "type": "CONTEXT",
+      "statement": "loans",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines"
+      },
+      "tags": [
+        "loans"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "9c28ff6ef4315dcafec3592bd06ec66a576e313f2fa278e26c22f8126265f08f"
+    },
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": {
+      "canon_id": "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+      "type": "CONTEXT",
+      "statement": "a loan records which book was borrowed, which member borrowed it, when it was borrowed, when",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf"
+      ],
+      "link_types": {
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines"
+      },
+      "tags": [
+        "loan",
+        "records",
+        "which",
+        "book",
+        "borrowed",
+        "member"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "370b20e64d6b1a1a77ee0ac2bb6ceee4e87959f692152221f0d466ae0542a21e"
+    },
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": {
+      "canon_id": "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b",
+      "type": "CONTEXT",
+      "statement": "it is due back, and when it was returned",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "c77debd06887b7e50bb2b6817fc7743a6ad6e834885ab1e2c2db1766af4774dc",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245"
+      ],
+      "link_types": {
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "c77debd06887b7e50bb2b6817fc7743a6ad6e834885ab1e2c2db1766af4774dc": "refines",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines"
+      },
+      "tags": [
+        "due",
+        "back",
+        "returned"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "5e84a26693ebd89cf6e49dbf08501f9af9410ee7a1a83cc6a3638c73c6cf4a33"
+    },
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": {
+      "canon_id": "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+      "type": "REQUIREMENT",
+      "statement": "The system assigns every loan a stable unique integer identifier.",
+      "confidence": 0.5,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905"
+      ],
+      "link_types": {
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "relates_to",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines"
+      },
+      "tags": [
+        "loan",
+        "stable",
+        "unique",
+        "integer",
+        "identifier"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "e17d43a9dabe5a17e21c55a727319b9b44fb274f47db5dd65e473261213e6363"
+    },
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": {
+      "canon_id": "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+      "type": "CONTEXT",
+      "statement": "users can borrow a book by naming an existing book and an existing member",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3"
+      ],
+      "link_types": {
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines"
+      },
+      "tags": [
+        "users",
+        "borrow",
+        "book",
+        "naming",
+        "existing",
+        "member"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "7976adb34980e1f09b1654d4d540789b708f3880f184c0d90ab01f44a5a825f5"
+    },
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": {
+      "canon_id": "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+      "type": "DEFINITION",
+      "statement": "The system classifies borrowing a book that does not exist or naming a member who does not exist as a not-found error.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1"
+      ],
+      "link_types": {
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "defines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "defines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines"
+      },
+      "tags": [
+        "not-found",
+        "borrowing",
+        "book",
+        "exist",
+        "naming",
+        "member",
+        "who",
+        "error"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "d78cf7001c163c47abfccac8a2db2a6c98e42fbb1f5fa511f83da14ca1b6141b"
+    },
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": {
+      "canon_id": "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+      "type": "CONTEXT",
+      "statement": "a loan is due 14 days after it is borrowed",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+      ],
+      "link_types": {
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+      },
+      "tags": [
+        "loan",
+        "due",
+        "days",
+        "after",
+        "borrowed"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "247dde9fb274a93fb80ab57ea5d4414547ec6fbf8748d3edd1916ca23a844f7b"
+    },
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": {
+      "canon_id": "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+      "type": "CONSTRAINT",
+      "statement": "The system cannot allow borrowing of a book with no available copies.",
+      "confidence": 0.3,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c"
+      ],
+      "link_types": {
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines"
+      },
+      "tags": [
+        "book",
+        "available",
+        "copies",
+        "cannot",
+        "borrowed",
+        "conflict"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "0f5909b8a33bf69b07f29fa11bc06046f4f457e1eb04a47dc24e784799561192"
+    },
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": {
+      "canon_id": "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+      "type": "DEFINITION",
+      "statement": "A member has at most 3 active loans at once, and a fourth active loan is a conflict.",
+      "confidence": 0.3,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa"
+      ],
+      "link_types": {
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "defines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "defines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "defines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "defines"
+      },
+      "tags": [
+        "member",
+        "active",
+        "loans",
+        "once",
+        "fourth",
+        "conflict"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "c28cbd1b5c77260f3731eb0230026b171fa517251e5615e9b14605cdf5e91811"
+    },
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": {
+      "canon_id": "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+      "type": "CONTEXT",
+      "statement": "an active loan is one that has not been returned",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+      ],
+      "link_types": {
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+      },
+      "tags": [
+        "active",
+        "loan",
+        "one",
+        "returned"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "4a970cf87ae8ac5c6143796a6336e1b92f27468049392528de47afa22e49d4d6"
+    },
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": {
+      "canon_id": "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+      "type": "REQUIREMENT",
+      "statement": "The user returns a loan, the system records the return date, and the system makes the copy available again.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+      ],
+      "link_types": {
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "constrains",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+      },
+      "tags": [
+        "users",
+        "return",
+        "loan",
+        "returning",
+        "records",
+        "came",
+        "back",
+        "makes",
+        "copy",
+        "available",
+        "again"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "fddda0721502e229b038c837a37dc1140ce04acf1a5fa036fac8b47d34ece67f"
+    },
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": {
+      "canon_id": "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+      "type": "DEFINITION",
+      "statement": "Returning a loan that has already been returned constitutes a conflict.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+      ],
+      "link_types": {
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "defines",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+      },
+      "tags": [
+        "returning",
+        "loan",
+        "already",
+        "returned",
+        "conflict"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "207521dfc0abe8fd55595833a3189aba57ba85f626c48fe727218eff93a4586d"
+    },
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": {
+      "canon_id": "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+      "type": "DEFINITION",
+      "statement": "Returning a loan that does not exist produces a not-found error.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed"
+      ],
+      "link_types": {
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "refines",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+        "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "defines"
+      },
+      "tags": [
+        "not-found",
+        "returning",
+        "loan",
+        "exist",
+        "error"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "8fac411515402ec61f4f162f6cdf3fd893143bdc1bb77a534172fc7447095f4a"
+    },
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": {
+      "canon_id": "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+      "type": "CONTEXT",
+      "statement": "users can list every loan, and can list only the active ones",
+      "confidence": 1,
+      "source_clause_ids": [
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+      ],
+      "linked_canon_ids": [
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e"
+      ],
+      "link_types": {
+        "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines"
+      },
+      "tags": [
+        "users",
+        "list",
+        "loan",
+        "only",
+        "active",
+        "ones"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "96c8c8b4094dfaf830d9d5bca73501e91bb303f51608fbe3c56f349cfa3c343a"
+    },
+    "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40": {
+      "canon_id": "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40",
+      "type": "CONTEXT",
+      "statement": "summary",
+      "confidence": 1,
+      "source_clause_ids": [
+        "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+      ],
+      "linked_canon_ids": [
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee"
+      ],
+      "link_types": {
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines"
+      },
+      "tags": [
+        "summary"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "b53394df6bcd74b45186005d6b544e6c226bd85c929c25994ee8d7b1d7c8512d"
+    },
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": {
+      "canon_id": "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+      "type": "CONTEXT",
+      "statement": "users can read a summary of the library: how many members are registered, how many distinct books",
+      "confidence": 1,
+      "source_clause_ids": [
+        "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40",
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40": "refines",
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines"
+      },
+      "tags": [
+        "users",
+        "read",
+        "summary",
+        "library",
+        "how",
+        "many",
+        "members",
+        "registered",
+        "distinct",
+        "books"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "92753b692df403e4a927345f1d91f071d7d2833808b1af09d21608f7cc5cd24c"
+    },
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": {
+      "canon_id": "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+      "type": "CONTEXT",
+      "statement": "the library holds, how many copies are currently on loan, and how many loans are active",
+      "confidence": 1,
+      "source_clause_ids": [
+        "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines"
+      },
+      "tags": [
+        "library",
+        "holds",
+        "how",
+        "many",
+        "copies",
+        "currently",
+        "loan",
+        "loans",
+        "active"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "62697427d5dd34d4cea57f36f5dc320b76ea385aeb9bb33565cfdc3783fe45ac"
+    },
+    "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633": {
+      "canon_id": "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633",
+      "type": "REQUIREMENT",
+      "statement": "The summary reflects every change immediately.",
+      "confidence": 0.5,
+      "source_clause_ids": [
+        "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+      ],
+      "linked_canon_ids": [
+        "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee"
+      ],
+      "link_types": {
+        "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines"
+      },
+      "tags": [
+        "summary",
+        "reflect",
+        "change",
+        "immediately"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "1a73c24d383b6e36741cdf5b99287796914e0f46cde6f0e34cb42b1032102775"
+    },
+    "f977437b8ae66264326a49a1e501d878fbd5819a4722b73b6d8f07374a629d1d": {
+      "canon_id": "f977437b8ae66264326a49a1e501d878fbd5819a4722b73b6d8f07374a629d1d",
+      "type": "CONTEXT",
+      "statement": "http interface",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d"
+      ],
+      "link_types": {
+        "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d": "refines"
+      },
+      "tags": [
+        "http",
+        "interface"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "0b2907e4ed28486722159916718066f6aade8ffbdfc61cd7a21042d57d993584"
+    },
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": {
+      "canon_id": "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+      "type": "CONTEXT",
+      "statement": "the service exposes exactly these routes, and answers json on all of them:",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1"
+      ],
+      "link_types": {
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines"
+      },
+      "tags": [
+        "service",
+        "exposes",
+        "exactly",
+        "routes",
+        "answers",
+        "json",
+        "them"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "d38fb51c707763aace8b4e0d81949f0f6ec9ef713319f22ebfbe4348115b731a"
+    },
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": {
+      "canon_id": "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+      "type": "CONTEXT",
+      "statement": "get /health — returns 200 once the service is ready",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+      },
+      "tags": [
+        "get",
+        "health",
+        "returns",
+        "200",
+        "once",
+        "service",
+        "ready"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "adf73d398c2d91ad3d12443e0be68385e8f0e3093485bdedc40600b64ee148c1"
+    },
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": {
+      "canon_id": "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+      "type": "CONTEXT",
+      "statement": "post /members — registers a member; returns 201 and the created member",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f"
+      ],
+      "link_types": {
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": "refines"
+      },
+      "tags": [
+        "post",
+        "members",
+        "registers",
+        "member",
+        "returns",
+        "201",
+        "created"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "960580c046e73bc9ae3d14096f365fe30ef54552685c038b0bec8e406be227bd"
+    },
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": {
+      "canon_id": "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+      "type": "CONTEXT",
+      "statement": "get /members — returns 200 and a json array of members",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+      },
+      "tags": [
+        "get",
+        "members",
+        "returns",
+        "200",
+        "json",
+        "array"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "f27fc852756729d05847c2462fa0045b72d54fbabbd006e068efa5f377a90ecc"
+    },
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": {
+      "canon_id": "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+      "type": "CONTEXT",
+      "statement": "get /members/:id — returns 200 and the member, or 404",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+      },
+      "tags": [
+        "get",
+        "membersid",
+        "returns",
+        "200",
+        "member",
+        "404"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "ea514ef8a990bd36651440a0331953366e007cd1d02ceb6efbdcb37a1d1e1b4d"
+    },
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": {
+      "canon_id": "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+      "type": "REQUIREMENT",
+      "statement": "The system returns 204 for DELETE /members/:id, returns 404 if no such member exists, or returns 409 if the member holds an active loan.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390"
+      ],
+      "link_types": {
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "relates_to",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines"
+      },
+      "tags": [
+        "delete",
+        "membersid",
+        "returns",
+        "204",
+        "404",
+        "there",
+        "member",
+        "409",
+        "they",
+        "hold",
+        "active",
+        "loan"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "1045981ed23ff05562e7b58de4ec4c2472eb6cc121023c5740d7f6ff1301e13b"
+    },
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": {
+      "canon_id": "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+      "type": "CONTEXT",
+      "statement": "post /books — adds a book; returns 201 and the created book",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f"
+      ],
+      "link_types": {
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": "refines",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": "refines"
+      },
+      "tags": [
+        "post",
+        "books",
+        "adds",
+        "book",
+        "returns",
+        "201",
+        "created"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "d51c24f1a7c930f3865200aae5026713e5f8a3e4267e14d84f454d568bb282e4"
+    },
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": {
+      "canon_id": "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+      "type": "CONTEXT",
+      "statement": "get /books — returns 200 and a json array of books; get /books?available=true returns only",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+      },
+      "tags": [
+        "get",
+        "books",
+        "returns",
+        "200",
+        "json",
+        "array",
+        "booksavailabletrue",
+        "only"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "541facd6f07cf022d2a9cb2199855b6a1160b51338f6a92fd956acbd58b53dd3"
+    },
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": {
+      "canon_id": "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+      "type": "CONSTRAINT",
+      "statement": "The system displays books with at least one copy available.",
+      "confidence": 0.3333333333333333,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643"
+      ],
+      "link_types": {
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": "refines",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines"
+      },
+      "tags": [
+        "books",
+        "least",
+        "one",
+        "copy",
+        "available"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "cf13f25df77f9729b832b24438af36d1362bff189039ff622c07d71b9d392c1a"
+    },
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": {
+      "canon_id": "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+      "type": "CONTEXT",
+      "statement": "get /books/:id — returns 200 and the book, or 404",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+      },
+      "tags": [
+        "get",
+        "booksid",
+        "returns",
+        "200",
+        "book",
+        "404"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "1d035e89233c38ecb3698687c9bce0d8dc68ccc6f0aeeb6ceef5f280e5ca470e"
+    },
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": {
+      "canon_id": "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+      "type": "CONTEXT",
+      "statement": "post /loans — borrows a book from a json body of { \"book_id\": n, \"member_id\": n }; returns 201",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5",
+        "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines",
+        "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e": "refines",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "refines"
+      },
+      "tags": [
+        "post",
+        "loans",
+        "borrows",
+        "book",
+        "json",
+        "body",
+        "bookid",
+        "memberid",
+        "returns",
+        "201"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "ad944900cf20238fb5ef98a60c76311d253154420b49d0460b84ddc0f514bc8f"
+    },
+    "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": {
+      "canon_id": "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f",
+      "type": "CONTEXT",
+      "statement": "and the created loan",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f"
+      ],
+      "link_types": {
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "refines",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines"
+      },
+      "tags": [
+        "created",
+        "loan"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "ab1d835da5aae6f1b1932cfc53f0b596bfce79dfa324aa0bed57f23b0e6b802a"
+    },
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": {
+      "canon_id": "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+      "type": "CONTEXT",
+      "statement": "get /loans — returns 200 and a json array of loans; get /loans?active=true returns only loans",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+        "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+        "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+      },
+      "tags": [
+        "get",
+        "loans",
+        "returns",
+        "200",
+        "json",
+        "array",
+        "loansactivetrue",
+        "only"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "03abb6516cd97fbae4fe574641fe95271fa4786eadeceaca203ff7fcb496f30c"
+    },
+    "c77debd06887b7e50bb2b6817fc7743a6ad6e834885ab1e2c2db1766af4774dc": {
+      "canon_id": "c77debd06887b7e50bb2b6817fc7743a6ad6e834885ab1e2c2db1766af4774dc",
+      "type": "CONTEXT",
+      "statement": "that have not been returned",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+      ],
+      "link_types": {
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+      },
+      "tags": [
+        "returned"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "c58410e140c2e17f2ec3d8b934ef9548dcd758a1a91970ccede13af239fa9814"
+    },
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": {
+      "canon_id": "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5",
+      "type": "REQUIREMENT",
+      "statement": "The POST /loans/:id/return endpoint returns 200 and the returned loan.",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee"
+      ],
+      "link_types": {
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "relates_to",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines"
+      },
+      "tags": [
+        "post",
+        "loansidreturn",
+        "returns",
+        "200",
+        "returned",
+        "loan"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "5fca595d1784edf088d2a608ab958444124b3143159fa177c0871d8c371dbf81"
+    },
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": {
+      "canon_id": "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+      "type": "CONTEXT",
+      "statement": "get /summary — returns 200 and",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "link_types": {
+        "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633": "refines",
+        "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+        "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+      },
+      "tags": [
+        "get",
+        "summary",
+        "returns",
+        "200"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "89e1b5a147d6b74945e1a1486dc163c63262064558bdb64dab6588a3acb1afc3"
+    },
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": {
+      "canon_id": "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+      "type": "CONTEXT",
+      "statement": "{ \"members\": n, \"books\": n, \"copies_on_loan\": n, \"active_loans\": n }",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "link_types": {
+        "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+        "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+        "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+        "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+        "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": "refines",
+        "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines"
+      },
+      "tags": [
+        "members",
+        "books",
+        "copiesonloan",
+        "activeloans"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "03457ef17b422c1afac6b7a3c35605c897abaf7e4548268a278cbaaecca0b2b0"
+    },
+    "4daa4f12ced4b7fe008ddbd8fada22bb7ecf318877299bfdda38c8ae74afcd06": {
+      "canon_id": "4daa4f12ced4b7fe008ddbd8fada22bb7ecf318877299bfdda38c8ae74afcd06",
+      "type": "CONTEXT",
+      "statement": "status codes carry meaning and are part of the contract:",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [],
+      "link_types": {},
+      "tags": [
+        "status",
+        "codes",
+        "carry",
+        "meaning",
+        "part",
+        "contract"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "5eba5b1a46b506f1601e1d452ed61630551c26bf04c10776ecfacc592cfb3876"
+    },
+    "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e": {
+      "canon_id": "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e",
+      "type": "CONTEXT",
+      "statement": "400 — the body is malformed or a field is invalid",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4"
+      ],
+      "link_types": {
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines"
+      },
+      "tags": [
+        "400",
+        "body",
+        "malformed",
+        "field",
+        "invalid"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "da7c376bd32eda0c06ededa4bd01a5a1af883d57bc15ca23eaff13cb06755538"
+    },
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": {
+      "canon_id": "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+      "type": "CONTEXT",
+      "statement": "404 — a named member, book or loan does not exist",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23"
+      ],
+      "link_types": {
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "refines",
+        "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+        "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "refines",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": "refines",
+        "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines"
+      },
+      "tags": [
+        "404",
+        "named",
+        "member",
+        "book",
+        "loan",
+        "exist"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "81958427a08fcb78cc335b0f23a0bef1d43ed60fcc7544dd5b3e1b64f9b50ce5"
+    },
+    "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": {
+      "canon_id": "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87",
+      "type": "CONTEXT",
+      "statement": "409 — the request was well formed and the library's rules forbid it: a duplicate email, a duplicate",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3"
+      ],
+      "link_types": {
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines"
+      },
+      "tags": [
+        "409",
+        "request",
+        "well",
+        "formed",
+        "librarys",
+        "rules",
+        "forbid",
+        "duplicate",
+        "email"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "e1ffde73572858251c7e3b13519da8c2b6659cb7cf5465f01856f1b50c7ad92f"
+    },
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": {
+      "canon_id": "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+      "type": "CONTEXT",
+      "statement": "isbn, a book with no copies available, a member already holding 3 loans, a loan returned twice, or removing a member who still holds one",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf"
+      ],
+      "link_types": {
+        "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+        "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+        "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "refines",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines"
+      },
+      "tags": [
+        "isbn",
+        "book",
+        "copies",
+        "available",
+        "member",
+        "already",
+        "holding",
+        "loans",
+        "loan",
+        "returned",
+        "twice",
+        "removing",
+        "who",
+        "still",
+        "holds",
+        "one"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "c65fae63c38f3a2562e557430640719317b6b8a3486db58277dc6a3d501e165a"
+    },
+    "e6e7dbc1f2b8b9b6397164cc107c7f2c599046f76849bfe7494b3d39d4f0bba6": {
+      "canon_id": "e6e7dbc1f2b8b9b6397164cc107c7f2c599046f76849bfe7494b3d39d4f0bba6",
+      "type": "CONTEXT",
+      "statement": "in every response:",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [],
+      "link_types": {},
+      "tags": [
+        "response"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "458cb1679b31839154a4e6bd28b69b5c36b960953a90a76c1cbc3ff74f7a3972"
+    },
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": {
+      "canon_id": "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+      "type": "DEFINITION",
+      "statement": "A member consists of id, name, email, joined_at, and active_loans, where active_loans is an integer.",
+      "confidence": 0.75,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab"
+      ],
+      "link_types": {
+        "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+        "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+        "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "defines",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "defines"
+      },
+      "tags": [
+        "member",
+        "id",
+        "name",
+        "email",
+        "joinedat",
+        "activeloans",
+        "integer"
+      ],
+      "extraction_method": "llm",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "e936cba60f9a9d40ba8ec83b0220e9d5832d91669bea08ca73518c1ae8a2593c"
+    },
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": {
+      "canon_id": "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23",
+      "type": "CONTEXT",
+      "statement": "a book is { id, title, author, isbn, copies_total, copies_available } where both counts are integers",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab"
+      ],
+      "link_types": {
+        "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+        "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+        "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "refines",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "refines"
+      },
+      "tags": [
+        "book",
+        "id",
+        "title",
+        "author",
+        "isbn",
+        "copiestotal",
+        "copiesavailable",
+        "counts",
+        "integers"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "e1866f4dd878c8b34a144c42d2268eb4e0861975fb2353b2ce3c7b6003918dfa"
+    },
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": {
+      "canon_id": "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab",
+      "type": "CONTEXT",
+      "statement": "a loan is { id, book_id, member_id, borrowed_at, due_at, returned_at } where returned_at is",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23"
+      ],
+      "link_types": {
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": "refines",
+        "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines",
+        "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "refines",
+        "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines"
+      },
+      "tags": [
+        "loan",
+        "id",
+        "bookid",
+        "memberid",
+        "borrowedat",
+        "dueat",
+        "returnedat"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "760ff57f72b1403da85547dfeec38a1d2792495fc9b222e72460a5bb1e862ab3"
+    },
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": {
+      "canon_id": "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245",
+      "type": "CONTEXT",
+      "statement": "null until the loan comes back",
+      "confidence": 1,
+      "source_clause_ids": [
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "linked_canon_ids": [
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+      ],
+      "link_types": {
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+        "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": "refines",
+        "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "refines",
+        "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+      },
+      "tags": [
+        "null",
+        "until",
+        "loan",
+        "comes",
+        "back"
+      ],
+      "extraction_method": "rule",
+      "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+      "canon_anchor": "fe532580cca1fadbfb6f855036d55c21e1c6d411a1bd806605db07f702477113"
+    }
+  },
+  "provenance": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": [
+      "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+    ],
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": [
+      "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+    ],
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": [
+      "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+    ],
+    "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d": [
+      "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+    ],
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": [
+      "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+    ],
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": [
+      "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+    ],
+    "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": [
+      "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+    ],
+    "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40": [
+      "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+    ],
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": [
+      "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+    ],
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": [
+      "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+    ],
+    "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633": [
+      "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+    ],
+    "f977437b8ae66264326a49a1e501d878fbd5819a4722b73b6d8f07374a629d1d": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "c77debd06887b7e50bb2b6817fc7743a6ad6e834885ab1e2c2db1766af4774dc": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "4daa4f12ced4b7fe008ddbd8fada22bb7ecf318877299bfdda38c8ae74afcd06": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "e6e7dbc1f2b8b9b6397164cc107c7f2c599046f76849bfe7494b3d39d4f0bba6": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ],
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": [
+      "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+    ]
+  }
+}

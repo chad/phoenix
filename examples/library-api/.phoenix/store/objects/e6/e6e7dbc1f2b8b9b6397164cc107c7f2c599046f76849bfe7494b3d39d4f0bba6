@@ -1,0 +1,17 @@
+{
+  "canon_id": "e6e7dbc1f2b8b9b6397164cc107c7f2c599046f76849bfe7494b3d39d4f0bba6",
+  "type": "CONTEXT",
+  "statement": "in every response:",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [],
+  "link_types": {},
+  "tags": [
+    "response"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "458cb1679b31839154a4e6bd28b69b5c36b960953a90a76c1cbc3ff74f7a3972"
+}

@@ -1,0 +1,33 @@
+{
+  "canon_id": "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b",
+  "type": "CONTEXT",
+  "statement": "it is due back, and when it was returned",
+  "confidence": 1,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+    "c77debd06887b7e50bb2b6817fc7743a6ad6e834885ab1e2c2db1766af4774dc",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245"
+  ],
+  "link_types": {
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+    "c77debd06887b7e50bb2b6817fc7743a6ad6e834885ab1e2c2db1766af4774dc": "refines",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines"
+  },
+  "tags": [
+    "due",
+    "back",
+    "returned"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "5e84a26693ebd89cf6e49dbf08501f9af9410ee7a1a83cc6a3638c73c6cf4a33"
+}

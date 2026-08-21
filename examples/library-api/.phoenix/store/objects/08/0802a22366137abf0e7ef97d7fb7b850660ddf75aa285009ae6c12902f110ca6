@@ -1,0 +1,38 @@
+{
+  "canon_id": "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+  "type": "CONTEXT",
+  "statement": "{ \"members\": n, \"books\": n, \"copies_on_loan\": n, \"active_loans\": n }",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+  ],
+  "link_types": {
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": "refines",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines"
+  },
+  "tags": [
+    "members",
+    "books",
+    "copiesonloan",
+    "activeloans"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "03457ef17b422c1afac6b7a3c35605c897abaf7e4548268a278cbaaecca0b2b0"
+}

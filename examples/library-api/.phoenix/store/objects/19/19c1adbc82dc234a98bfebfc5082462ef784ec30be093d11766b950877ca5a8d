@@ -1,0 +1,50 @@
+{
+  "canon_id": "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+  "type": "CONTEXT",
+  "statement": "get /books — returns 200 and a json array of books; get /books?available=true returns only",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+  ],
+  "link_types": {
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+  },
+  "tags": [
+    "get",
+    "books",
+    "returns",
+    "200",
+    "json",
+    "array",
+    "booksavailabletrue",
+    "only"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "541facd6f07cf022d2a9cb2199855b6a1160b51338f6a92fd956acbd58b53dd3"
+}

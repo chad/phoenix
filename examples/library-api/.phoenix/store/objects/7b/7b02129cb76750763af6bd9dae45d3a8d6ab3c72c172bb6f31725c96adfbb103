@@ -1,0 +1,15 @@
+{
+  "clause_id": "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103",
+  "source_doc_id": "spec/library.md",
+  "source_line_range": [
+    1,
+    5
+  ],
+  "raw_text": "# Library Loans\n\nA lending service for a small library. It tracks members, the books the library owns,\nand the loans between them. Other systems drive it over HTTP.\n",
+  "normalized_text": "library loans\na lending service for a small library. it tracks members, the books the library owns,\nand the loans between them. other systems drive it over http.",
+  "section_path": [
+    "Library Loans"
+  ],
+  "clause_semhash": "d2e6c828a67e016e6b1e6189d2ccf35f73786f1c6d58f82073350514b7821c27",
+  "context_semhash_cold": "8ed7108246a0e391d9a10fbcb88d4301c33121909be398de9d19151b8daa6c99"
+}

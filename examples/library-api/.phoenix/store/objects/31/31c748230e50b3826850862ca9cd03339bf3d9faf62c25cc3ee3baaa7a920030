@@ -1,0 +1,41 @@
+{
+  "canon_id": "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+  "type": "CONSTRAINT",
+  "statement": "A member's name must not exceed 120 characters.",
+  "confidence": 1,
+  "source_clause_ids": [
+    "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+  ],
+  "linked_canon_ids": [
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+  ],
+  "link_types": {
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "constrains",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines"
+  },
+  "tags": [
+    "members",
+    "name",
+    "exceed",
+    "120",
+    "characters"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "cdae3bf0e413b8bcdd57fd6a3edf1f60817dc5bb1c32b530dc7f862c19bd0e79"
+}

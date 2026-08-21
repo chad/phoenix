@@ -1,0 +1,35 @@
+{
+  "canon_id": "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab",
+  "type": "CONTEXT",
+  "statement": "a loan is { id, book_id, member_id, borrowed_at, due_at, returned_at } where returned_at is",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23"
+  ],
+  "link_types": {
+    "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": "refines",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "refines",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines"
+  },
+  "tags": [
+    "loan",
+    "id",
+    "bookid",
+    "memberid",
+    "borrowedat",
+    "dueat",
+    "returnedat"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "760ff57f72b1403da85547dfeec38a1d2792495fc9b222e72460a5bb1e862ab3"
+}

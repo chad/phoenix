@@ -1,0 +1,41 @@
+{
+  "canon_id": "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23",
+  "type": "CONTEXT",
+  "statement": "a book is { id, title, author, isbn, copies_total, copies_available } where both counts are integers",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab"
+  ],
+  "link_types": {
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "refines",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "refines"
+  },
+  "tags": [
+    "book",
+    "id",
+    "title",
+    "author",
+    "isbn",
+    "copiestotal",
+    "copiesavailable",
+    "counts",
+    "integers"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "e1866f4dd878c8b34a144c42d2268eb4e0861975fb2353b2ce3c7b6003918dfa"
+}

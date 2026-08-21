@@ -1,0 +1,25 @@
+{
+  "canon_id": "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d",
+  "type": "CONTEXT",
+  "statement": "loans",
+  "confidence": 1,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1"
+  ],
+  "link_types": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines"
+  },
+  "tags": [
+    "loans"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "9c28ff6ef4315dcafec3592bd06ec66a576e313f2fa278e26c22f8126265f08f"
+}

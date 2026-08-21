@@ -139,6 +139,23 @@ Set `PHOENIX_NO_LLM=1` to force deterministic stub generation (offline / reprodu
 
 ## Examples
 
+### [library-api](examples/library-api/) — **start here**
+
+The demo. A lending service — members, books, loans — generated from a
+[118-line spec](examples/library-api/spec/library.md) with three related entities, derived
+availability counts, a borrowing limit, and rules that answer `409` rather than `400`. This
+build passes **51/51** of the bench's independent behavioural checks, driven against the
+booted service over HTTP.
+
+```bash
+cd examples/library-api && npm install && npm run dev
+```
+
+It ships its `.phoenix/` state, so `phoenix why`, `journal --verify`, `ingest` and selective
+regeneration all work straight from a clone — including the honest parts: `phoenix status`
+reports 3 errors and 13 warnings on a service that passes every behavioural check, and the
+README explains why both are true. See [the walkthrough](examples/library-api/README.md).
+
 ### [todo-app](examples/todo-app/)
 
 A Todoist-style task manager generated from a [user-centric spec](examples/todo-app/spec/todos.md). Features:

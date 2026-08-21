@@ -1,0 +1,16 @@
+{
+  "clause_id": "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44",
+  "source_doc_id": "spec/library.md",
+  "source_line_range": [
+    35,
+    50
+  ],
+  "raw_text": "## Loans\n\n- A loan records which book was borrowed, which member borrowed it, when it was borrowed, when\n  it is due back, and when it was returned\n- Every loan must have a stable unique integer identifier\n- Users can borrow a book by naming an existing book and an existing member\n- Borrowing a book that does not exist, or naming a member who does not exist, is a not-found error\n- A loan is due 14 days after it is borrowed\n- A book with no available copies cannot be borrowed; that is a conflict\n- A member may have at most 3 active loans at once; a fourth is a conflict\n- An active loan is one that has not been returned\n- Users can return a loan; returning it records when it came back and makes the copy available again\n- Returning a loan that has already been returned is a conflict\n- Returning a loan that does not exist is a not-found error\n- Users can list every loan, and can list only the active ones\n",
+  "normalized_text": "loans\na loan records which book was borrowed, which member borrowed it, when it was borrowed, when\nit is due back, and when it was returned\na book with no available copies cannot be borrowed; that is a conflict\na loan is due 14 days after it is borrowed\na member may have at most 3 active loans at once; a fourth is a conflict\nan active loan is one that has not been returned\nborrowing a book that does not exist, or naming a member who does not exist, is a not-found error\nevery loan must have a stable unique integer identifier\nreturning a loan that does not exist is a not-found error\nreturning a loan that has already been returned is a conflict\nusers can borrow a book by naming an existing book and an existing member\nusers can list every loan, and can list only the active ones\nusers can return a loan; returning it records when it came back and makes the copy available again",
+  "section_path": [
+    "Library Loans",
+    "Loans"
+  ],
+  "clause_semhash": "65bd1a336ac193c65e72c88b915b20ece6aaae3dcd429ccd9f97fe5d9a833b01",
+  "context_semhash_cold": "9ecfbce423a0be4beca03bfb4cb298ccd32d495748417c3eed29d54fb98e3a6b"
+}

@@ -1,0 +1,25 @@
+{
+  "canon_id": "e66559a79e65a6490cee56d022367b674cfe3d23308d307710aa4f7540221f40",
+  "type": "CONTEXT",
+  "statement": "summary",
+  "confidence": 1,
+  "source_clause_ids": [
+    "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f"
+  ],
+  "linked_canon_ids": [
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+    "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee"
+  ],
+  "link_types": {
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+    "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633": "refines",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines"
+  },
+  "tags": [
+    "summary"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "b53394df6bcd74b45186005d6b544e6c226bd85c929c25994ee8d7b1d7c8512d"
+}

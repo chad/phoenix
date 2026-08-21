@@ -1,0 +1,25 @@
+{
+  "canon_id": "42ce1370fdced2125fd86443419e4c7877cfb831b594562083b1daeffebf472e",
+  "type": "CONTEXT",
+  "statement": "400 — the body is malformed or a field is invalid",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4"
+  ],
+  "link_types": {
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines"
+  },
+  "tags": [
+    "400",
+    "body",
+    "malformed",
+    "field",
+    "invalid"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "da7c376bd32eda0c06ededa4bd01a5a1af883d57bc15ca23eaff13cb06755538"
+}

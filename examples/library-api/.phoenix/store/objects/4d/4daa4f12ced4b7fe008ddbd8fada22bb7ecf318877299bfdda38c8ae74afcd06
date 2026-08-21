@@ -1,0 +1,22 @@
+{
+  "canon_id": "4daa4f12ced4b7fe008ddbd8fada22bb7ecf318877299bfdda38c8ae74afcd06",
+  "type": "CONTEXT",
+  "statement": "status codes carry meaning and are part of the contract:",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [],
+  "link_types": {},
+  "tags": [
+    "status",
+    "codes",
+    "carry",
+    "meaning",
+    "part",
+    "contract"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "5eba5b1a46b506f1601e1d452ed61630551c26bf04c10776ecfacc592cfb3876"
+}

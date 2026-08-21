@@ -1,0 +1,37 @@
+{
+  "canon_id": "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87",
+  "type": "CONTEXT",
+  "statement": "409 — the request was well formed and the library's rules forbid it: a duplicate email, a duplicate",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3"
+  ],
+  "link_types": {
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines"
+  },
+  "tags": [
+    "409",
+    "request",
+    "well",
+    "formed",
+    "librarys",
+    "rules",
+    "forbid",
+    "duplicate",
+    "email"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "e1ffde73572858251c7e3b13519da8c2b6659cb7cf5465f01856f1b50c7ad92f"
+}

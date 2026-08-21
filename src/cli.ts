@@ -2596,6 +2596,37 @@ function cmdIngest(args: string[]): void {
     saveBootstrapState(phoenixDir, machine);
   }
 
+  // A trivial edit must not disconnect the graph. A clause is addressed by
+  // sha256(doc + normalized_text), and the normalizer's "formatting" is narrower than the
+  // classifier's class A — a trailing full stop re-keys the clause while being classified
+  // trivial. Left alone, the canonical graph keeps pointing at the vanished id and the
+  // NEXT real edit to that clause invalidates nothing at all: the defining capability,
+  // silently off, after a cosmetic change. So the graph follows the address.
+  {
+    const remap = new Map<string, string>();
+    for (const { diff, classification } of allChanges) {
+      if (classification.change_class !== 'A') continue;
+      if (diff.diff_type !== DiffType.MODIFIED) continue;
+      const before = diff.clause_before?.clause_id;
+      const after = diff.clause_after?.clause_id;
+      if (before && after && before !== after) remap.set(before, after);
+    }
+    const rewritten = remap.size > 0 ? canonStoreForClass.rekeyClauseReferences(remap) : 0;
+    if (rewritten > 0) {
+      // Keep the in-memory copy the invalidation walk is about to use in step with disk.
+      for (const node of canonNodesBefore) {
+        node.source_clause_ids = [...new Set(node.source_clause_ids.map(id => remap.get(id) ?? id))];
+      }
+      console.log(`  ${dim(`Re-keyed ${rewritten} canonical node(s) after ${remap.size} trivial edit(s) — provenance preserved`)}`);
+      new Journal(phoenixDir).append({
+        type: 'ingest',
+        inputs: [...remap.keys()],
+        outputs: [...remap.values()],
+        meta: { rekey: true, reason: 'class-A edit changed the clause address; canonical references followed', nodes: rewritten },
+      });
+    }
+  }
+
   // Selective invalidation — the defining capability. Walk the changed clauses
   // through canon → IU → dependents and persist exactly which IUs are stale.
   let invalidationSummary: { stale: number; revalidate: number; canonStale: boolean } | null = null;

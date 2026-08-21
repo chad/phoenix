@@ -1,0 +1,43 @@
+{
+  "canon_id": "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+  "type": "CONTEXT",
+  "statement": "it tracks members, the books the library owns, and the loans between them.",
+  "confidence": 1,
+  "source_clause_ids": [
+    "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+  ],
+  "linked_canon_ids": [
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+    "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d",
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad"
+  ],
+  "link_types": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+    "ca3bcf0591b02308aea4ea10c3cfab53a4de11d91e82cd27c4f3399d0895050d": "refines",
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines"
+  },
+  "tags": [
+    "tracks",
+    "members",
+    "books",
+    "library",
+    "owns",
+    "loans",
+    "between",
+    "them"
+  ],
+  "extraction_method": "rule",
+  "canon_anchor": "7d872d4db6db3f4d2dace415d9625c55ccc015f78d506f0f66b616f81a8a5ffc"
+}

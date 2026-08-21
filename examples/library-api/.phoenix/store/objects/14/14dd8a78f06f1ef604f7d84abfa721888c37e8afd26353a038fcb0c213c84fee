@@ -1,0 +1,41 @@
+{
+  "canon_id": "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+  "type": "DEFINITION",
+  "statement": "Returning a loan that does not exist produces a not-found error.",
+  "confidence": 0.75,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed"
+  ],
+  "link_types": {
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "refines",
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "refines",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "defines"
+  },
+  "tags": [
+    "not-found",
+    "returning",
+    "loan",
+    "exist",
+    "error"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "8fac411515402ec61f4f162f6cdf3fd893143bdc1bb77a534172fc7447095f4a"
+}

@@ -1,0 +1,517 @@
+{
+  "evaluations": [
+    {
+      "eval_id": "abae2859f971d546",
+      "name": "book supports: The system assigns every book a stable unique",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "book supports: The system assigns every book a stable unique inte",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"The system assigns every book a stable unique integer identi\"",
+      "created_at": "2026-08-21T17:17:27.323Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "4c7bee859fbb5b67",
+      "name": "book rejects input violating: The book's title and author mu",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "book rejects input violating: The book's title and author must not be empty.",
+      "given": "a request to book",
+      "when": "the input violates \"The book's title and author must not be \"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"The book's title and author must not be empty.\"",
+      "created_at": "2026-08-21T17:17:27.323Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "e25f1d1c780c8fae",
+      "name": "book maintains: The system never allows two books to share t",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "binding": "invariant",
+      "origin": "specified",
+      "assertion": "book maintains: The system never allows two books to share the sam",
+      "given": "any sequence of operations on book",
+      "when": "the state is observed",
+      "then": "the property \"The system never allows two books to sha\" holds",
+      "canon_ids": [
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f"
+      ],
+      "conservation": false,
+      "rationale": "Derived from INVARIANT \"The system never allows two books to share the same ISBN; th\"",
+      "created_at": "2026-08-21T17:17:27.323Z",
+      "last_status": "untested",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "8ad078880612e76e",
+      "name": "book rejects input violating: The copy count must be a whole",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "book rejects input violating: The copy count must be a whole number of at least ",
+      "given": "a request to book",
+      "when": "the input violates \"The copy count must be a whole number of\"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"The copy count must be a whole number of at least 1.\"",
+      "created_at": "2026-08-21T17:17:27.323Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "1c6e040a53ed4379",
+      "name": "book maintains: The number of copies currently out on loan m",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "binding": "invariant",
+      "origin": "specified",
+      "assertion": "book maintains: The number of copies currently out on loan must ne",
+      "given": "any sequence of operations on book",
+      "when": "the state is observed",
+      "then": "the property \"The number of copies currently out on lo\" holds",
+      "canon_ids": [
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c"
+      ],
+      "conservation": false,
+      "rationale": "Derived from INVARIANT \"The number of copies currently out on loan must never be neg\"",
+      "created_at": "2026-08-21T17:17:27.323Z",
+      "last_status": "fail",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "e07a98054de64d0c",
+      "name": "book rejects input violating: The system displays only books",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "book rejects input violating: The system displays only books that have at least ",
+      "given": "a request to book",
+      "when": "the input violates \"The system displays only books that have\"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"The system displays only books that have at least one copy a\"",
+      "created_at": "2026-08-21T17:17:27.323Z",
+      "last_status": "untested",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "f282ef1c632515f3",
+      "name": "book rejects input violating: The system displays books with",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "book rejects input violating: The system displays books with at least one copy a",
+      "given": "a request to book",
+      "when": "the input violates \"The system displays books with at least \"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"The system displays books with at least one copy available.\"",
+      "created_at": "2026-08-21T17:17:27.323Z",
+      "last_status": "untested",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "b633601f4c9e1226",
+      "name": "loan supports: The system assigns every loan a stable unique",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "loan supports: The system assigns every loan a stable unique inte",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"The system assigns every loan a stable unique integer identi\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "5a3f53952433772a",
+      "name": "loan exposes the not-found shape",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "boundary_contract",
+      "origin": "specified",
+      "assertion": "loan exposes the not-found shape",
+      "given": "the loan module",
+      "when": "its contract is inspected",
+      "then": "it defines not-found, classifies, borrowing",
+      "canon_ids": [
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b"
+      ],
+      "conservation": true,
+      "rationale": "Derived from DEFINITION \"The system classifies borrowing a book that does not exist o\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "64fbfea0af4652ac",
+      "name": "loan rejects input violating: The system cannot allow borrow",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "loan rejects input violating: The system cannot allow borrowing of a book with n",
+      "given": "a request to loan",
+      "when": "the input violates \"The system cannot allow borrowing of a b\"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"The system cannot allow borrowing of a book with no availabl\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "untested",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "d7deae61fbd04f55",
+      "name": "loan exposes the member shape",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "boundary_contract",
+      "origin": "specified",
+      "assertion": "loan exposes the member shape",
+      "given": "the loan module",
+      "when": "its contract is inspected",
+      "then": "it defines member, active, loans",
+      "canon_ids": [
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6"
+      ],
+      "conservation": true,
+      "rationale": "Derived from DEFINITION \"A member has at most 3 active loans at once, and a fourth ac\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "e56197cc58f35ea9",
+      "name": "loan supports: The user returns a loan, the system records t",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "loan supports: The user returns a loan, the system records the re",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"The user returns a loan, the system records the return date,\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "69cf7fb3cd778ddf",
+      "name": "loan exposes the returning shape",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "boundary_contract",
+      "origin": "specified",
+      "assertion": "loan exposes the returning shape",
+      "given": "the loan module",
+      "when": "its contract is inspected",
+      "then": "it defines returning, loan, already",
+      "canon_ids": [
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293"
+      ],
+      "conservation": true,
+      "rationale": "Derived from DEFINITION \"Returning a loan that has already been returned constitutes \"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "59a438e1f9a5a2b9",
+      "name": "loan exposes the not-found shape",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "boundary_contract",
+      "origin": "specified",
+      "assertion": "loan exposes the not-found shape",
+      "given": "the loan module",
+      "when": "its contract is inspected",
+      "then": "it defines not-found, returning, loan",
+      "canon_ids": [
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee"
+      ],
+      "conservation": true,
+      "rationale": "Derived from DEFINITION \"Returning a loan that does not exist produces a not-found er\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "df0c5accb2f6fbfe",
+      "name": "loan supports: The POST /loans/:id/return endpoint returns 2",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "loan supports: The POST /loans/:id/return endpoint returns 200 an",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"The POST /loans/:id/return endpoint returns 200 and the retu\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "554d44c1378c19f5",
+      "name": "member supports: The system assigns every member a stable un",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "member supports: The system assigns every member a stable unique in",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"The system assigns every member a stable unique integer iden\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "98da9765ee7e4ea0",
+      "name": "member rejects input violating: The member's name must not b",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "member rejects input violating: The member's name must not be empty.",
+      "given": "a request to member",
+      "when": "the input violates \"The member's name must not be empty.\"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"The member's name must not be empty.\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "6b731d7377f2d8a8",
+      "name": "member rejects input violating: A member's name must not exc",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "member rejects input violating: A member's name must not exceed 120 characters.",
+      "given": "a request to member",
+      "when": "the input violates \"A member's name must not exceed 120 char\"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"A member's name must not exceed 120 characters.\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "a18dd44801153c19",
+      "name": "member supports: A member's email address must contain an @ ",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "member supports: A member's email address must contain an @ symbol.",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"A member's email address must contain an @ symbol.\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "9f729b179d3c4c6b",
+      "name": "member rejects input violating: A member's email address mus",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "failure_mode",
+      "origin": "specified",
+      "assertion": "member rejects input violating: A member's email address must not be empty.",
+      "given": "a request to member",
+      "when": "the input violates \"A member's email address must not be emp\"",
+      "then": "the operation is rejected with an error",
+      "canon_ids": [
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2"
+      ],
+      "conservation": false,
+      "rationale": "Derived from CONSTRAINT \"A member's email address must not be empty.\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "02c92568a937e10f",
+      "name": "member maintains: The system must never allow two members to",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "invariant",
+      "origin": "specified",
+      "assertion": "member maintains: The system must never allow two members to share t",
+      "given": "any sequence of operations on member",
+      "when": "the state is observed",
+      "then": "the property \"The system must never allow two members \" holds",
+      "canon_ids": [
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3"
+      ],
+      "conservation": false,
+      "rationale": "Derived from INVARIANT \"The system must never allow two members to share the same em\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "untested",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "37c2bed91ce86720",
+      "name": "member exposes the email shape",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "boundary_contract",
+      "origin": "specified",
+      "assertion": "member exposes the email shape",
+      "given": "the member module",
+      "when": "its contract is inspected",
+      "then": "it defines email, conflict, validation",
+      "canon_ids": [
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3"
+      ],
+      "conservation": true,
+      "rationale": "Derived from DEFINITION \"Email is a conflict, not a validation error.\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "54586beb0957b94c",
+      "name": "member exposes the one shape",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "boundary_contract",
+      "origin": "specified",
+      "assertion": "member exposes the one shape",
+      "given": "the member module",
+      "when": "its contract is inspected",
+      "then": "it defines one, relationship, constitutes",
+      "canon_ids": [
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011"
+      ],
+      "conservation": true,
+      "rationale": "Derived from DEFINITION \"One \"has\" relationship constitutes one conflict.\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "fail",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "3e06f2a09a40def1",
+      "name": "member maintains: Removing a member never deletes that membe",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "invariant",
+      "origin": "specified",
+      "assertion": "member maintains: Removing a member never deletes that member's retu",
+      "given": "any sequence of operations on member",
+      "when": "the state is observed",
+      "then": "the property \"Removing a member never deletes that mem\" holds",
+      "canon_ids": [
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2"
+      ],
+      "conservation": false,
+      "rationale": "Derived from INVARIANT \"Removing a member never deletes that member's returned loan \"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "untested",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "2b648144e9d3b1d2",
+      "name": "member supports: The system returns 204 for DELETE /members/",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "member supports: The system returns 204 for DELETE /members/:id, re",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"The system returns 204 for DELETE /members/:id, returns 404 \"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "85a65d1363b21b29",
+      "name": "member exposes the member shape",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "binding": "boundary_contract",
+      "origin": "specified",
+      "assertion": "member exposes the member shape",
+      "given": "the member module",
+      "when": "its contract is inspected",
+      "then": "it defines member, consists, name",
+      "canon_ids": [
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "conservation": true,
+      "rationale": "Derived from DEFINITION \"A member consists of id, name, email, joined_at, and active_\"",
+      "created_at": "2026-08-21T17:17:27.324Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "eval_id": "4eec6902b2190301",
+      "name": "summary supports: The summary reflects every change immediat",
+      "iu_id": "4becec2b5cf6add402c248133e7f6f49e68798896fc7549465238e4627867613",
+      "binding": "domain_rule",
+      "origin": "specified",
+      "assertion": "summary supports: The summary reflects every change immediately.",
+      "given": "a valid request",
+      "when": "the capability is exercised",
+      "then": "the expected outcome is produced",
+      "canon_ids": [
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633"
+      ],
+      "conservation": false,
+      "rationale": "Derived from REQUIREMENT \"The summary reflects every change immediately.\"",
+      "created_at": "2026-08-21T17:17:27.325Z",
+      "last_status": "pass",
+      "last_verified_at": "2026-08-21T17:17:27.323Z"
+    }
+  ]
+}

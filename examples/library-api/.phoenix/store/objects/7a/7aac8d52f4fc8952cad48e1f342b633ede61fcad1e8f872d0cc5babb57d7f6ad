@@ -1,0 +1,39 @@
+{
+  "canon_id": "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+  "type": "CONTEXT",
+  "statement": "the service exposes exactly these routes, and answers json on all of them:",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1"
+  ],
+  "link_types": {
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines"
+  },
+  "tags": [
+    "service",
+    "exposes",
+    "exactly",
+    "routes",
+    "answers",
+    "json",
+    "them"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "d38fb51c707763aace8b4e0d81949f0f6ec9ef713319f22ebfbe4348115b731a"
+}

@@ -1,0 +1,44 @@
+{
+  "canon_id": "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+  "type": "CONTEXT",
+  "statement": "users can borrow a book by naming an existing book and an existing member",
+  "confidence": 1,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3"
+  ],
+  "link_types": {
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+    "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines"
+  },
+  "tags": [
+    "users",
+    "borrow",
+    "book",
+    "naming",
+    "existing",
+    "member"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "7976adb34980e1f09b1654d4d540789b708f3880f184c0d90ab01f44a5a825f5"
+}

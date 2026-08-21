@@ -1,0 +1,45 @@
+{
+  "canon_id": "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+  "type": "DEFINITION",
+  "statement": "Returning a loan that has already been returned constitutes a conflict.",
+  "confidence": 0.75,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+  ],
+  "link_types": {
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "refines",
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "defines",
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+  },
+  "tags": [
+    "returning",
+    "loan",
+    "already",
+    "returned",
+    "conflict"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "207521dfc0abe8fd55595833a3189aba57ba85f626c48fe727218eff93a4586d"
+}

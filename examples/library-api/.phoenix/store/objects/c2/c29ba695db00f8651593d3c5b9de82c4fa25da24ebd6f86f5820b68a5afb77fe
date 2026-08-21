@@ -1,0 +1,49 @@
+{
+  "canon_id": "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+  "type": "DEFINITION",
+  "statement": "A member consists of id, name, email, joined_at, and active_loans, where active_loans is an integer.",
+  "confidence": 0.75,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab"
+  ],
+  "link_types": {
+    "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce": "refines",
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "defines",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "defines"
+  },
+  "tags": [
+    "member",
+    "id",
+    "name",
+    "email",
+    "joinedat",
+    "activeloans",
+    "integer"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "e936cba60f9a9d40ba8ec83b0220e9d5832d91669bea08ca73518c1ae8a2593c"
+}

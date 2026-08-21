@@ -1,0 +1,37 @@
+{
+  "canon_id": "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+  "type": "REQUIREMENT",
+  "statement": "The system assigns every loan a stable unique integer identifier.",
+  "confidence": 0.5,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905"
+  ],
+  "link_types": {
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "relates_to",
+    "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c": "refines",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines"
+  },
+  "tags": [
+    "loan",
+    "stable",
+    "unique",
+    "integer",
+    "identifier"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "e17d43a9dabe5a17e21c55a727319b9b44fb274f47db5dd65e473261213e6363"
+}

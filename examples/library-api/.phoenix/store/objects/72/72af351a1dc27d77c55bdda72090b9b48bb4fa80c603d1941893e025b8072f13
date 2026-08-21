@@ -1,0 +1,38 @@
+{
+  "canon_id": "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+  "type": "CONSTRAINT",
+  "statement": "The book's title and author must not be empty.",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+  ],
+  "linked_canon_ids": [
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23"
+  ],
+  "link_types": {
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": "refines",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines"
+  },
+  "tags": [
+    "books",
+    "title",
+    "author",
+    "empty"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "7d3f512d5148469c706e24b8fec37aff7da4d7e27a535e6838815a565e37f378"
+}

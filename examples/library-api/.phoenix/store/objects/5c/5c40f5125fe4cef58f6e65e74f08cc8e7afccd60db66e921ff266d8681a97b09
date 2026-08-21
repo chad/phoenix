@@ -1,0 +1,16 @@
+{
+  "clause_id": "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09",
+  "source_doc_id": "spec/library.md",
+  "source_line_range": [
+    6,
+    20
+  ],
+  "raw_text": "## Members\n\n- A member has a name, an email address, and the date they joined\n- Every member must have a stable unique integer identifier that external systems can reference\n- Users can register a member by providing a name and an email address\n- A member's name must not be empty and must not exceed 120 characters\n- A member's email address must contain an `@` and must not be empty\n- Two members must never share the same email address; a registration that repeats an existing\n  email is a conflict, not a validation error\n- Users can list every member\n- Users can read a single member, including how many loans that member currently has out\n- Users can remove a member only when that member has no active loan; removing a member who still\n  has one is a conflict\n- Removing a member must never delete that member's returned loan history\n",
+  "normalized_text": "members\na member has a name, an email address, and the date they joined\na member's email address must contain an @ and must not be empty\na member's name must not be empty and must not exceed 120 characters\nevery member must have a stable unique integer identifier that external systems can reference\ntwo members must never share the same email address; a registration that repeats an existing\nusers can register a member by providing a name and an email address\nemail is a conflict, not a validation error\nusers can list every member\nusers can read a single member, including how many loans that member currently has out\nusers can remove a member only when that member has no active loan; removing a member who still\nhas one is a conflict\nremoving a member must never delete that member's returned loan history",
+  "section_path": [
+    "Library Loans",
+    "Members"
+  ],
+  "clause_semhash": "08d72ea837994bc70c5acef0dbdfb5e67f611657319a57b981b33aa95f3681e8",
+  "context_semhash_cold": "0be43cfab43edcdfd128952a28a2d5f0928859bf42eb5fdf3edcbebb8753db0f"
+}

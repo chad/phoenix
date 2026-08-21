@@ -1,0 +1,58 @@
+{
+  "canon_id": "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+  "type": "CONTEXT",
+  "statement": "isbn, a book with no copies available, a member already holding 3 loans, a loan returned twice, or removing a member who still holds one",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf"
+  ],
+  "link_types": {
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "refines",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "refines",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines"
+  },
+  "tags": [
+    "isbn",
+    "book",
+    "copies",
+    "available",
+    "member",
+    "already",
+    "holding",
+    "loans",
+    "loan",
+    "returned",
+    "twice",
+    "removing",
+    "who",
+    "still",
+    "holds",
+    "one"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "c65fae63c38f3a2562e557430640719317b6b8a3486db58277dc6a3d501e165a"
+}

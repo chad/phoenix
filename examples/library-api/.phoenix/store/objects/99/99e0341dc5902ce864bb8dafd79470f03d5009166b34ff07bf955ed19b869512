@@ -1,0 +1,43 @@
+{
+  "canon_id": "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+  "type": "CONTEXT",
+  "statement": "the available count is the number of copies the library owns minus the number of copies",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+  ],
+  "linked_canon_ids": [
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf"
+  ],
+  "link_types": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+    "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223": "refines",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines"
+  },
+  "tags": [
+    "available",
+    "count",
+    "number",
+    "copies",
+    "library",
+    "owns",
+    "minus"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "9bb3605a2d7a141f1c90afe0fe4aa5e9e6072cf4027a078fa197565564bc6f34"
+}

@@ -1,0 +1,34 @@
+{
+  "canon_id": "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+  "type": "DEFINITION",
+  "statement": "One \"has\" relationship constitutes one conflict.",
+  "confidence": 0.5,
+  "source_clause_ids": [
+    "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+  ],
+  "linked_canon_ids": [
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+  ],
+  "link_types": {
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "defines",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "defines",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "defines",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "defines"
+  },
+  "tags": [
+    "one",
+    "conflict"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "cca6cd82139c45e4efa98604d0cbfda06e5faf9693ed17c8c969bb9f33e5003b"
+}

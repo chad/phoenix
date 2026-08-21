@@ -1,0 +1,49 @@
+{
+  "canon_id": "8662edcfed4bc73627b78d8f6bc2f02d28e0d25b25d2be0dbc25c5606cf28cce",
+  "type": "CONTEXT",
+  "statement": "a member has a name, an email address, and the date they joined",
+  "confidence": 1,
+  "source_clause_ids": [
+    "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+  ],
+  "linked_canon_ids": [
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+    "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87"
+  ],
+  "link_types": {
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+    "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33": "refines",
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+    "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0": "refines",
+    "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2": "refines",
+    "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3": "refines",
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "defines",
+    "cd658c20788da22692544c9a437f7083aeed3c4ed9ba08304e45fbb89f075c87": "refines"
+  },
+  "tags": [
+    "member",
+    "name",
+    "email",
+    "address",
+    "date",
+    "they",
+    "joined"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "a304dc13fbc14d0e78517295826639192489c303005ddb54af5361c48012b613"
+}

@@ -1,0 +1,46 @@
+{
+  "canon_id": "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+  "type": "CONTEXT",
+  "statement": "404 — a named member, book or loan does not exist",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+    "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23"
+  ],
+  "link_types": {
+    "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "refines",
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "refines",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "refines",
+    "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f": "refines",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines"
+  },
+  "tags": [
+    "404",
+    "named",
+    "member",
+    "book",
+    "loan",
+    "exist"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "81958427a08fcb78cc335b0f23a0bef1d43ed60fcc7544dd5b3e1b64f9b50ce5"
+}

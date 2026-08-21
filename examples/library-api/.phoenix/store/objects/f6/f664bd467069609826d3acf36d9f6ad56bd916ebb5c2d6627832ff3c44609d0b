@@ -1,0 +1,46 @@
+{
+  "canon_id": "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+  "type": "DEFINITION",
+  "statement": "The system classifies borrowing a book that does not exist or naming a member who does not exist as a not-found error.",
+  "confidence": 0.75,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f",
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1"
+  ],
+  "link_types": {
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "defines",
+    "fcdc7e371a9c2084a3aec8826823ba249c339c7b0b0c90f515d0909a4abdc94f": "defines",
+    "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3": "refines",
+    "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f": "refines",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+    "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92": "refines",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines"
+  },
+  "tags": [
+    "not-found",
+    "borrowing",
+    "book",
+    "exist",
+    "naming",
+    "member",
+    "who",
+    "error"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "d78cf7001c163c47abfccac8a2db2a6c98e42fbb1f5fa511f83da14ca1b6141b"
+}

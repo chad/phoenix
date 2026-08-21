@@ -1,0 +1,35 @@
+{
+  "canon_id": "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+  "type": "CONSTRAINT",
+  "statement": "The copy count must be a whole number of at least 1.",
+  "confidence": 0.5,
+  "source_clause_ids": [
+    "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+  ],
+  "linked_canon_ids": [
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+  ],
+  "link_types": {
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "constrains",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "refines"
+  },
+  "tags": [
+    "copy",
+    "count",
+    "whole",
+    "number",
+    "least"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "ba773a2eb302f3fdfbbf288b2c9082d6391d8a21efe97c098ba0723c4c47b81a"
+}

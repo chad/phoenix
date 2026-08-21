@@ -1,0 +1,46 @@
+{
+  "canon_id": "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+  "type": "CONTEXT",
+  "statement": "get /members/:id — returns 200 and the member, or 404",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+  ],
+  "link_types": {
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+    "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9": "refines",
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+    "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047": "refines",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+  },
+  "tags": [
+    "get",
+    "membersid",
+    "returns",
+    "200",
+    "member",
+    "404"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "ea514ef8a990bd36651440a0331953366e007cd1d02ceb6efbdcb37a1d1e1b4d"
+}

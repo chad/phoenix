@@ -1,0 +1,16 @@
+{
+  "clause_id": "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f",
+  "source_doc_id": "spec/library.md",
+  "source_line_range": [
+    51,
+    56
+  ],
+  "raw_text": "## Summary\n\n- Users can read a summary of the library: how many members are registered, how many distinct books\n  the library holds, how many copies are currently on loan, and how many loans are active\n- The summary must reflect every change immediately\n",
+  "normalized_text": "summary\nusers can read a summary of the library: how many members are registered, how many distinct books\nthe library holds, how many copies are currently on loan, and how many loans are active\nthe summary must reflect every change immediately",
+  "section_path": [
+    "Library Loans",
+    "Summary"
+  ],
+  "clause_semhash": "5fd5bb18fd312d477358c6aba6264367ddd2e66cada5f3097e85e819267972fc",
+  "context_semhash_cold": "1dd2ad84013c91c5bb2f468db8fa69e0842064910ae440b108e69d1c023225ba"
+}

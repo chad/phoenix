@@ -1,0 +1,49 @@
+{
+  "canon_id": "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+  "type": "CONTEXT",
+  "statement": "users can add a book by providing a title, an author, an isbn, and a copy count",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+  ],
+  "linked_canon_ids": [
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23",
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512"
+  ],
+  "link_types": {
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "b77d8286f590461d9daad8e7a142d5127af0186f75efa484cfbaf43f8554cf23": "refines",
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines"
+  },
+  "tags": [
+    "users",
+    "add",
+    "book",
+    "providing",
+    "title",
+    "author",
+    "isbn",
+    "copy",
+    "count"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "1d10ac890b545d09789cbd69ec5f51e4fa37476613be8049b5ceb1ee38a65974"
+}

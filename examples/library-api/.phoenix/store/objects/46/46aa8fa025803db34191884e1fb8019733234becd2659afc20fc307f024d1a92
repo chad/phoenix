@@ -1,0 +1,40 @@
+{
+  "canon_id": "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+  "type": "REQUIREMENT",
+  "statement": "The system assigns every book a stable unique integer identifier that external systems can reference.",
+  "confidence": 0.5,
+  "source_clause_ids": [
+    "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd"
+  ],
+  "linked_canon_ids": [
+    "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d",
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b"
+  ],
+  "link_types": {
+    "310d735e5e4b18efd04a3cde8d6da2b83e9fc447b40166a704daef240853111d": "refines",
+    "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92": "refines",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+    "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe": "defines",
+    "050b1c261a816e8f4cf08a0a3d03d6b54bf733b3e5d9e4fce93f846b6da989e1": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b": "defines"
+  },
+  "tags": [
+    "book",
+    "stable",
+    "unique",
+    "integer",
+    "identifier",
+    "external",
+    "systems",
+    "reference"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "484dc335f6e04e8f8c271e5648271ce3cfa6202f3a537dddd6db4b8118b86417"
+}

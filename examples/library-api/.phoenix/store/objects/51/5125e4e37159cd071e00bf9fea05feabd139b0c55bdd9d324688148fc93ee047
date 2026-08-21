@@ -1,0 +1,48 @@
+{
+  "canon_id": "5125e4e37159cd071e00bf9fea05feabd139b0c55bdd9d324688148fc93ee047",
+  "type": "CONTEXT",
+  "statement": "get /members — returns 200 and a json array of members",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8",
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa",
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+  ],
+  "link_types": {
+    "5b0a5e54a4083451e28d3155e1279fcd6990f4de10471bbd5c130a1db58073d8": "refines",
+    "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030": "refines",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+    "19c1adbc82dc234a98bfebfc5082462ef784ec30be093d11766b950877ca5a8d": "refines",
+    "de971684fa7958a6cb71385933dd175cec5911bb738cd17a7551faedfb8d17f4": "refines",
+    "877963a89a4571732d82de2c050dbd9ea84ab6462372fd07ee6fc64cde993ce1": "refines",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines",
+    "a83827cc8dd3c900d54682ace059cdc5126fb9d4a2baccadd1b17b872d0f4535": "refines",
+    "1f892b7f6db4a69f6f406dbf91c3ad22c799bd6d06503142c752697cecc0c390": "refines",
+    "3b2049acc3c52fd940904d172647697c55824b1e98693afa1aa757978010a8ee": "refines",
+    "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5": "refines"
+  },
+  "tags": [
+    "get",
+    "members",
+    "returns",
+    "200",
+    "json",
+    "array"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "f27fc852756729d05847c2462fa0045b72d54fbabbd006e068efa5f377a90ecc"
+}

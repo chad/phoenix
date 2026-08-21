@@ -1,0 +1,35 @@
+{
+  "canon_id": "916f152aab5532352f913f5d09ffca97039b2aa9148d7689b125814f0d4e3c7c",
+  "type": "CONTEXT",
+  "statement": "a loan is due 14 days after it is borrowed",
+  "confidence": 1,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+  ],
+  "link_types": {
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e": "refines",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+    "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf": "refines",
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+  },
+  "tags": [
+    "loan",
+    "due",
+    "days",
+    "after",
+    "borrowed"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "247dde9fb274a93fb80ab57ea5d4414547ec6fbf8748d3edd1916ca23a844f7b"
+}

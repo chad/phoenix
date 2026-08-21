@@ -1,0 +1,50 @@
+{
+  "canon_id": "2389e6d06981beac0a2695ab379c481eaf6ebec85eec2558425fade137fbfffe",
+  "type": "CONTEXT",
+  "statement": "users can read a single member, including how many loans that member currently has out",
+  "confidence": 1,
+  "source_clause_ids": [
+    "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09"
+  ],
+  "linked_canon_ids": [
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90",
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c",
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96",
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c"
+  ],
+  "link_types": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+    "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6": "defines",
+    "8557e569665716b7039bf568e459266b275e9dd2a4d4dd04091384336353c2d3": "refines",
+    "4f27f70d4616dc65c0c16364594942456f00d7a99f23700b397609934aaf0d90": "refines",
+    "5d0d422694dfd12f1f333484304872d065d4355df834de4e5930e61c26dec91c": "refines",
+    "bb7d2fb9081ab0b8c032f3e7d97d6e1db180bf7cca088a72fa1eb7dae56158e2": "refines",
+    "e2a2f4c31f0cb1a92a1f8f93af9e856b7365779eefc33a78e7bea23371dbf3db": "refines",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+    "948d07abfa84c5ea31bb23f8e28040326fd5d9c97aea8bb0e1276d14241dfa96": "refines",
+    "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c": "refines"
+  },
+  "tags": [
+    "users",
+    "read",
+    "single",
+    "member",
+    "including",
+    "how",
+    "many",
+    "loans",
+    "currently",
+    "out"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "79063342730e4aaa1917b57c954f4b911a87645ea9d034ffa3eaec5c6af3729e"
+}

@@ -1,0 +1,15 @@
+{
+  "documents": {
+    "spec/library.md": {
+      "clause_ids": [
+        "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103",
+        "5c40f5125fe4cef58f6e65e74f08cc8e7afccd60db66e921ff266d8681a97b09",
+        "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd",
+        "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44",
+        "b6d0d1caa7cad33ebec64f1ac46010d17de7928b1865127c1d52210a52014f4f",
+        "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+      ],
+      "last_ingested": "2026-08-21T17:35:22.071Z"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "canon_id": "a304de49d92d85b201a5e26ed14df86636c16d5f6ce2e8be9bca37c8f73e2223",
+  "type": "CONTEXT",
+  "statement": "a lending service for a small library.",
+  "confidence": 1,
+  "source_clause_ids": [
+    "7b02129cb76750763af6bd9dae45d3a8d6ab3c72c172bb6f31725c96adfbb103"
+  ],
+  "linked_canon_ids": [
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa"
+  ],
+  "link_types": {
+    "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00": "refines",
+    "b3cd52948594564c14d10b87e3aeb9c91841b8af7dbbb398600cf2d71ec8b6e7": "refines",
+    "99e0341dc5902ce864bb8dafd79470f03d5009166b34ff07bf955ed19b869512": "refines",
+    "95cecc6da8c3b3672dbb9df5c0aad1f6813ff0c7baf046db4bf295359e5ad63c": "refines",
+    "7aac8d52f4fc8952cad48e1f342b633ede61fcad1e8f872d0cc5babb57d7f6ad": "refines",
+    "6aea5cba7323266bfe5b69d40ca3ca75cdc4a6d66a02ccb8896d5b6302a99bfa": "refines"
+  },
+  "tags": [
+    "lending",
+    "service",
+    "small",
+    "library"
+  ],
+  "extraction_method": "rule",
+  "canon_anchor": "e72c745559300c7cd24b39b9ba2c09144dd5e6d248a1cba7379642b507c1bcce"
+}

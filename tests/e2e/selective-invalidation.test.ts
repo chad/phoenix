@@ -130,6 +130,46 @@ describe('e2e: selective invalidation', () => {
     expect(statusOut).not.toMatch(/Invalidation:.*stale/);
   });
 
+  /**
+   * Regression: a cosmetic edit must not switch the defining capability off.
+   *
+   * A clause is addressed by sha256(doc + normalized_text), and the normalizer's notion of
+   * "formatting" is narrower than the classifier's class A — a trailing full stop is
+   * classified trivial and still re-keys the clause. Before the fix, the canonical graph
+   * kept pointing at the vanished id, so the NEXT real edit to that clause walked canon →
+   * IU, found nothing, and invalidated NOTHING: silent, green, and wrong. Found while
+   * building examples/library-api.
+   */
+  it('a trivial edit does not disconnect the graph from the next real one', () => {
+    const specPath = join(project, 'spec', 'app.md');
+    const original = readFileSync(specPath, 'utf8');
+
+    // 1. A class-A edit to the invoice clause: different bullet, extra indent, full stop.
+    writeFileSync(specPath, original.replace(
+      '- The system must generate invoices and track invoice payments',
+      '  *  The system must generate invoices and track invoice payments.  ',
+    ), 'utf8');
+    const trivial = phoenix(project, ['ingest']);
+    expect(trivial).toMatch(/classes 1A/);
+    expect(trivial).not.toMatch(/Invalidated:/);   // nothing regenerates — correct
+
+    // 2. Now a real change to the SAME clause. It must still find its unit.
+    writeFileSync(specPath, original.replace(
+      '- The system must generate invoices and track invoice payments',
+      '- The system must generate invoices, track invoice payments, and issue refunds',
+    ), 'utf8');
+    const meaningful = phoenix(project, ['ingest']);
+    expect(meaningful).toMatch(/classes 1B/);
+    expect(meaningful).toMatch(/Invalidated: 1 IU\(s\) stale/);
+
+    const statusOut = phoenix(project, ['status']).replace(/\x1b\[[0-9;]*m/g, '');
+    expect(statusOut).toMatch(/Invalidation:.*1 stale/);
+    expect(statusOut.toLowerCase()).toContain('invoice');
+
+    writeFileSync(specPath, original, 'utf8');
+    phoenix(project, ['ingest']);
+  });
+
   it('journal chain is intact and tamper-evident', () => {
     const out = phoenix(project, ['journal', '--verify']);
     expect(out).toMatch(/chain intact/);

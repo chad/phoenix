@@ -10,3 +10,8 @@ examples/*/data/
 
 # Bench workspace (disposable build state; results live in bench/results/)
 .phoenix-bench/
+
+# The library-api demo ships its .phoenix state so `why`, `journal --verify`,
+# `ingest` and selective regen work from a fresh clone (see examples/library-api/README.md).
+!examples/library-api/.phoenix/
+!examples/library-api/.phoenix/**

@@ -1,0 +1,41 @@
+{
+  "canon_id": "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+  "type": "CONSTRAINT",
+  "statement": "The system displays books with at least one copy available.",
+  "confidence": 0.3333333333333333,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b",
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f",
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6",
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643"
+  ],
+  "link_types": {
+    "9fdf2a1c1852da4681cd1abdf61a5edf79b8023e50203f24418ae61773f52a8b": "refines",
+    "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13": "refines",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines",
+    "0802a22366137abf0e7ef97d7fb7b850660ddf75aa285009ae6c12902f110ca6": "refines",
+    "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011": "refines",
+    "a814a361745557d84a099a4fad4dc0e4aec6b03a12f1da2789e26300966bdeba": "refines",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+    "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643": "refines"
+  },
+  "tags": [
+    "books",
+    "least",
+    "one",
+    "copy",
+    "available"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "cf13f25df77f9729b832b24438af36d1362bff189039ff622c07d71b9d392c1a"
+}

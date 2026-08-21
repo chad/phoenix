@@ -1,0 +1,51 @@
+{
+  "canon_id": "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+  "type": "REQUIREMENT",
+  "statement": "The user returns a loan, the system records the return date, and the system makes the copy available again.",
+  "confidence": 1,
+  "source_clause_ids": [
+    "068d1bbae8803e7628a45c4f770d3ad6f73908ec7274797dee516a400aa7cb44"
+  ],
+  "linked_canon_ids": [
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7",
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b"
+  ],
+  "link_types": {
+    "f2ebe8478b89251d950032b22ba874dfd22834b406f4dc2376672fdc2580a6ad": "refines",
+    "0aabb2604c54b16b2ea1f32c90a808e4e806bbfc830b122473bc7b43331077c4": "refines",
+    "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b": "refines",
+    "d617b59894b69dd813b29d66200b2f7f52cf7121027292d444abcba41f4ad905": "refines",
+    "0ae7e8a81ed9c2c25b77a27f6e03f346aadb017ac774f639f1b0f1651edccf3c": "refines",
+    "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293": "defines",
+    "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee": "defines",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines",
+    "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a": "refines",
+    "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7": "constrains",
+    "2414b528d9d8ac4a98fc42df953d1e0bf8c053afddb6b81703678fe4d22db58b": "refines"
+  },
+  "tags": [
+    "users",
+    "return",
+    "loan",
+    "returning",
+    "records",
+    "came",
+    "back",
+    "makes",
+    "copy",
+    "available",
+    "again"
+  ],
+  "extraction_method": "llm",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "fddda0721502e229b038c837a37dc1140ce04acf1a5fa036fac8b47d34ece67f"
+}

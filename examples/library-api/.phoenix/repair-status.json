@@ -1,0 +1,25 @@
+{
+  "before": {
+    "schema": 0,
+    "constraint": 2,
+    "build": 0
+  },
+  "after": {
+    "schema": 0,
+    "constraint": 1,
+    "build": 0
+  },
+  "rounds": 3,
+  "template_repairs": 0,
+  "template_closed": [],
+  "green": false,
+  "stop": "budget",
+  "residual": [
+    {
+      "category": "constraint",
+      "subject": "book.count",
+      "message": "book.count >= 1: no min() bound on \"count\" (field present, bound missing)"
+    }
+  ],
+  "checked_at": "2026-08-21T17:23:11.515Z"
+}

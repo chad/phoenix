@@ -1,0 +1,16 @@
+{
+  "clause_id": "1bd53f8feee961ca7594aac054a4b9d2e27e91a659d24df402d5ec0093964cdd",
+  "source_doc_id": "spec/library.md",
+  "source_line_range": [
+    21,
+    34
+  ],
+  "raw_text": "## Books\n\n- A book has a title, an author, an ISBN, and a count of how many copies the library owns\n- Every book must have a stable unique integer identifier that external systems can reference\n- Users can add a book by providing a title, an author, an ISBN, and a copy count\n- A book's title and author must not be empty\n- Two books must never share the same ISBN; a repeat is a conflict, not a validation error\n- The copy count must be a whole number of at least 1\n- Users can list every book\n- Users can read a single book, including how many of its copies are currently available\n- The available count is the number of copies the library owns minus the number of copies\n  currently out on loan, and it must never be negative\n- Users can list only the books that have at least one copy available\n",
+  "normalized_text": "books\na book has a title, an author, an isbn, and a count of how many copies the library owns\na book's title and author must not be empty\nevery book must have a stable unique integer identifier that external systems can reference\nthe available count is the number of copies the library owns minus the number of copies\nthe copy count must be a whole number of at least 1\ntwo books must never share the same isbn; a repeat is a conflict, not a validation error\nusers can add a book by providing a title, an author, an isbn, and a copy count\nusers can list every book\nusers can read a single book, including how many of its copies are currently available\ncurrently out on loan, and it must never be negative\nusers can list only the books that have at least one copy available",
+  "section_path": [
+    "Library Loans",
+    "Books"
+  ],
+  "clause_semhash": "f1a2641025310e8fa7128dbb3c9f52881cfd45c6dfee0b84f2dd650a77062408",
+  "context_semhash_cold": "55e017b83a9c86e92eab4fafbe2e727d1400e20629e370489edd8b74588dbd51"
+}

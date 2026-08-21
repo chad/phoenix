@@ -178,25 +178,31 @@ function fold(word: string): string {
   return w;
 }
 
-function nameMatches(prefix: string, mod: ModuleSurface): boolean {
-  const target = fold(prefix);
-  const tokens = [
-    ...mod.name.split(/[^A-Za-z0-9]+/),
-    ...(mod.entities ?? []).flatMap(e => e.split(/[^A-Za-z0-9]+/)),
-  ].filter(Boolean);
-  return tokens.some(tok => fold(tok) === target);
+function tokensMatch(target: string, source: string): boolean {
+  return source.split(/[^A-Za-z0-9]+/).filter(Boolean).some(tok => fold(tok) === target);
 }
 
-interface Scored { key: string; coverage: number; matched: number; nominal: boolean }
+interface Scored {
+  key: string;
+  coverage: number;
+  matched: number;
+  /** The unit is NAMED for this prefix. The strongest nominal evidence there is. */
+  named: boolean;
+  /** The module reads or writes a table named for this prefix. Weaker: a loans module
+   *  joins `books` to compute availability, which makes it look book-ish and is not. */
+  handles: boolean;
+}
 
 function score(surface: DeclaredSurface, mod: ModuleSurface): Scored {
   const have = new Set(mod.shapes);
   const matched = surface.shapes.filter(s => have.has(s)).length;
+  const target = fold(surface.prefix);
   return {
     key: mod.key,
     coverage: surface.shapes.length === 0 ? 0 : matched / surface.shapes.length,
     matched,
-    nominal: nameMatches(surface.prefix, mod),
+    named: tokensMatch(target, mod.name),
+    handles: (mod.entities ?? []).some(e => tokensMatch(target, e)),
   };
 }
 
@@ -206,9 +212,18 @@ function score(surface: DeclaredSurface, mod: ModuleSurface): Scored {
  * **Structure qualifies; the noun decides.** Shape matching alone cannot tell `/tasks`
  * from `/projects` — two CRUD resources register exactly the same five shapes — so a
  * candidate must first implement at least half the declared surface, and then the noun
- * (the unit's name, or the tables the module actually reads and writes) picks between the
- * qualifiers. Where no candidate carries the noun, a placement is made only if there is
- * exactly ONE qualifying module and therefore nothing to confuse it with.
+ * picks between the qualifiers.
+ *
+ * Nominal evidence comes in two strengths, and conflating them was a real bug: a `loans`
+ * module reads the `books` table to compute availability, so "mentions the noun" made it a
+ * candidate for `/books` alongside the `book` module, the two tied on structure, and
+ * `/books` was abstained on — the app served `/book`. So the unit's NAME is tried first,
+ * and only if nothing is named for the prefix do the tables it touches get a vote:
+ *
+ *   1. a unit named for the prefix        (`book` ← `/books`)
+ *   2. failing that, one that handles it   (the only module touching a `stats` table)
+ *   3. failing that, structure alone, and only when there is exactly ONE candidate
+ *      and therefore nothing to confuse it with
  *
  * Everything else is left UNDECIDED. Guessing which of two modules owns `/tasks` is
  * precisely the confident wrongness this module exists to remove; an abstention keeps the
@@ -230,24 +245,32 @@ export function planMounts(
     const qualifying = modules
       .filter(m => !takenModules.has(m.key))
       .map(m => score(surface, m))
-      .filter(s => s.matched > 0 && (s.coverage >= 0.5 || s.nominal))
-      .sort((a, b) => b.coverage - a.coverage || Number(b.nominal) - Number(a.nominal) || a.key.localeCompare(b.key));
+      .filter(s => s.matched > 0 && (s.coverage >= 0.5 || s.named || s.handles))
+      .sort((a, b) =>
+        b.coverage - a.coverage
+        || Number(b.named) - Number(a.named)
+        || Number(b.handles) - Number(a.handles)
+        || a.key.localeCompare(b.key));
 
     if (qualifying.length === 0) { unplaced.push(surface); continue; }
 
-    const named = qualifying.filter(s => s.nominal);
+    const named = qualifying.filter(s => s.named);
+    const handlers = qualifying.filter(s => !s.named && s.handles);
+    const tier = named.length > 0 ? named : handlers.length > 0 ? handlers : qualifying;
+
     let best: Scored;
-    if (named.length > 0) {
-      // The noun decides. Two modules carrying the same noun are broken by coverage; a
-      // tie coverage cannot break is not a decision anyone should make from here.
-      if (named.length > 1 && named[0].coverage === named[1].coverage) { unplaced.push(surface); continue; }
-      best = named[0];
-    } else {
-      // Nobody carries the noun. One qualifying module is an identification; two is a
-      // coin flip between `/tasks` and `/projects`, which look identical from here.
-      if (qualifying.length > 1) { unplaced.push(surface); continue; }
-      best = qualifying[0];
+    if (tier === qualifying && qualifying.length > 1) {
+      // Nobody carries the noun at all. One qualifying module is an identification; two is
+      // a coin flip between `/tasks` and `/projects`, which look identical from here.
+      unplaced.push(surface);
+      continue;
     }
+    if (tier.length > 1 && tier[0].coverage === tier[1].coverage) {
+      // Two units with equal claim at the same strength of evidence. Not our call.
+      unplaced.push(surface);
+      continue;
+    }
+    best = tier[0];
 
     takenModules.add(best.key);
     const pct = Math.round(best.coverage * 100);

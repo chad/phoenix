@@ -1,0 +1,316 @@
+{
+  "records": [
+    {
+      "evidence_id": "f563d5ebdce20047",
+      "kind": "typecheck",
+      "status": "PASS",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "canon_ids": [
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "artifact_hash": "655a5a44e23499782c01d0a91f8df12940f76491b10f50e4c669cda3a208c7fe",
+      "message": "Compiles under target toolchain",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "f694175de2c99e87",
+      "kind": "lint",
+      "status": "PASS",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "canon_ids": [
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "artifact_hash": "655a5a44e23499782c01d0a91f8df12940f76491b10f50e4c669cda3a208c7fe",
+      "message": "Emitted code is structurally valid",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "953d30b583be3ccd",
+      "kind": "boundary_validation",
+      "status": "PASS",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "canon_ids": [
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "artifact_hash": "655a5a44e23499782c01d0a91f8df12940f76491b10f50e4c669cda3a208c7fe",
+      "message": "No boundary violations",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "8d9d4e12169a853d",
+      "kind": "typecheck",
+      "status": "PASS",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "canon_ids": [
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "artifact_hash": "d2386cdd63b36c5ac1106a78e254711006dec028385ec2281fe7fc3bba99cbe1",
+      "message": "Compiles under target toolchain",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "fd3a78af9c325e00",
+      "kind": "lint",
+      "status": "PASS",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "canon_ids": [
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "artifact_hash": "d2386cdd63b36c5ac1106a78e254711006dec028385ec2281fe7fc3bba99cbe1",
+      "message": "Emitted code is structurally valid",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "e83f0970c4690972",
+      "kind": "boundary_validation",
+      "status": "PASS",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "canon_ids": [
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "artifact_hash": "d2386cdd63b36c5ac1106a78e254711006dec028385ec2281fe7fc3bba99cbe1",
+      "message": "No boundary violations",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "1ef3659584de3f10",
+      "kind": "typecheck",
+      "status": "PASS",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "artifact_hash": "410ee34a64c24d2c3cc7cdef4d9cb9b4c62cd4008b00b8f292df5593bb675c74",
+      "message": "Compiles under target toolchain",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "54a9e72d066d683b",
+      "kind": "lint",
+      "status": "PASS",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "artifact_hash": "410ee34a64c24d2c3cc7cdef4d9cb9b4c62cd4008b00b8f292df5593bb675c74",
+      "message": "Emitted code is structurally valid",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "84d563bfeed77034",
+      "kind": "boundary_validation",
+      "status": "PASS",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "artifact_hash": "410ee34a64c24d2c3cc7cdef4d9cb9b4c62cd4008b00b8f292df5593bb675c74",
+      "message": "No boundary violations",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "66ade8fec449a75b",
+      "kind": "typecheck",
+      "status": "PASS",
+      "iu_id": "4becec2b5cf6add402c248133e7f6f49e68798896fc7549465238e4627867613",
+      "canon_ids": [
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633"
+      ],
+      "artifact_hash": "5e9502a4c8039c3d361c827aadd90ef292eba240853748c0c9f91779e4bd0090",
+      "message": "Compiles under target toolchain",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "69c3407742dc0a8f",
+      "kind": "lint",
+      "status": "PASS",
+      "iu_id": "4becec2b5cf6add402c248133e7f6f49e68798896fc7549465238e4627867613",
+      "canon_ids": [
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633"
+      ],
+      "artifact_hash": "5e9502a4c8039c3d361c827aadd90ef292eba240853748c0c9f91779e4bd0090",
+      "message": "Emitted code is structurally valid",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "7db4c07d3207f5ea",
+      "kind": "boundary_validation",
+      "status": "PASS",
+      "iu_id": "4becec2b5cf6add402c248133e7f6f49e68798896fc7549465238e4627867613",
+      "canon_ids": [
+        "7f555374bc4fca20030955f9e0c3da106109f840876d2b829267fd6f4793e633"
+      ],
+      "artifact_hash": "5e9502a4c8039c3d361c827aadd90ef292eba240853748c0c9f91779e4bd0090",
+      "message": "No boundary violations",
+      "timestamp": "2026-08-21T17:17:27.322Z"
+    },
+    {
+      "evidence_id": "4b272a147ea99572",
+      "kind": "unit_tests",
+      "status": "PENDING",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "canon_ids": [
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "artifact_hash": "655a5a44e23499782c01d0a91f8df12940f76491b10f50e4c669cda3a208c7fe",
+      "message": "5 durable behavioral eval(s) could not be verified by the static oracle",
+      "timestamp": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "evidence_id": "a3d8932e05989ab5",
+      "kind": "property_tests",
+      "status": "FAIL",
+      "iu_id": "58ecb19058ff698225ee3951a4a6da0e7e2eee519d2e2d49f5f1442e4f6c3788",
+      "canon_ids": [
+        "46aa8fa025803db34191884e1fb8019733234becd2659afc20fc307f024d1a92",
+        "72af351a1dc27d77c55bdda72090b9b48bb4fa80c603d1941893e025b8072f13",
+        "7fb633551f985841740f3f69faa39fb0df5ffd781cbf90e63f10d7086bd44b1f",
+        "8de21afe31f1b166f1d45908a980546ab363f3cedd962183456f17c07ea2f83a",
+        "158522b8b2bf56ce4ae7a2b5a075fba48a31cc19b2662fddd5f694b727a2d12c",
+        "a688b1bccc762a0c162ce9206f9ac8d3adf0ad431a151607d90facc1e16e396b",
+        "1e86e5018b7aa78e8c642d385588b62e48e17f9f7d078d125d5e6d3eb12b59a7"
+      ],
+      "artifact_hash": "655a5a44e23499782c01d0a91f8df12940f76491b10f50e4c669cda3a208c7fe",
+      "message": "2 durable invariant eval(s) failed the static oracle",
+      "timestamp": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "evidence_id": "ee5cd068df07f882",
+      "kind": "unit_tests",
+      "status": "PENDING",
+      "iu_id": "44c41635ba427da4b82f3d25370888e185f703d3fad6570d4829d3349e199f08",
+      "canon_ids": [
+        "a1232036a4f982aee8a34a81eb2276e0d6d741df6665b6841553d45af284987e",
+        "f664bd467069609826d3acf36d9f6ad56bd916ebb5c2d6627832ff3c44609d0b",
+        "bac26d6bdf8e9ad6efde0aade079b7b23a695347feef1b132bfa5fc058ba07cf",
+        "1dcfd0c5b01704986cf87984a55963a3472eb67e13793fdf063a6a6249ef5ee6",
+        "7de135ad69a288bf0cd75fc23ebc584062b4e85b5477711d28b01421579ff643",
+        "45cf66d48414c553f4a72a476cf54d10a1b581eef55f91300b803304bff85293",
+        "14dd8a78f06f1ef604f7d84abfa721888c37e8afd26353a038fcb0c213c84fee",
+        "911b3846a53171dccfb6b0bafa7634d802140f3c19920086ed5c1a0e22ca07c5"
+      ],
+      "artifact_hash": "d2386cdd63b36c5ac1106a78e254711006dec028385ec2281fe7fc3bba99cbe1",
+      "message": "8 durable behavioral eval(s) could not be verified by the static oracle",
+      "timestamp": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "evidence_id": "6907f7d8fe3e7dfb",
+      "kind": "unit_tests",
+      "status": "FAIL",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "artifact_hash": "410ee34a64c24d2c3cc7cdef4d9cb9b4c62cd4008b00b8f292df5593bb675c74",
+      "message": "9 durable behavioral eval(s) failed the static oracle",
+      "timestamp": "2026-08-21T17:17:27.323Z"
+    },
+    {
+      "evidence_id": "a220f72a5fd4d627",
+      "kind": "property_tests",
+      "status": "PENDING",
+      "iu_id": "43f635d75ced238550de9f563b7ba033a161ffc5166870ef960f87e95880a13b",
+      "canon_ids": [
+        "a20450168f1d5255e570f8d9b9b718acaba408f9727397561378559da176fe92",
+        "669f08f2374cf075d176874a1bee7b45103654fb2da8fc1f1c5ff7c3708f4c33",
+        "31c748230e50b3826850862ca9cd03339bf3d9faf62c25cc3ee3baaa7a920030",
+        "f6ff5277cff19e2789def11fa9c96193f7cf6a702a70d2de306aba7ef52073a0",
+        "c94f15dead313a77c262c83e3578683c736e96a1c4c16f574037c9655f68b3c2",
+        "d47cb6d246ee58ff7c94f91a34a3bc65656d3c267b3237d5a5d1d6ab3cf5a3f3",
+        "fa098533b1d11e6c2220c8583d04b9921065ddfdfdbabca4e4bc6ea90bcc96c3",
+        "7e7cf25994703c0096a856db473dfd211f3910be4c18606e9f4e753ec5527011",
+        "8404fa5924bb1956958c5e1f767be542b78c89d581527d2cad406db9f66d5ad2",
+        "da4c133160fe885894950c954e200fccee5b35819deada1300be0c4d7107c9d9",
+        "c29ba695db00f8651593d3c5b9de82c4fa25da24ebd6f86f5820b68a5afb77fe"
+      ],
+      "artifact_hash": "410ee34a64c24d2c3cc7cdef4d9cb9b4c62cd4008b00b8f292df5593bb675c74",
+      "message": "2 durable invariant eval(s) could not be verified by the static oracle",
+      "timestamp": "2026-08-21T17:17:27.323Z"
+    }
+  ]
+}

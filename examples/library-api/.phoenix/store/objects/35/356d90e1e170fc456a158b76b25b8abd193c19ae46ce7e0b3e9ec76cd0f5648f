@@ -1,0 +1,30 @@
+{
+  "canon_id": "356d90e1e170fc456a158b76b25b8abd193c19ae46ce7e0b3e9ec76cd0f5648f",
+  "type": "CONTEXT",
+  "statement": "and the created loan",
+  "confidence": 1,
+  "source_clause_ids": [
+    "1bb73752eed3b73c50104243fe24c3fa23b674c04b4d9c071fbde5c5d35ce1ef"
+  ],
+  "linked_canon_ids": [
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f"
+  ],
+  "link_types": {
+    "ba5530eff7939364f3c5a9bde502137c8e2f958714e080b83682913dff2b75ed": "refines",
+    "4d3005e0e0df424c477f7d365cdb6502f926f341536ada3cb0c39fa9efa6d1ab": "refines",
+    "6868a67ad207b4296199d541033daf6a98a2ac0a5c7dce5cc2f529db81d91245": "refines",
+    "a6abbeaba6235d9fa3ce7a3e71e0d81b00d85d2c6a0c0885c7f5d0d32730021a": "refines",
+    "448841032e0d28ef9c02f77332f58da532928e57cb710dcbd84ba1e6f33c3c2f": "refines"
+  },
+  "tags": [
+    "created",
+    "loan"
+  ],
+  "extraction_method": "rule",
+  "parent_canon_id": "bdad47cb15cec1659fc58b2ccbd7a471db3209700df1f899b0c14ea3d8603a00",
+  "canon_anchor": "ab1d835da5aae6f1b1932cfc53f0b596bfce79dfa324aa0bed57f23b0e6b802a"
+}

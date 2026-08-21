@@ -140,3 +140,55 @@ describe('placing the declared surface', () => {
     expect(lines.join('\n')).toMatch(/\d+\/\d+ declared route shapes/);
   });
 });
+
+describe('nominal evidence has two strengths (regression: /books served as /book)', () => {
+  // Taken from examples/library-api, where this actually happened. The loans module
+  // reads the books table to compute availability and registers the same CRUD shapes,
+  // so "mentions books" made it a rival claimant to /books, the two tied on structure,
+  // and the surface was abstained on — the app served /book.
+  const surfaces = declaredSurfaces(extractDeclaredRoutes([
+    'get /books — returns 200 and a json array of books',
+    'get /books/:id — returns 200 and the book, or 404',
+    'post /books — adds a book; returns 201 and the created book',
+    'get /loans — returns 200 and a json array of loans',
+    'post /loans — borrows a book; returns 201 and the created loan',
+    'post /loans/:id/return — returns 200 and the returned loan',
+  ]));
+  const modules = [
+    {
+      key: 'src/generated/book/book.ts', name: 'book',
+      shapes: ['DELETE /:x', 'GET /', 'GET /:x', 'PATCH /:x', 'POST /'],
+      entities: ['books', 'hono', 'zod'],
+    },
+    {
+      key: 'src/generated/loan/loan.ts', name: 'loan',
+      shapes: ['GET /', 'GET /:x', 'POST /', 'POST /:x/return'],
+      entities: ['books', 'hono', 'loans', 'members', 'zod'],
+    },
+  ];
+
+  it('the unit NAMED for the prefix beats one that merely reads its table', () => {
+    const plan = planMounts(surfaces, modules);
+    expect(plan.decisions.get('src/generated/book/book.ts')?.prefix).toBe('/books');
+    expect(plan.decisions.get('src/generated/loan/loan.ts')?.prefix).toBe('/loans');
+    expect(plan.unplaced).toEqual([]);
+  });
+
+  it('a table a module merely joins still counts when nothing is named for the prefix', () => {
+    const stats = declaredSurfaces(extractDeclaredRoutes(['get /stats — returns the totals']));
+    const plan = planMounts(stats, [
+      { key: 'a.ts', name: 'reporting', shapes: ['GET /'], entities: ['stats', 'loans'] },
+      { key: 'b.ts', name: 'loan', shapes: ['GET /'], entities: ['loans'] },
+    ]);
+    expect(plan.decisions.get('a.ts')?.prefix).toBe('/stats');
+  });
+
+  it('two units named for the same prefix, equally covered, are still an abstention', () => {
+    const plan = planMounts(declaredSurfaces(extractDeclaredRoutes(['get /books', 'post /books'])), [
+      { key: 'a.ts', name: 'book', shapes: ['GET /', 'POST /'], entities: ['books'] },
+      { key: 'b.ts', name: 'books', shapes: ['GET /', 'POST /'], entities: ['books'] },
+    ]);
+    expect(plan.decisions.size).toBe(0);
+    expect(plan.unplaced.map(s => s.prefix)).toEqual(['books']);
+  });
+});

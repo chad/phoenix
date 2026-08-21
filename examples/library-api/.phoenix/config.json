@@ -1,0 +1,7 @@
+{
+  "architecture": "sqlite-web-api",
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5"
+  }
+}
