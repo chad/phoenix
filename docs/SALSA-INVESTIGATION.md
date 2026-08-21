@@ -5,6 +5,20 @@ recommendation and the conditions that would reverse it.
 **Artifact:** a running spike under [`spike/salsa/`](../spike/salsa) — 16 tests, all green,
 `cargo test` from that directory. Every claim below that can be tested, is.
 
+> **TL;DR** — Salsa really does deliver Phoenix's headline capability ("change one spec line,
+> regenerate only the dependent subtree") for free and by construction, and the spike proves
+> it in model-call counts rather than prose. But that capability is **1,050 of Phoenix's
+> 29,500 lines**. The other 96% — provenance, evidence, drift, policy, the trust surface — is
+> what Phoenix is actually for, and salsa's dependency graph is explicitly a *forgettable
+> private cache*, not an auditable artifact, so it cannot serve as the provenance record; a
+> salsa Phoenix would run two graphs of the same causality. Add that salsa's core contract is
+> query purity, which a model call can never satisfy.
+>
+> **Recommendation: do not rewrite.** Steal three ideas into the TypeScript pipeline —
+> identity-as-content, backdating, durability/pace-layers — and revisit salsa if Phoenix grows
+> a daemon mode, if graph derivation ever becomes the bottleneck instead of model latency, or
+> if its persistence prototype stabilises and its dependency edges become readable.
+
 ---
 
 ## 0. Why this is even a question

@@ -1,5 +1,46 @@
 # Phoenix VCS
 
+> ### 🔬 Branch `investigate/salsa` — should Phoenix be rebuilt in Rust on salsa?
+>
+> **Answer: no — steal three ideas instead.** Not an opinion: a running spike in
+> [`spike/salsa/`](spike/salsa) models Phoenix's real pipeline as
+> [salsa](https://github.com/salsa-rs/salsa) queries and measures what each kind of spec edit
+> *costs in model calls*. 16 tests, all green, **no invalidation code in the crate** — every
+> number below is salsa's behaviour.
+>
+> | Spec edit | Model calls | What it shows |
+> |---|---|---|
+> | Reindent / change bullets / add a full stop | **0** | Phoenix's A-class change, structurally — no classifier, no thresholds, no D-rate |
+> | Reorder requirements within a section | **0** | backdating |
+> | Change one requirement's meaning | 1 extract + **1 of 2** generate | *selective invalidation, by construction* |
+> | The same clause in a second document | **0** | content identity (interning) |
+> | Bump the prompt pack | 0 extract + 2 generate | *how* changed, *what* didn't — pace layers, enforced |
+> | Restart the process | **7** — the whole bill | salsa is in-memory; Phoenix is a CLI |
+> | Restart from a serialized database | **0**, and still incremental after | salsa 0.28's brand-new `persistence` feature |
+>
+> **The finding:** salsa is a *better implementation of the capability Phoenix talks about
+> most*, and has *nothing to say about the capability Phoenix actually sells*. It would
+> replace ~1,050 lines of the subtlest code here — which is **3.6% of 29,500**. Its dependency
+> graph is a deliberately forgettable private cache (LRU eviction, no public read API), while
+> Phoenix's provenance is append-only, hash-chained and verifiable — so a salsa Phoenix keeps
+> its journal and runs **two graphs of the same causality**. And salsa's contract is that
+> queries are pure, which is the one thing a model call can never be.
+>
+> **Recommendation:** don't rewrite. Port the three load-bearing ideas into the TypeScript
+> pipeline — *identity-as-content*, *backdating* (~50 lines, the cheapest large win; Phoenix
+> currently never stops a cascade on "the output didn't change"), and *durability / pace
+> layers* (in PRINCIPLES §30, enforced nowhere). Revisit salsa if Phoenix grows a daemon mode,
+> if graph derivation ever becomes the bottleneck instead of model latency, or if persistence
+> stabilises and the dependency graph becomes readable.
+>
+> 📄 **Full write-up, options analysis, and the explicit "what would change my mind" list:
+> [`docs/SALSA-INVESTIGATION.md`](docs/SALSA-INVESTIGATION.md)** · reproduce with
+> `cd spike/salsa && cargo test`
+>
+> *This banner exists only on the `investigate/salsa` branch.*
+
+---
+
 **Regenerative version control that compiles intent to working software.**
 
 Phoenix takes a specification written in plain language, extracts structured requirements, and generates a working application — database, API, validation, and UI — with full traceability from every line of spec to every line of generated code.
