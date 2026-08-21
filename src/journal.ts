@@ -29,6 +29,7 @@ export type JournalEventType =
   | 'adapt-spec'    // an LLM drafted a derived spec (provenance + coverage receipted)
   | 'repair:template' // deterministic guard synthesis closed a mechanical finding (P1)
   | 'adequacy'      // Step 0: architecture shape derived, a fit resolved or halted
+  | 'interface'     // the spec's declared HTTP surface resolved onto generated modules
   | 'assembly-gate' // the assembled product was checked for coherence as a whole
   | 'deletion-test' // the ch9 deletion diagnostic ran over an IU or the whole plan
   | 'compact'       // a compaction pass proposed conceptual-mass reductions

@@ -131,6 +131,10 @@ import { NegativeKnowledgeStore } from './store/negative-knowledge-store.js';
 import { failedGenerationKnowledge } from './models/negative-knowledge.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { PaceLayerMetadata } from './models/pace-layer.js';
+import {
+  extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, describeMountPlan,
+  type ModuleSurface,
+} from './spec-interface.js';
 import { loadCases } from './bench/case.js';
 import { ARMS, isArmName, type ArmName } from './bench/arms.js';
 import { loadEntries, treeState, type Resolution } from './bench/results.js';
@@ -1894,9 +1898,16 @@ async function cmdBootstrap(args: string[] = []): Promise<void> {
   console.log(`  ${dim('Scaffold:')} Service wiring + project config`);
   const services = deriveServices(ius);
   const projectName = basename(projectRoot);
+
+  // The spec's HTTP interface is a CONTRACT. Resolve the declared surface against what
+  // the generated modules actually implement BEFORE wiring the server, so a mount path
+  // is never invented from an implementation unit's name when the spec already named it.
+  // (This is the bug the bench found first — bench/FINDINGS.md.)
+  const declaredMounts = resolveDeclaredMounts(projectRoot, ius, canonNodes, allClauses, phoenixDir);
+
   const scaffoldFiles = arch
-    ? arch.runtime.scaffold(services, projectName, split.serverImports)
-    : nodeScaffold(services, projectName, null).files;
+    ? arch.runtime.scaffold(services, projectName, split.serverImports, declaredMounts)
+    : nodeScaffold(services, projectName, null, [], declaredMounts).files;
   for (const [filePath, content] of scaffoldFiles) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
@@ -4355,6 +4366,70 @@ async function cmdEval(args: string[]): Promise<void> {
     console.error(yellow(`⚠ ${sc.promotions.length} promotion(s) — flip these reds to green (--strict).`));
     process.exit(2);
   }
+}
+
+/**
+ * Resolve the mount prefix of every generated module against the interface the SPEC
+ * declared, and report the resolution.
+ *
+ * Silence is not an option in either direction: a placement is printed with the evidence
+ * that produced it, and a declared surface Phoenix could not place is printed as the
+ * finding it is. Both are journaled, so `phoenix why` can answer "why does this app
+ * answer on /tasks?" with "because line 34 of the spec says so".
+ */
+function resolveDeclaredMounts(
+  projectRoot: string,
+  ius: ImplementationUnit[],
+  canonNodes: CanonicalNode[],
+  clauses: Clause[],
+  phoenixDir: string,
+): ReadonlyMap<string, string> {
+  const statements = [
+    ...canonNodes.map(n => n.statement),
+    ...clauses.map(c => c.raw_text),
+  ];
+  const surfaces = declaredSurfaces(extractDeclaredRoutes(statements));
+  if (surfaces.length === 0) return new Map();
+
+  const modules: ModuleSurface[] = [];
+  const nameByKey = new Map<string, string>();
+  for (const iu of ius) {
+    for (const file of iu.output_files) {
+      const full = join(projectRoot, file);
+      if (!existsSync(full)) continue;
+      const source = readFileSync(full, 'utf8');
+      modules.push({
+        key: file,
+        name: iu.name,
+        shapes: moduleShapes(source),
+        entities: moduleEntities(source),
+      });
+      nameByKey.set(file, iu.name);
+    }
+  }
+
+  const plan = planMounts(surfaces, modules);
+  const lines = describeMountPlan(plan, key => nameByKey.get(key) ?? key);
+  if (lines.length > 0) {
+    console.log(`  ${dim('Interface:')} ${surfaces.length} surface(s) declared by the spec`);
+    for (const line of lines) {
+      const placed = !line.includes('not placed');
+      console.log(`    ${placed ? green('✔') : yellow('⚠')} ${line}`);
+    }
+  }
+
+  new Journal(phoenixDir).append({
+    type: 'interface',
+    inputs: surfaces.map(s => `/${s.prefix}`),
+    outputs: [...plan.decisions.values()].map(d => `${d.prefix} → ${d.key}`),
+    meta: {
+      declared: surfaces.map(s => `/${s.prefix}`),
+      placed: [...plan.decisions.values()].map(d => ({ prefix: d.prefix, module: d.key, basis: d.basis, why: d.why })),
+      unplaced: plan.unplaced.map(s => `/${s.prefix}`),
+    },
+  });
+
+  return new Map([...plan.decisions].map(([key, d]) => [key, d.prefix]));
 }
 
 // ─── bench: the pipeline measured against the same model with the pipeline removed ───

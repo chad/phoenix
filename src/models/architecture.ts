@@ -175,8 +175,20 @@ export interface RuntimeTarget {
   assemblyGate?(projectRoot: string, ius: ImplementationUnit[]): AssemblyFinding[];
   /** Shared aggregate artifacts this target lifts out of modules (e.g. migrations). */
   aggregates: AggregateRole[];
-  /** Generate the runnable shell: server entry, project config, per-service wiring. */
-  scaffold(services: ServiceDescriptor[], projectName: string, sharedImports: string[]): Map<string, string>;
+  /**
+   * Generate the runnable shell: server entry, project config, per-service wiring.
+   *
+   * `declaredMounts` carries the mount prefixes the SPEC declared (module output path →
+   * prefix, from `src/spec-interface.ts`). A target that serves HTTP must honour it: a
+   * spec that states its interface has pinned a conservation layer, and no internal
+   * naming rule outranks it. A target with no such surface ignores the argument.
+   */
+  scaffold(
+    services: ServiceDescriptor[],
+    projectName: string,
+    sharedImports: string[],
+    declaredMounts?: ReadonlyMap<string, string>,
+  ): Map<string, string>;
   /** Optional: prepare the project before generation so the compiler can resolve imports
    *  (e.g. write package.json + npm install for tsc). No-op for targets that don't need it. */
   prepareProject?(projectRoot: string): void;

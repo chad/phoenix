@@ -110,7 +110,15 @@ export function interpolate(s: string, vars: Record<string, unknown>): string {
 }
 
 function interpolateBody(body: unknown, vars: Record<string, unknown>): unknown {
-  if (typeof body === 'string') return interpolate(body, vars);
+  if (typeof body === 'string') {
+    // A body field that is EXACTLY one binding keeps the binding's type. `{"book_id":
+    // "{book}"}` means the id that was saved, not the string "7" — and a schema that
+    // validates `book_id` as a number would reject the string, turning a harness detail
+    // into a scored failure.
+    const whole = /^\{(\w+)\}$/.exec(body);
+    if (whole && Object.prototype.hasOwnProperty.call(vars, whole[1])) return vars[whole[1]];
+    return interpolate(body, vars);
+  }
   if (Array.isArray(body)) return body.map(v => interpolateBody(v, vars));
   if (body && typeof body === 'object') {
     const out: Record<string, unknown> = {};

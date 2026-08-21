@@ -12,9 +12,12 @@
  *   dirty     uncommitted changes at run time, so the commit pins nothing. Not re-runnable.
  *   unstated  drawn before the run declared what its sample size was for.
  *
- * And one hard partition: entries with different fixture digests were not asked the same
- * question, so they are never pooled. The digest covers the spec, the checks and the
- * runtime contract — change any of them and the old numbers describe a different bench.
+ * And two hard partitions. Entries with different **fixture digests** were not asked the
+ * same question: the digest covers the spec, the checks and the runtime contract, and
+ * changing any of them means the old numbers describe a different bench. Entries from
+ * different **commits** were not the same answerer: the commit pins Phoenix's own code,
+ * and the pipeline is the thing under test, so pooling a run from before a fix with a run
+ * from after it would average away the only effect anybody wanted to measure.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -139,6 +142,8 @@ export function isCitable(e: BenchEntry): boolean {
 export interface Aggregate {
   readonly case: string;
   readonly fixture_digest: string;
+  /** The Phoenix commit under test. Never pooled across — the tool is the treatment. */
+  readonly commit: string;
   readonly arm: ArmName;
   readonly model: string;
   readonly entries: number;
@@ -161,15 +166,15 @@ export function modelLabel(e: BenchEntry): string {
 }
 
 function aggKey(e: BenchEntry): string {
-  return [e.case, e.fixture_digest, e.arm, modelLabel(e)].join('\u0000');
+  return [e.case, e.fixture_digest, e.commit, e.arm, modelLabel(e)].join('\u0000');
 }
 
 /**
- * Pool citable entries by (case, fixture digest, arm, model).
+ * Pool citable entries by (case, fixture digest, commit, arm, model).
  *
- * Pooling across *models* or across *digests* is not offered, because neither is the
- * same question repeated — it is two questions averaged, which is how a headline number
- * stops meaning anything.
+ * Pooling across *models*, *digests* or *commits* is not offered, because none of them is
+ * the same question repeated — it is two questions averaged, which is how a headline
+ * number stops meaning anything.
  */
 export function aggregate(entries: readonly BenchEntry[]): Aggregate[] {
   const groups = new Map<string, BenchEntry[]>();
@@ -196,6 +201,7 @@ export function aggregate(entries: readonly BenchEntry[]): Aggregate[] {
     out.push({
       case: first.case,
       fixture_digest: first.fixture_digest,
+      commit: first.commit,
       arm: first.arm,
       model: modelLabel(first),
       entries: g.length,

@@ -137,6 +137,40 @@ describe('runBehavior — the shared oracle', () => {
     expect(r.reason).toContain('nothing runnable');
   }, 30_000);
 
+  it('a body field that is exactly one binding keeps the binding\'s type', async () => {
+    // The app echoes the body back; a string "1" where a number was saved would fail here,
+    // and in a real generated app it would be a 400 from the schema — a harness artifact.
+    const echo = `
+import { createServer } from 'node:http';
+createServer((req, res) => {
+  let body = '';
+  req.on('data', c => { body += c; });
+  req.on('end', () => {
+    const url = new URL(req.url, 'http://x');
+    res.writeHead(200, {'content-type':'application/json'});
+    if (url.pathname === '/health') return res.end('{"ok":true}');
+    if (url.pathname === '/tasks' && req.method === 'POST') return res.end(JSON.stringify({ id: 7 }));
+    res.end(JSON.stringify({ echo: JSON.parse(body || '{}') }));
+  });
+}).listen(Number(process.env.PORT));
+`;
+    const r = await runBehavior(appDir(echo), benchWith([
+      { name: 'health', method: 'GET', path: '/health', status: 200 },
+      { name: 'create', method: 'POST', path: '/tasks', body: { title: 'x' }, status: 200, save: { id: 'id' } },
+      {
+        name: 'the id arrives as a number',
+        method: 'POST', path: '/loans', body: { task_id: '{id}', note: 'task {id}' }, status: 200,
+        json: [
+          { path: 'echo.task_id', op: 'type', value: 'number' },
+          { path: 'echo.task_id', op: 'equals', value: 7 },
+          { path: 'echo.note', op: 'equals', value: 'task 7' },
+        ],
+      },
+    ]));
+    expect(r.failed).toEqual([]);
+    expect(r.outcome).toBe('working');
+  }, 30_000);
+
   it('saved bindings flow between checks, so state is really exercised', async () => {
     const r = await runBehavior(appDir(WORKING_APP), benchWith([
       ...CHECKS,

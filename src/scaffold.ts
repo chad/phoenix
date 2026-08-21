@@ -70,6 +70,14 @@ export function nodeScaffold(
   projectName: string = 'phoenix-project',
   rt?: RuntimeTarget | null,
   sharedImports: string[] = [],
+  /**
+   * Mount prefixes the SPEC declared, keyed by the module's output file path.
+   *
+   * When the spec states its HTTP interface, that interface is the contract and this map
+   * carries it (see `src/spec-interface.ts`). An absent key means the spec said nothing
+   * confident about that module, and the IU-name slug below stands.
+   */
+  declaredMounts: ReadonlyMap<string, string> = new Map(),
 ): ScaffoldResult {
   const files = new Map<string, string>();
 
@@ -101,7 +109,13 @@ export function nodeScaffold(
         const lowerName = iuName.toLowerCase();
         const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
         let prefix: string;
-        if (isWebUI && !webRootTaken) { prefix = ''; webRootTaken = true; }
+        const declared = declaredMounts.get(`src/generated/${svc.dir}/${mod}`);
+        if (declared !== undefined) {
+          // The spec pinned this interface. An internal naming decision does not get to
+          // move a URL other systems were told to call.
+          prefix = declared;
+          usedPrefixes.add(prefix);
+        } else if (isWebUI && !webRootTaken) { prefix = ''; webRootTaken = true; }
         else {
           let slug = lowerName.normalize('NFKD').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
           if (!slug) slug = baseName.toLowerCase().replace(/[^a-z0-9-]/g, '-') || 'mod';

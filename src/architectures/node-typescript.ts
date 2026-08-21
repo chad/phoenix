@@ -519,8 +519,13 @@ export const nodeTypescript: RuntimeTarget = {
     path.startsWith('src/generated/') && !path.endsWith('_migrations.ts'),
   validateSource: validateInlineScripts,
   aggregates: [migrationRole],
-  scaffold: (services: ServiceDescriptor[], projectName: string, sharedImports: string[]): Map<string, string> =>
-    nodeScaffold(services, projectName, nodeTypescript, sharedImports).files,
+  scaffold: (
+    services: ServiceDescriptor[],
+    projectName: string,
+    sharedImports: string[],
+    declaredMounts?: ReadonlyMap<string, string>,
+  ): Map<string, string> =>
+    nodeScaffold(services, projectName, nodeTypescript, sharedImports, declaredMounts).files,
 
   // Write package.json + npm install before generation so tsc can resolve the
   // framework's type declarations during the per-IU typecheck-retry loop.

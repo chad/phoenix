@@ -1,0 +1,710 @@
+[
+  {
+    "name": "health answers 200",
+    "method": "GET",
+    "path": "/health",
+    "status": 200
+  },
+  {
+    "name": "an empty library summarises to zeros",
+    "method": "GET",
+    "path": "/summary",
+    "status": 200,
+    "json": [
+      {
+        "path": "members",
+        "op": "equals",
+        "value": 0
+      },
+      {
+        "path": "books",
+        "op": "equals",
+        "value": 0
+      },
+      {
+        "path": "copies_on_loan",
+        "op": "equals",
+        "value": 0
+      },
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "registering a member returns 201",
+    "method": "POST",
+    "path": "/members",
+    "body": {
+      "name": "Ada Lovelace",
+      "email": "ada@example.com"
+    },
+    "status": 201,
+    "json": [
+      {
+        "path": "name",
+        "op": "equals",
+        "value": "Ada Lovelace"
+      },
+      {
+        "path": "email",
+        "op": "equals",
+        "value": "ada@example.com"
+      },
+      {
+        "path": "id",
+        "op": "type",
+        "value": "number"
+      }
+    ],
+    "save": {
+      "member": "id"
+    }
+  },
+  {
+    "name": "a new member holds no loans",
+    "method": "GET",
+    "path": "/members/{member}",
+    "status": 200,
+    "json": [
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 0
+      },
+      {
+        "path": "joined_at",
+        "op": "notEmpty"
+      }
+    ]
+  },
+  {
+    "name": "the member list shows the registration",
+    "method": "GET",
+    "path": "/members",
+    "status": 200,
+    "json": [
+      {
+        "path": "length",
+        "op": "equals",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "a repeated email is a conflict, not a validation error",
+    "method": "POST",
+    "path": "/members",
+    "body": {
+      "name": "Ada again",
+      "email": "ada@example.com"
+    },
+    "status": 409
+  },
+  {
+    "name": "an empty member name is rejected",
+    "method": "POST",
+    "path": "/members",
+    "body": {
+      "name": "",
+      "email": "x@example.com"
+    },
+    "status": 400
+  },
+  {
+    "name": "an email without an @ is rejected",
+    "method": "POST",
+    "path": "/members",
+    "body": {
+      "name": "Nope",
+      "email": "not-an-email"
+    },
+    "status": 400
+  },
+  {
+    "name": "adding a book returns 201",
+    "method": "POST",
+    "path": "/books",
+    "body": {
+      "title": "Structure and Interpretation",
+      "author": "Abelson",
+      "isbn": "111-1",
+      "copies_total": 2
+    },
+    "status": 201,
+    "json": [
+      {
+        "path": "title",
+        "op": "equals",
+        "value": "Structure and Interpretation"
+      },
+      {
+        "path": "copies_total",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "path": "copies_available",
+        "op": "equals",
+        "value": 2
+      }
+    ],
+    "save": {
+      "book": "id"
+    }
+  },
+  {
+    "name": "a book reports its availability",
+    "method": "GET",
+    "path": "/books/{book}",
+    "status": 200,
+    "json": [
+      {
+        "path": "copies_total",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "path": "copies_available",
+        "op": "equals",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "a repeated ISBN is a conflict",
+    "method": "POST",
+    "path": "/books",
+    "body": {
+      "title": "Copycat",
+      "author": "Someone",
+      "isbn": "111-1",
+      "copies_total": 1
+    },
+    "status": 409
+  },
+  {
+    "name": "a copy count below one is rejected",
+    "method": "POST",
+    "path": "/books",
+    "body": {
+      "title": "Ghost",
+      "author": "Nobody",
+      "isbn": "000-0",
+      "copies_total": 0
+    },
+    "status": 400
+  },
+  {
+    "name": "an empty book title is rejected",
+    "method": "POST",
+    "path": "/books",
+    "body": {
+      "title": "",
+      "author": "Nobody",
+      "isbn": "444-4",
+      "copies_total": 1
+    },
+    "status": 400
+  },
+  {
+    "name": "a second book can be added",
+    "method": "POST",
+    "path": "/books",
+    "body": {
+      "title": "Types and Programming Languages",
+      "author": "Pierce",
+      "isbn": "222-2",
+      "copies_total": 1
+    },
+    "status": 201,
+    "json": [
+      {
+        "path": "copies_available",
+        "op": "equals",
+        "value": 1
+      }
+    ],
+    "save": {
+      "book2": "id"
+    }
+  },
+  {
+    "name": "the book list shows both books",
+    "method": "GET",
+    "path": "/books",
+    "status": 200,
+    "json": [
+      {
+        "path": "length",
+        "op": "equals",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "borrowing returns 201 with an open loan",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book}",
+      "member_id": "{member}"
+    },
+    "status": 201,
+    "json": [
+      {
+        "path": "borrowed_at",
+        "op": "notEmpty"
+      },
+      {
+        "path": "due_at",
+        "op": "notEmpty"
+      },
+      {
+        "path": "returned_at",
+        "op": "equals",
+        "value": null
+      }
+    ],
+    "save": {
+      "loan": "id"
+    }
+  },
+  {
+    "name": "a borrowed copy is no longer available",
+    "method": "GET",
+    "path": "/books/{book}",
+    "status": 200,
+    "json": [
+      {
+        "path": "copies_total",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "path": "copies_available",
+        "op": "equals",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "the borrower's active loan count rises",
+    "method": "GET",
+    "path": "/members/{member}",
+    "status": 200,
+    "json": [
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "the summary reflects the loan immediately",
+    "method": "GET",
+    "path": "/summary",
+    "status": 200,
+    "json": [
+      {
+        "path": "members",
+        "op": "equals",
+        "value": 1
+      },
+      {
+        "path": "books",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "path": "copies_on_loan",
+        "op": "equals",
+        "value": 1
+      },
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "borrowing a book that does not exist is 404",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": 987654,
+      "member_id": "{member}"
+    },
+    "status": 404
+  },
+  {
+    "name": "borrowing for a member who does not exist is 404",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book}",
+      "member_id": 987654
+    },
+    "status": 404
+  },
+  {
+    "name": "the last copy can be borrowed",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book2}",
+      "member_id": "{member}"
+    },
+    "status": 201,
+    "save": {
+      "loan2": "id"
+    }
+  },
+  {
+    "name": "only books with a spare copy are listed as available",
+    "method": "GET",
+    "path": "/books?available=true",
+    "status": 200,
+    "json": [
+      {
+        "path": "length",
+        "op": "equals",
+        "value": 1
+      },
+      {
+        "path": "[0].isbn",
+        "op": "equals",
+        "value": "111-1"
+      }
+    ]
+  },
+  {
+    "name": "borrowing a book with no copies left is a conflict",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book2}",
+      "member_id": "{member}"
+    },
+    "status": 409
+  },
+  {
+    "name": "a member holding a loan cannot be removed",
+    "method": "DELETE",
+    "path": "/members/{member}",
+    "status": 409
+  },
+  {
+    "name": "both loans are active",
+    "method": "GET",
+    "path": "/loans?active=true",
+    "status": 200,
+    "json": [
+      {
+        "path": "length",
+        "op": "equals",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "returning a loan returns 200 and records the return",
+    "method": "POST",
+    "path": "/loans/{loan2}/return",
+    "status": 200,
+    "json": [
+      {
+        "path": "returned_at",
+        "op": "notEmpty"
+      }
+    ]
+  },
+  {
+    "name": "returning the same loan twice is a conflict",
+    "method": "POST",
+    "path": "/loans/{loan2}/return",
+    "status": 409
+  },
+  {
+    "name": "returning a loan that does not exist is 404",
+    "method": "POST",
+    "path": "/loans/987654/return",
+    "status": 404
+  },
+  {
+    "name": "a returned copy becomes available again",
+    "method": "GET",
+    "path": "/books/{book2}",
+    "status": 200,
+    "json": [
+      {
+        "path": "copies_available",
+        "op": "equals",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "only the unreturned loan is still active",
+    "method": "GET",
+    "path": "/loans?active=true",
+    "status": 200,
+    "json": [
+      {
+        "path": "length",
+        "op": "equals",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "the full loan list keeps the returned loan",
+    "method": "GET",
+    "path": "/loans",
+    "status": 200,
+    "json": [
+      {
+        "path": "length",
+        "op": "equals",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "a second member can register",
+    "method": "POST",
+    "path": "/members",
+    "body": {
+      "name": "Grace Hopper",
+      "email": "grace@example.com"
+    },
+    "status": 201,
+    "save": {
+      "member2": "id"
+    }
+  },
+  {
+    "name": "a well-stocked book can be added",
+    "method": "POST",
+    "path": "/books",
+    "body": {
+      "title": "Artificial Intelligence",
+      "author": "Russell",
+      "isbn": "333-3",
+      "copies_total": 5
+    },
+    "status": 201,
+    "save": {
+      "book3": "id"
+    }
+  },
+  {
+    "name": "first of three loans",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book3}",
+      "member_id": "{member2}"
+    },
+    "status": 201,
+    "save": {
+      "limitLoan": "id"
+    }
+  },
+  {
+    "name": "second of three loans",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book3}",
+      "member_id": "{member2}"
+    },
+    "status": 201
+  },
+  {
+    "name": "third of three loans",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book3}",
+      "member_id": "{member2}"
+    },
+    "status": 201
+  },
+  {
+    "name": "a fourth concurrent loan is a conflict",
+    "method": "POST",
+    "path": "/loans",
+    "body": {
+      "book_id": "{book3}",
+      "member_id": "{member2}"
+    },
+    "status": 409
+  },
+  {
+    "name": "the member is holding three loans",
+    "method": "GET",
+    "path": "/members/{member2}",
+    "status": 200,
+    "json": [
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 3
+      }
+    ]
+  },
+  {
+    "name": "the summary counts every copy on loan",
+    "method": "GET",
+    "path": "/summary",
+    "status": 200,
+    "json": [
+      {
+        "path": "members",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "path": "books",
+        "op": "equals",
+        "value": 3
+      },
+      {
+        "path": "copies_on_loan",
+        "op": "equals",
+        "value": 4
+      },
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 4
+      }
+    ]
+  },
+  {
+    "name": "returning frees the member's slot",
+    "method": "POST",
+    "path": "/loans/{limitLoan}/return",
+    "status": 200
+  },
+  {
+    "name": "the member is down to two loans",
+    "method": "GET",
+    "path": "/members/{member2}",
+    "status": 200,
+    "json": [
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "a book with copies out still shows the rest available",
+    "method": "GET",
+    "path": "/books/{book3}",
+    "status": 200,
+    "json": [
+      {
+        "path": "copies_total",
+        "op": "equals",
+        "value": 5
+      },
+      {
+        "path": "copies_available",
+        "op": "equals",
+        "value": 3
+      }
+    ]
+  },
+  {
+    "name": "a third member can register",
+    "method": "POST",
+    "path": "/members",
+    "body": {
+      "name": "Carol Shaw",
+      "email": "carol@example.com"
+    },
+    "status": 201,
+    "save": {
+      "member3": "id"
+    }
+  },
+  {
+    "name": "a member with no active loan can be removed",
+    "method": "DELETE",
+    "path": "/members/{member3}",
+    "status": 204
+  },
+  {
+    "name": "a removed member is gone",
+    "method": "GET",
+    "path": "/members/{member3}",
+    "status": 404
+  },
+  {
+    "name": "removing a member who never existed is 404",
+    "method": "DELETE",
+    "path": "/members/987654",
+    "status": 404
+  },
+  {
+    "name": "reading a book that does not exist is 404",
+    "method": "GET",
+    "path": "/books/987654",
+    "status": 404
+  },
+  {
+    "name": "reading a member that does not exist is 404",
+    "method": "GET",
+    "path": "/members/987654",
+    "status": 404
+  },
+  {
+    "name": "the member list reflects the removal",
+    "method": "GET",
+    "path": "/members",
+    "status": 200,
+    "json": [
+      {
+        "path": "length",
+        "op": "equals",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "name": "the closing summary is consistent",
+    "method": "GET",
+    "path": "/summary",
+    "status": 200,
+    "json": [
+      {
+        "path": "members",
+        "op": "equals",
+        "value": 2
+      },
+      {
+        "path": "books",
+        "op": "equals",
+        "value": 3
+      },
+      {
+        "path": "copies_on_loan",
+        "op": "equals",
+        "value": 3
+      },
+      {
+        "path": "active_loans",
+        "op": "equals",
+        "value": 3
+      }
+    ]
+  }
+]

@@ -40,15 +40,15 @@ export function renderTerminal(entries: readonly BenchEntry[]): string {
 
   const groups = new Map<string, Aggregate[]>();
   for (const a of aggs) {
-    const k = `${a.case}\u0000${a.fixture_digest}\u0000${a.model}`;
+    const k = `${a.case}\u0000${a.fixture_digest}\u0000${a.commit}\u0000${a.model}`;
     const g = groups.get(k);
     if (g) g.push(a); else groups.set(k, [a]);
   }
 
   for (const [k, rows] of groups) {
-    const [caseId, digest, model] = k.split('\u0000');
+    const [caseId, digest, commit, model] = k.split('\u0000');
     out.push('');
-    out.push(`${caseId} · ${model} · fixture ${digest}`);
+    out.push(`${caseId} · ${model} · fixture ${digest} · phoenix ${commit}`);
     out.push('');
     out.push(`  ${'arm'.padEnd(9)} ${'works (booted + every assertion held)'.padEnd(38)} ${'checks passed'.padEnd(26)} ${'samples'.padEnd(8)} outcomes`);
     for (const r of rows) {
@@ -103,17 +103,18 @@ export function renderHtml(entries: readonly BenchEntry[], meta: { generatedAt: 
   const data = JSON.stringify({ entries, aggs, meta }).replace(/</g, '\\u003c');
   const current = currentDigests(entries);
 
+  const isCurrent = (a: Aggregate): boolean => current.get(a.case) === `${a.fixture_digest}\u0000${a.commit}`;
   const aggRows = [...aggs]
-    .sort((a, b) => Number(current.get(b.case) === b.fixture_digest) - Number(current.get(a.case) === a.fixture_digest))
+    .sort((a, b) => Number(isCurrent(b)) - Number(isCurrent(a)))
     .map(a => `
-      <tr class="${current.get(a.case) === a.fixture_digest ? '' : 'superseded'}">
+      <tr class="${isCurrent(a) ? '' : 'superseded'}">
         <td>${esc(a.case)}</td><td class="mono">${esc(a.model)}</td>
         <td><span class="arm arm-${a.arm}">${a.arm}</span></td>
         <td class="num">${fmt(a)}</td>
         <td class="num">${esc(formatInterval(a.checks))}</td>
         <td class="num">${a.eligible}</td>
         <td class="small">${a.working} working · ${a.disagreed} disagreed · ${a.broke} broke${a.unreachable ? ` · ${a.unreachable} unreachable (excluded)` : ''}</td>
-        <td class="mono small">${esc(a.fixture_digest)}${current.get(a.case) === a.fixture_digest ? '' : '<br><span class="flag">superseded</span>'}</td>
+        <td class="mono small">${esc(a.fixture_digest)}<br>phoenix ${esc(a.commit)}${isCurrent(a) ? '' : '<br><span class="flag">superseded</span>'}</td>
       </tr>`).join('');
 
   const runRows = [...entries].reverse().map(e => {
@@ -136,15 +137,15 @@ export function renderHtml(entries: readonly BenchEntry[], meta: { generatedAt: 
   const comparisons: string[] = [];
   const byKey = new Map<string, Aggregate[]>();
   for (const a of aggs) {
-    const k = `${a.case}\u0000${a.fixture_digest}\u0000${a.model}`;
+    const k = `${a.case}\u0000${a.fixture_digest}\u0000${a.commit}\u0000${a.model}`;
     const g = byKey.get(k); if (g) g.push(a); else byKey.set(k, [a]);
   }
   for (const [k, rows] of byKey) {
-    const [caseId, , model] = k.split('\u0000');
+    const [caseId, , commit, model] = k.split('\u0000');
     const phoenix = rows.find(r => r.arm === 'phoenix');
     if (!phoenix) continue;
     for (const other of rows.filter(r => r.arm !== 'phoenix')) {
-      comparisons.push(`<li><strong>${esc(caseId)}</strong> <span class="mono small">${esc(model)}</span><br>${esc(compareSentence('phoenix', phoenix.works, other.arm, other.works))}</li>`);
+      comparisons.push(`<li><strong>${esc(caseId)}</strong> <span class="mono small">${esc(model)} · phoenix ${esc(commit)}</span><br>${esc(compareSentence('phoenix', phoenix.works, other.arm, other.works))}</li>`);
     }
   }
 
@@ -221,12 +222,13 @@ one arm is better.</p>
 </div>
 
 <h2>Citable runs, pooled</h2>
-<p class="small">Pooled by case, fixture digest, arm and model. Never across models and never across digests —
-two runs with different digests were not asked the same question. A <span class="flag">superseded</span> row was drawn
+<p class="small">Pooled by case, fixture digest, Phoenix commit, arm and model. Never across models, never across
+digests, and never across commits — a different digest is a different question, and a different commit is a
+different answerer, which is the whole point when the pipeline is the thing under test. A <span class="flag">superseded</span> row was drawn
 against an older version of the case; it is kept because deleting a number that has been read is how a results log
 stops being one.</p>
 <table>
-  <thead><tr><th>Case</th><th>Model</th><th>Arm</th><th>Works</th><th>Checks passed</th><th>n</th><th>Outcomes</th><th>Fixture</th></tr></thead>
+  <thead><tr><th>Case</th><th>Model</th><th>Arm</th><th>Works</th><th>Checks passed</th><th>n</th><th>Outcomes</th><th>Fixture / code</th></tr></thead>
   <tbody>${aggRows || '<tr><td colspan="8" class="small">No citable runs yet.</td></tr>'}</tbody>
 </table>
 
@@ -288,14 +290,18 @@ question instead of inviting one, so it is not drawn.</p>
 `;
 }
 
-/** The digest each case was most recently run against — older ones are superseded, not wrong. */
+/**
+ * The (fixture, commit) each case was most recently run against. Older pairs are
+ * superseded — not wrong, and not deleted, just no longer the current question or the
+ * current answerer.
+ */
 function currentDigests(entries: readonly BenchEntry[]): Map<string, string> {
-  const latest = new Map<string, { at: string; digest: string }>();
+  const latest = new Map<string, { at: string; key: string }>();
   for (const e of entries) {
     const prev = latest.get(e.case);
-    if (!prev || e.at > prev.at) latest.set(e.case, { at: e.at, digest: e.fixture_digest });
+    if (!prev || e.at > prev.at) latest.set(e.case, { at: e.at, key: `${e.fixture_digest}\u0000${e.commit}` });
   }
-  return new Map([...latest].map(([c, v]) => [c, v.digest]));
+  return new Map([...latest].map(([c, v]) => [c, v.key]));
 }
 
 function esc(s: string): string {

@@ -93,6 +93,17 @@ describe('aggregation', () => {
     expect(aggs).toHaveLength(2);
   });
 
+  it('never pools across commits — the pipeline is the treatment, not a constant', () => {
+    const before = entry({ commit: 'aaa1111' });
+    const after = entry({ commit: 'bbb2222', runs: [sample('working', 20), sample('working', 20), sample('working', 20)] });
+    const aggs = aggregate([before, after]);
+    expect(aggs).toHaveLength(2);
+    expect(aggs.map(a => a.commit).sort()).toEqual(['aaa1111', 'bbb2222']);
+    // The fix must be visible as a change, not averaged into the number it fixed.
+    expect(aggs.find(a => a.commit === 'bbb2222')!.works.k).toBe(3);
+    expect(aggs.find(a => a.commit === 'aaa1111')!.works.k).toBe(1);
+  });
+
   it('excludes unreachable samples from the denominator but keeps the count', () => {
     const runs = [sample('working', 20), sample('unreachable'), sample('unreachable')];
     const aggs = aggregate([entry({ runs })]);
