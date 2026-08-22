@@ -227,8 +227,10 @@ Every rate is printed beside its 95% Wilson interval, because `4/5` and `40/50` 
 rate and different facts. Overlapping intervals mean *these runs do not distinguish these
 rates* — never that one arm is better. Smoke runs, dirty-tree runs and runs with no declared
 sample size stay visible in the results and are excluded from every aggregate. The results are
-append-only JSONL under `bench/results/`, and [`bench/site/index.html`](bench/site/index.html)
-is generated from them.
+append-only JSONL under `bench/results/`, and the published page at
+**<http://chadfowler.com/phoenix/>** is regenerated from them by CI on every push — the
+results are the record, the page is derived, and there is deliberately no committed copy to
+drift from them.
 
 ```bash
 phoenix bench --dry           # what the run costs, spends nothing

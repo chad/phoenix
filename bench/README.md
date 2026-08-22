@@ -15,7 +15,7 @@ phoenix bench --dry                      # what a run will cost, spends nothing
 phoenix bench --res=coarse               # 5 samples on every arm
 phoenix bench todo-api --arm=phoenix,baseline --res=fine
 phoenix bench report                     # read the append-only results
-phoenix bench report --html              # rebuild bench/site/index.html
+phoenix bench report --html              # render the page locally (bench/site/index.html)
 ```
 
 ## The three arms
@@ -117,7 +117,10 @@ import Phoenix, and an oracle that can see the generator is not an oracle.
 ## Results
 
 Append-only JSONL under `bench/results/<case>.jsonl`, one object per run, never edited.
-`bench/site/index.html` is generated from them and adds no measurement of its own.
+The published page — **<http://chadfowler.com/phoenix/>** — is regenerated from those files
+by `.github/workflows/bench-site.yml` on every push that touches them, and adds no
+measurement of its own. Nothing renders a committed copy: one set of numbers, one source.
+`phoenix bench report --html` renders the same page locally into `bench/site/` (gitignored).
 
 ## Cost
 

@@ -1,0 +1,74 @@
+name: Bench results site
+
+# The bench results are the record; the page is derived from them and nothing else.
+#
+# That is why this workflow REGENERATES the page from `bench/results/*.jsonl` on every
+# deploy instead of publishing a committed artifact. A page built by hand can drift from
+# the runs it claims to describe, and a results page that quietly disagrees with the
+# results is worse than no page at all — it is a number nobody can trace.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bench/results/**'
+      - 'src/bench/**'
+      - '.github/workflows/bench-site.yml'
+  workflow_dispatch:
+
+# Pages needs an OIDC token to deploy; nothing here needs write access to the repo.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and never cancel one mid-flight: a half-published site is a
+# broken URL rather than a stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build the page from the append-only results
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PHOENIX_NO_LLM: '1'   # the report only READS results; it must never reach for a model
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Render the results page
+        run: node dist/cli.js bench report --html=_site/index.html
+
+      # If the results are empty the page still builds and says so — but an empty file
+      # would mean the renderer failed, and that should fail the deploy rather than
+      # publish a blank page.
+      - name: Refuse to publish an empty page
+        run: |
+          test -s _site/index.html || { echo "::error title=Empty bench page::the renderer produced nothing"; exit 1; }
+          grep -q "Bench results" _site/index.html || { echo "::error title=Unexpected page::the rendered file is not the bench report"; exit 1; }
+          echo "rendered $(wc -c < _site/index.html) bytes from $(cat bench/results/*.jsonl | wc -l) recorded run(s)"
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

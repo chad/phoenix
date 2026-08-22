@@ -15,3 +15,7 @@ examples/*/data/
 # `ingest` and selective regen work from a fresh clone (see examples/library-api/README.md).
 !examples/library-api/.phoenix/
 !examples/library-api/.phoenix/**
+
+# The bench page is DERIVED from bench/results/*.jsonl and published by CI.
+# Two sources of truth for one set of numbers is how a results page starts lying.
+bench/site/
