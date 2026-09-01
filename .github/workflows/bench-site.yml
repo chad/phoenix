@@ -58,7 +58,7 @@ jobs:
           grep -q "Bench results" _site/index.html || { echo "::error title=Unexpected page::the rendered file is not the bench report"; exit 1; }
           echo "rendered $(wc -c < _site/index.html) bytes from $(cat bench/results/*.jsonl | wc -l) recorded run(s)"
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
@@ -71,4 +71,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
