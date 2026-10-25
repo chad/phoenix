@@ -16,7 +16,7 @@
  *   PHOENIX_LLM_PROVIDER=custom PHOENIX_LLM_BASE_URL=… [PHOENIX_LLM_API_KEY=…]
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LLMProvider, LLMConfig } from './provider.js';
 import { DEFAULT_MODELS } from './provider.js';
@@ -58,8 +58,9 @@ export function resolveProvider(phoenixDir?: string): LLMProvider | null {
     || DEFAULT_MODELS.anthropic;
 
   // 4. Build provider
-  const provider = buildProvider(providerName, model);
-  if (!provider) return null;
+  const built = buildProvider(providerName, model);
+  if (!built) return null;
+  const provider = process.env.PHOENIX_LLM_TRACE ? traced(built, process.env.PHOENIX_LLM_TRACE) : built;
 
   // 5. Save preference if we detected it (and have a phoenix dir)
   if (phoenixDir && !config.llm && !envProvider && !envModel) {
@@ -70,6 +71,35 @@ export function resolveProvider(phoenixDir?: string): LLMProvider | null {
   }
 
   return provider;
+}
+
+/**
+ * PHOENIX_LLM_TRACE=<file> appends one JSON line per LLM call (start time, duration,
+ * model, prompt/response sizes, and the prompt's first line) — so a run's wall-clock can
+ * be attributed to the calls that spent it. Observation only: the call is unchanged.
+ */
+function traced(inner: LLMProvider, file: string): LLMProvider {
+  return {
+    name: inner.name,
+    model: inner.model,
+    async generate(prompt, options) {
+      const t0 = Date.now();
+      let ok = false;
+      let out = '';
+      try {
+        out = await inner.generate(prompt, options);
+        ok = true;
+        return out;
+      } finally {
+        const line = JSON.stringify({
+          start: new Date(t0).toISOString(), ms: Date.now() - t0, ok, model: inner.model,
+          prompt_chars: prompt.length, response_chars: out.length,
+          head: (options?.system ?? prompt).split('\n').find(l => l.trim())?.slice(0, 100) ?? '',
+        });
+        try { appendFileSync(file, line + '\n', 'utf8'); } catch { /* tracing must never break a run */ }
+      }
+    },
+  };
 }
 
 /** How a provider is built and whether it participates in env auto-detection. */
