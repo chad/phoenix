@@ -44,3 +44,13 @@ describe('declaredSurfaceForUnit — interface-first planning', () => {
     expect(declaredSurfaceForUnit(routes, { name: 'storage', isUi: false }, ['storage', 'question', 'web ui'])).toBeNull();
   });
 });
+
+describe('asPythonRegions', () => {
+  it('re-renders planned TS migration regions in Python syntax', async () => {
+    const { planFromMigrations, asPythonRegions } = await import('../../src/schema-plan.js');
+    const plan = planFromMigrations("registerMigration('votes', `CREATE TABLE IF NOT EXISTS votes (voter TEXT)`);")!;
+    const py = asPythonRegions(plan);
+    expect(py.regions[0].body).toBe('register_migration("votes", """CREATE TABLE IF NOT EXISTS votes (voter TEXT)""")');
+    expect(py.ddl).toBe(plan.ddl);
+  });
+});

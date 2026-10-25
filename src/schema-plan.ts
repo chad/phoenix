@@ -80,15 +80,33 @@ export async function planSchema(
   const hasMigrationRole = (target?.runtime.aggregates ?? []).some(r => r.role === 'migration');
   if (!hasMigrationRole) return null;
 
+  const forRuntime = (plan: SchemaPlan | null): SchemaPlan | null =>
+    plan && target?.runtime.language === 'python' ? asPythonRegions(plan) : plan;
   if (llm) {
     try {
       const plan = await planWithLLM(ius, canonNodes, allClauses, llm);
-      if (plan && plan.tableCount > 0) return plan;
+      if (plan && plan.tableCount > 0) return forRuntime(plan);
     } catch {
       /* fall through to the deterministic derivation */
     }
   }
-  return deriveSchema(ius, canonNodes, allClauses);
+  return forRuntime(deriveSchema(ius, canonNodes, allClauses));
+}
+
+/**
+ * The planned regions are written in TypeScript's registerMigration('t', `…`) form. A
+ * Python target's aggregate is Python — inserting them verbatim made _migrations.py a
+ * syntax error, so the generated service could not even import. Re-render each region
+ * as register_migration("t", """…""") with the identical DDL.
+ */
+export function asPythonRegions(plan: SchemaPlan): SchemaPlan {
+  const regions = plan.regions.map(r => {
+    const m = r.body.match(/registerMigration\(\s*(['"])(.*?)\1\s*,\s*`([\s\S]*?)`\s*\)\s*;?/);
+    if (!m) return r;
+    const body = `register_migration("${m[2]}", """${m[3]}""")`;
+    return { ...r, body, content_hash: sha(body) };
+  });
+  return { ...plan, regions };
 }
 
 // ─── LLM planning ─────────────────────────────────────────────────────────────
