@@ -69,7 +69,7 @@ import { checkConstraintAst } from './constraints/check-ast.js';
 import { computeObligations } from './constraints/obligations.js';
 import type { StructuredConstraint } from './constraints/model.js';
 import { parseSchema, checkModuleSchema } from './schema-contract.js';
-import { planSchema, SCHEMA_PLAN_IU, planFromMigrations } from './schema-plan.js';
+import { planSchema, SCHEMA_PLAN_IU, planFromMigrations, ddlFromMigrationsFile } from './schema-plan.js';
 import type { SchemaPlan } from './schema-plan.js';
 import { runRepairLoop } from './repair.js';
 import type { RepairTarget, RepairLoopResult } from './repair.js';
@@ -145,6 +145,7 @@ import { runBench, BenchRefusal } from './bench/run.js';
 import type { Clause } from './models/clause.js';
 import { DiffType } from './models/clause.js';
 import type { CanonicalNode } from './models/canonical.js';
+import { CanonicalType } from './models/canonical.js';
 import type { ImplementationUnit } from './models/iu.js';
 import type { Diagnostic } from './models/diagnostic.js';
 import type { DriftReport, DriftEntry } from './models/manifest.js';
@@ -2983,8 +2984,17 @@ async function cmdRegen(args: string[]): Promise<void> {
 
   const { nkByIU, onGenerationFailure } = buildNKRouting(phoenixDir, ius);
 
+  // The schema every module was generated against lives in the migrations aggregate.
+  // Bootstrap injects it into every prompt; regen must too, or a regenerated module
+  // invents columns (observed: a board query on votes.id, a column the declared
+  // schema never had — every GET /board a 500).
+  const migRole = regenArch?.runtime.aggregates?.find(r => r.role === 'migration');
+  const migPath = migRole ? join(projectRoot, migRole.filePath) : '';
+  const regenSchema = migPath && existsSync(migPath) ? ddlFromMigrationsFile(readFileSync(migPath, 'utf8')) : undefined;
+
   const regenCtx: RegenContext = {
     llm: llm ?? undefined,
+    sharedSchema: regenSchema,
     canonNodes,
     allIUs: ius,
     projectRoot,
@@ -3038,9 +3048,11 @@ async function cmdRegen(args: string[]): Promise<void> {
   // Shared aggregate (migrations): this may be a PARTIAL regen, so preserve regions
   // owned by IUs not in this batch and merge the freshly-generated ones over them.
   const regeneratedIUs = new Set(results.map(r => r.iu_id));
-  const preserve = readSharedRegions(projectRoot, regenArch)
-    .filter(r => !regeneratedIUs.has(r.iu_id));
-  const split = splitSharedArtifacts(results, regenArch, { preserve });
+  const existingRegions = readSharedRegions(projectRoot, regenArch);
+  const pinned = existingRegions.filter(r => r.iu_id === SCHEMA_PLAN_IU);
+  const preserve = existingRegions
+    .filter(r => !regeneratedIUs.has(r.iu_id) && r.iu_id !== SCHEMA_PLAN_IU);
+  const split = splitSharedArtifacts(results, regenArch, { preserve, pinned });
   reportArtifactSplit(split, '  ');
 
   // Gate: stamp readiness + conceptual mass into manifests before recording.
@@ -3655,7 +3667,7 @@ async function cmdUpgrade(args: string[]): Promise<void> {
   console.log(green(`  ✔ Applied ${result.classification}. Canonical graph updated. Re-plan + regen affected IUs.`));
 }
 
-async function cmdCanonicalize(): Promise<void> {
+async function cmdCanonicalize(args: string[] = []): Promise<void> {
   const { projectRoot, phoenixDir } = requirePhoenixRoot();
   const specStore = new SpecStore(phoenixDir);
   const canonStore = new CanonicalStore(phoenixDir);
@@ -3678,6 +3690,15 @@ async function cmdCanonicalize(): Promise<void> {
     console.log(`  ${dim(`LLM: ${llm.name}/${llm.model}`)}`);
   }
   console.log();
+
+  // Incremental by default once a graph exists: only clauses the graph does not yet
+  // cover are re-extracted. `--full` re-derives everything (and, because the LLM rewrite
+  // is not byte-deterministic, re-keys every node — which is why it strands every IU).
+  const existingNodes = canonStore.getAllNodes();
+  if (existingNodes.length > 0 && !args.includes('--full')) {
+    await canonicalizeIncremental(projectRoot, phoenixDir, allClauses, existingNodes, llm);
+    return;
+  }
 
   // The fallback must never be silent: a user paying for tokens gets a warning and
   // the journal records which extraction actually produced the graph.
@@ -3724,6 +3745,114 @@ async function cmdCanonicalize(): Promise<void> {
   writeFileSync(warmPath, JSON.stringify(warmObj, null, 2), 'utf8');
 
   console.log(`  ${green('✔')} ${warmHashes.size} warm context hashes computed`);
+}
+
+/**
+ * Per-clause canonicalization — the incremental half of selective invalidation.
+ *
+ * `ingest` already scopes a meaning change to the IUs whose requirements came from the
+ * changed clause. Whole-graph canonicalization then threw that scope away: the LLM
+ * rewrite is not byte-deterministic, so re-deriving an UNCHANGED clause produces new
+ * canon ids, every IU's source_canon_ids dangle, and every unit regenerates. This keeps
+ * every node whose source clause is unchanged exactly as it is (same id, same
+ * statement), extracts nodes only for clauses the graph does not cover, and rebinds the
+ * fresh nodes to the IU that owned the nodes they replace — so the IU plan, the IU ids
+ * and the untouched units' provenance all survive.
+ */
+async function canonicalizeIncremental(
+  projectRoot: string,
+  phoenixDir: string,
+  allClauses: Clause[],
+  existing: CanonicalNode[],
+  llm: ReturnType<typeof resolveProvider>,
+): Promise<void> {
+  const canonStore = new CanonicalStore(phoenixDir);
+  const live = new Set(allClauses.map(c => c.clause_id));
+  const covered = new Set(existing.flatMap(n => n.source_clause_ids));
+  const changed = allClauses.filter(c => !covered.has(c.clause_id));
+  const kept = existing.filter(n => n.source_clause_ids.some(id => live.has(id)));
+  const dropped = existing.filter(n => !n.source_clause_ids.some(id => live.has(id)));
+
+  if (changed.length === 0 && dropped.length === 0) {
+    console.log(`  ${green('✔')} canonical graph is current ${dim(`(${existing.length} nodes, ${allClauses.length} clauses — nothing to re-derive)`)}`);
+    return;
+  }
+
+  let extraction: 'llm-normalized' | 'llm-partial' | 'rule' | 'rule-fallback' = llm ? 'llm-normalized' : 'rule';
+  const fresh = changed.length === 0 ? [] : await extractCanonicalNodesLLM(changed, llm, {
+    onFallback: (e, info) => {
+      extraction = info.fellBack >= info.attempted ? 'rule-fallback' : 'llm-partial';
+      console.log(`  ${yellow('⚠')} LLM normalization fell back to rule form for ${info.fellBack}/${info.attempted} candidates ${dim(`(${e.message})`)}`);
+    },
+  });
+
+  if (fresh.length === 0 && dropped.length === 0) {
+    console.log(`  ${green('✔')} canonical graph is current ${dim(`(${existing.length} nodes, ${allClauses.length} clauses — nothing to re-derive)`)}`);
+    return;
+  }
+
+  // Edges into dropped nodes would dangle — prune them from the kept nodes.
+  const goneIds = new Set(dropped.map(n => n.canon_id));
+  for (const n of kept) {
+    if (n.linked_canon_ids?.some(id => goneIds.has(id))) {
+      n.linked_canon_ids = n.linked_canon_ids.filter(id => !goneIds.has(id));
+      if (n.link_types) for (const id of Object.keys(n.link_types)) if (goneIds.has(id)) delete n.link_types[id];
+    }
+  }
+  const canonNodes = [...kept, ...fresh];
+  canonStore.replaceNodes(canonNodes);
+  const stability = new CanonStabilityStore(phoenixDir).update(canonNodes);
+
+  // Rebind: each fresh requirement goes to the IU that owned the most similar node it
+  // replaces (or, for a wholly new clause, the most similar requirement anywhere).
+  const ius = loadIUs(phoenixDir);
+  const tok = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2));
+  const sim = (a: Set<string>, b: Set<string>) => { let i = 0; for (const w of a) if (b.has(w)) i++; return i / Math.max(1, a.size + b.size - i); };
+  const ownerOf = new Map<string, ImplementationUnit>();
+  for (const iu of ius) for (const id of iu.source_canon_ids) ownerOf.set(id, iu);
+  const replaced = dropped.filter(n => ownerOf.has(n.canon_id));
+  const pool = replaced.length > 0 ? replaced : existing.filter(n => ownerOf.has(n.canon_id));
+  const rebound = new Map<string, string[]>();
+  for (const n of fresh) {
+    if (n.type === CanonicalType.CONTEXT || pool.length === 0) continue;
+    const t = tok(n.statement);
+    let best = pool[0], bestScore = -1;
+    for (const p of pool) { const sc = sim(t, tok(p.statement)); if (sc > bestScore) { best = p; bestScore = sc; } }
+    const iu = ownerOf.get(best.canon_id)!;
+    iu.source_canon_ids.push(n.canon_id);
+    (rebound.get(iu.name) ?? rebound.set(iu.name, []).get(iu.name)!).push(n.canon_id);
+  }
+  for (const iu of ius) iu.source_canon_ids = iu.source_canon_ids.filter(id => !goneIds.has(id));
+  saveIUs(phoenixDir, ius);
+
+  const warmHashes = computeWarmHashes(allClauses, canonNodes);
+  const warmObj: Record<string, string> = {};
+  for (const [k, v] of warmHashes) warmObj[k] = v;
+  writeFileSync(join(phoenixDir, 'graphs', 'warm-hashes.json'), JSON.stringify(warmObj, null, 2), 'utf8');
+
+  new Journal(phoenixDir).append({
+    type: 'canonicalize',
+    inputs: changed.map(c => c.clause_id),
+    outputs: fresh.map(n => n.canon_id),
+    meta: {
+      incremental: true, node_count: canonNodes.length, kept: kept.length, dropped: dropped.length, added: fresh.length,
+      rebound: Object.fromEntries(rebound), stability_retention: stability.retention,
+      model_id: llm ? `${llm.name}/${llm.model}` : 'rule', extraction,
+    },
+  });
+
+  // A heading-only clause yields no nodes, so it is never "covered" and is re-read every
+  // time (free — no candidates, no calls). Count only clauses that carried requirements.
+  const derived = changed.filter(c => fresh.some(n => n.source_clause_ids.includes(c.clause_id)));
+  console.log(`  ${green('✔')} incremental: re-derived ${derived.length} changed clause(s) of ${allClauses.length}`);
+  console.log(`    ${dim(`${kept.length} node(s) kept verbatim · ${dropped.length} retired · ${fresh.length} new`)}`);
+  for (const n of fresh.filter(f => f.type !== CanonicalType.CONTEXT)) {
+    const owner = [...rebound].find(([, ids]) => ids.includes(n.canon_id))?.[0];
+    console.log(`    ${green('+')} ${dim(n.type)} ${n.statement}${owner ? dim(`  → ${owner}`) : ''}`);
+  }
+  if (rebound.size > 0) {
+    console.log(`  ${green('✔')} IU plan unchanged — new requirements bound to: ${[...rebound.keys()].join(', ')}`);
+  }
 }
 
 function cmdEvaluate(args: string[]): void {
@@ -4683,7 +4812,7 @@ async function main(): Promise<void> {
       break;
     case 'canonicalize':
     case 'canon-extract':
-      await cmdCanonicalize();
+      await cmdCanonicalize(commandArgs);
       break;
     case 'upgrade':
       await cmdUpgrade(commandArgs);

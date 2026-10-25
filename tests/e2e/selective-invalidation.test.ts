@@ -170,6 +170,43 @@ describe('e2e: selective invalidation', () => {
     phoenix(project, ['ingest']);
   });
 
+  /**
+   * Per-clause canonicalization. Whole-graph re-canonicalization re-keys every node (the
+   * LLM rewrite is not byte-deterministic), stranding every IU's source_canon_ids, so the
+   * saving ingest computed was lost one stage later. Incremental canonicalization keeps
+   * unchanged clauses' nodes verbatim and rebinds the changed clause's fresh nodes to the
+   * IU that owned the ones they replace — no `phoenix plan`, no IU churn.
+   */
+  it('canonicalize re-derives only the changed clause and keeps the IU plan', () => {
+    const specPath = join(project, 'spec', 'app.md');
+    const original = readFileSync(specPath, 'utf8');
+    const iusPath = join(project, '.phoenix', 'graphs', 'ius.json');
+    phoenix(project, ['canonicalize']);   // earlier tests leave edits un-canonicalized
+    phoenix(project, ['regen']);
+    const before = JSON.parse(readFileSync(iusPath, 'utf8')) as Array<{ iu_id: string; name: string; source_canon_ids: string[] }>;
+
+    writeFileSync(specPath, original.replace('A product name must not be empty', 'A product name must not be empty or exceed 80 characters'), 'utf8');
+    expect(phoenix(project, ['ingest'])).toMatch(/Invalidated: 1 IU\(s\) stale/);
+    const out = phoenix(project, ['canonicalize']).replace(/\x1b\[[0-9;]*m/g, '');
+    expect(out).toMatch(/incremental: re-derived 1 changed clause/);
+    expect(out).toMatch(/IU plan unchanged — new requirements bound to: product/);
+
+    const after = JSON.parse(readFileSync(iusPath, 'utf8')) as typeof before;
+    expect(after.map(i => i.iu_id)).toEqual(before.map(i => i.iu_id));
+    for (const iu of after) {
+      const prev = before.find(b => b.iu_id === iu.iu_id)!;
+      if (iu.name === 'product') expect(iu.source_canon_ids).not.toEqual(prev.source_canon_ids);
+      else expect(iu.source_canon_ids).toEqual(prev.source_canon_ids);
+    }
+    expect(phoenix(project, ['regen'])).toMatch(/selective \(1 stale of 3\)/);
+    expect(phoenix(project, ['canonicalize'])).toMatch(/canonical graph is current/);
+
+    writeFileSync(specPath, original, 'utf8');
+    phoenix(project, ['ingest']);
+    phoenix(project, ['canonicalize']);
+    phoenix(project, ['regen']);
+  });
+
   it('journal chain is intact and tamper-evident', () => {
     const out = phoenix(project, ['journal', '--verify']);
     expect(out).toMatch(/chain intact/);
