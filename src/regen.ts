@@ -364,7 +364,8 @@ async function generateWithLLM(
     let attempt = 0;
     while (errors && attempt < MAX_RETRIES) {
       if (process.env.PHOENIX_LLM_TRACE) {
-        try { appendFileSync(process.env.PHOENIX_LLM_TRACE, JSON.stringify({ start: new Date().toISOString(), kind: 'compile-retry', iu: iu.name, attempt, errors: errors.slice(0, 800) }) + '\n'); } catch { /* observation only */ }
+        try { appendFileSync(process.env.PHOENIX_LLM_TRACE, JSON.stringify({ start: new Date().toISOString(), kind: 'compile-retry', iu: iu.name, attempt, errors: errors.slice(0, 800),
+          lines: [...errors.matchAll(/\((\d+),\d+\)/g)].slice(0, 5).map(m => code.split('\n')[Number(m[1]) - 1]?.slice(0, 200)) }) + '\n'); } catch { /* observation only */ }
       }
       const fixResponse = await llm.generate(buildFixPrompt(code, errors), { system: systemPrompt, temperature: 0.1, maxTokens: 16384 });
       code = rt.assemble(fixResponse, iu);

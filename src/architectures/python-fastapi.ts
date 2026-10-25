@@ -199,6 +199,12 @@ def delete_note(note_id: int):
 function assemblePy(llmResponse: string, iu: ImplementationUnit): string {
   let code = fixSqliteQuotes(cleanCodeResponse(llmResponse));
 
+  // The model mirrors the TypeScript target's traceability header
+  // (`/** @internal Phoenix VCS traceability — do not remove. */`) into Python, where a
+  // JSDoc line is a syntax error: every Python module failed its first compile on it and
+  // paid for a fix-loop round trip. A one-line /** … */ is never Python — make it one.
+  code = code.replace(/^(\s*)\/\*\*?\s*(.*?)\s*\*\/\s*$/gm, (_m, indent: string, text: string) => `${indent}# ${text}`);
+
   // Ensure a router exists (the app mounts `router`). Count only a real statement-
   // position assignment, not a mention in a comment/string.
   if (!/^\s*router\s*=\s*APIRouter\(/m.test(code)) {
