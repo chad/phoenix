@@ -11,7 +11,7 @@
  */
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync } from 'node:fs';
-import { extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, planRootMounts, declaredSurfaceForUnit, type ModuleSurface } from './spec-interface.js';
+import { extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planAllMounts, declaredSurfaceForUnit, type ModuleSurface } from './spec-interface.js';
 import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
 import type { CanonicalNode } from './models/canonical.js';
@@ -285,10 +285,8 @@ function declaredSiblingMounts(others: ImplementationUnit[], canonNodes: Canonic
     modules.push({ key: file, name: o.name, shapes: moduleShapes(source), entities: moduleEntities(source) });
     nameByKey.set(file, o.name);
   }
-  const root = planRootMounts(routes, modules);
-  const prefixed = planMounts(surfaces, modules.filter(m => !root.has(m.key)));
   const out: Record<string, string> = {};
-  for (const d of [...root.values(), ...prefixed.decisions.values()]) out[nameByKey.get(d.key)!] = d.prefix;
+  for (const d of planAllMounts(routes, modules).decisions.values()) out[nameByKey.get(d.key)!] = d.prefix;
   return out;
 }
 

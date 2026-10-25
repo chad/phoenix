@@ -316,6 +316,25 @@ export function planRootMounts(
   return out;
 }
 
+/**
+ * The full mount decision: modules written against full paths go to the root first, and
+ * every surface those root modules already serve is withdrawn BEFORE prefix placement.
+ * Withdrawing it only from the "unplaced" report (the first version) left the surface up
+ * for grabs: a web UI whose only route is `GET /` "implemented 1/1" of `/board`'s shapes
+ * and was mounted at /board — the page vanished from / and GET /board returned HTML.
+ */
+export function planAllMounts(routes: readonly DeclaredRoute[], modules: readonly ModuleSurface[]): MountPlan {
+  const surfaces = declaredSurfaces(routes);
+  const root = planRootMounts(routes, modules);
+  const rootServed = new Set(modules.filter(m => root.has(m.key)).flatMap(m => m.shapes));
+  const servedByRoot = (s: DeclaredSurface) => s.shapes.every(sh => {
+    const [method, rest] = sh.split(' ');
+    return rootServed.has(`${method} /${s.prefix}${rest === '/' ? '' : rest}`);
+  });
+  const prefixed = planMounts(surfaces.filter(s => !servedByRoot(s)), modules.filter(m => !root.has(m.key)));
+  return { decisions: new Map([...root, ...prefixed.decisions]), unplaced: prefixed.unplaced };
+}
+
 /** The slice of the declared interface one unit is responsible for, decided BEFORE generation. */
 export interface UnitSurface {
   /** The prefix this unit will be mounted at ('' = site root, for a UI serving `GET /`). */

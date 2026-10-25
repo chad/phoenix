@@ -29,3 +29,19 @@ describe('planRootMounts — modules written against full paths', () => {
   });
 });
 
+
+describe('planAllMounts — a surface a root module serves is not up for grabs', () => {
+  it('does not mount the web UI at /board when the board module serves /board by full path', async () => {
+    const { planAllMounts } = await import('../../src/spec-interface.js');
+    const r = extractDeclaredRoutes(['`GET /` the page', '`GET /board` the board', '`POST /votes` vote']);
+    const plan = planAllMounts(r, [
+      { key: 'board.py', name: 'board', shapes: ['GET /board'] },
+      { key: 'web_ui.py', name: 'web ui', shapes: ['GET /'] },
+      { key: 'vote.py', name: 'vote', shapes: ['POST /'] },
+    ]);
+    expect(plan.decisions.get('board.py')?.prefix).toBe('');
+    expect(plan.decisions.get('web_ui.py')).toBeUndefined();   // falls through to the UI root rule
+    expect(plan.decisions.get('vote.py')?.prefix).toBe('/votes');
+    expect(plan.unplaced).toEqual([]);
+  });
+});

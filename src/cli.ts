@@ -132,8 +132,8 @@ import { failedGenerationKnowledge } from './models/negative-knowledge.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { PaceLayerMetadata } from './models/pace-layer.js';
 import {
-  extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, planRootMounts, describeMountPlan,
-  type ModuleSurface, type MountPlan,
+  extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planAllMounts, describeMountPlan,
+  type ModuleSurface,
 } from './spec-interface.js';
 import { loadCases } from './bench/case.js';
 import { ARMS, isArmName, type ArmName } from './bench/arms.js';
@@ -4579,17 +4579,7 @@ function resolveDeclaredMounts(
   }
 
   // Modules written against full paths mount at the root; the rest are placed by prefix.
-  const rootMounts = planRootMounts(declaredRoutes, modules);
-  const prefixed = planMounts(surfaces, modules.filter(m => !rootMounts.has(m.key)));
-  const rootServed = new Set(modules.filter(m => rootMounts.has(m.key)).flatMap(m => m.shapes));
-  const plan: MountPlan = {
-    decisions: new Map([...rootMounts, ...prefixed.decisions]),
-    // A surface every one of whose shapes a root-mounted module serves IS placed.
-    unplaced: prefixed.unplaced.filter(s => !s.shapes.every(sh => {
-      const [method, rest] = sh.split(' ');
-      return rootServed.has(`${method} /${s.prefix}${rest === '/' ? '' : rest}`);
-    })),
-  };
+  const plan = planAllMounts(declaredRoutes, modules);
   const lines = describeMountPlan(plan, key => nameByKey.get(key) ?? key);
   if (lines.length > 0) {
     console.log(`  ${dim('Interface:')} ${surfaces.length} surface(s) declared by the spec`);
