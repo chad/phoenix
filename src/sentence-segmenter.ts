@@ -27,9 +27,31 @@ export function segmentSentences(rawText: string): Sentence[] {
   let idx = 0;
 
   let proseBuffer = '';
+  // A list item soft-wrapped onto indented continuation lines is ONE statement. It is
+  // held here until the item ends (blank line, heading, next item, or an unindented
+  // line), so a wrapped rule is never cut into two half-sentences.
+  let listBuffer = '';
+  const flushList = (): void => {
+    if (!listBuffer) return;
+    if (listBuffer.length >= CONFIG.MIN_LIST_ITEM_LENGTH) {
+      // Split compound modals within list items
+      for (const sub of splitCompoundModals(listBuffer)) {
+        sentences.push({ text: sub, index: idx++, fromList: true });
+      }
+    }
+    listBuffer = '';
+  };
 
   for (const line of lines) {
     const trimmed = line.trim();
+
+    // Indented continuation of the pending list item.
+    if (listBuffer && trimmed && /^\s/.test(line)
+        && !/^(?:[-*•]|\d{1,3}[.)])\s+/.test(trimmed) && !/^#{1,6}\s/.test(trimmed)) {
+      listBuffer += ' ' + trimmed;
+      continue;
+    }
+    flushList();
 
     // Extract heading text as a sentence (provides section context)
     const headingMatch = trimmed.match(/^#{1,6}\s+(.*)/);
@@ -67,14 +89,7 @@ export function segmentSentences(rawText: string): Sentence[] {
         idx = sentences.length;
         proseBuffer = '';
       }
-      const content = listMatch[1].trim();
-      if (content.length >= CONFIG.MIN_LIST_ITEM_LENGTH) {
-        // Split compound modals within list items
-        const subs = splitCompoundModals(content);
-        for (const sub of subs) {
-          sentences.push({ text: sub, index: idx++, fromList: true });
-        }
-      }
+      listBuffer = listMatch[1].trim();
     } else {
       // Prose line. In unstructured input (notes, chat) each line is usually its
       // own statement; only join when the line is a soft-wrap continuation of an
@@ -91,6 +106,8 @@ export function segmentSentences(rawText: string): Sentence[] {
       proseBuffer += (proseBuffer ? ' ' : '') + trimmed;
     }
   }
+
+  flushList();
 
   // Flush remaining prose
   if (proseBuffer) {

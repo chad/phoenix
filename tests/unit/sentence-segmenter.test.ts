@@ -71,3 +71,24 @@ describe('segmentSentences', () => {
     }
   });
 });
+
+describe('wrapped list items', () => {
+  it('joins an indented continuation line into its list item', () => {
+    const s = segmentSentences([
+      '- Two members must never share the same email address; a registration that repeats an existing',
+      '  email is a conflict, not a validation error',
+      '- Users can list every member',
+    ].join('\n'));
+    expect(s.map(x => x.text)).toEqual([
+      'Two members must never share the same email address; a registration that repeats an existing email is a conflict, not a validation error',
+      'Users can list every member',
+    ]);
+    expect(s.every(x => x.fromList)).toBe(true);
+  });
+
+  it('does not swallow an unindented prose line that follows a list', () => {
+    const s = segmentSentences('- The title must not be empty\nThe service answers JSON.');
+    expect(s.map(x => x.text)).toEqual(['The title must not be empty', 'The service answers JSON.']);
+    expect(s[1].fromList).toBe(false);
+  });
+});
