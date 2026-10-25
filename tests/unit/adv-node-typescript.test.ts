@@ -61,4 +61,12 @@ describe('adversarial: node-typescript', () => {
     expect(rec.contributions.map(c => c.key)).toContain('issues');
     expect(rec.strippedCode).toContain('See Database migrations doc');
   });
+
+  it('strips the template section markers the model emits as headers', () => {
+    const body = "__MIGRATIONS__\nregisterMigration('t', `CREATE TABLE IF NOT EXISTS t (id INTEGER)`);\n\n__SCHEMAS__\nconst S = z.object({ a: z.string() });\n\n/* __ROUTES__ */\nrouter.get('/', c => c.json({}));";
+    const code = nodeTypescript.assemble(body, iu());
+    expect(code).not.toMatch(/^\s*(\/\*\s*)?__(MIGRATIONS|SCHEMAS|ROUTES)__/m);
+    expect(code).toContain("router.get('/'");
+    expect(code).toContain('const S = z.object');
+  });
 });

@@ -325,9 +325,16 @@ function assembleFromTemplate(llmResponse: string, iu: ImplementationUnit): stri
   // match the whole module specifier, not a substring (so a user import path that
   // merely contains 'zod'/'hono'/'db.js' is preserved).
   const FRAMEWORK_IMPORT = /from\s*['"](hono(\/.*)?|zod|better-sqlite3|(\.\.?\/)+db\.js)['"]/;
+  // The prompt asks for the sections under their template markers (__MIGRATIONS__,
+  // __SCHEMAS__, __ROUTES__) and the model faithfully emits them as bare header lines.
+  // Left in, each is an undefined identifier: tsc failed on EVERY first attempt and the
+  // module paid for a whole second generation in the fix loop (measured: ~40% of regen
+  // wall-clock). They are delimiters, not code.
+  const SECTION_MARKER = /^\s*(?:\/\/\s*|\/\*\s*)?__(?:MIGRATIONS|SCHEMAS|ROUTES|PHOENIX_METADATA)__\s*(?:\*\/)?\s*:?\s*$/;
   const bodyLines = codeLines.filter(line => {
     const trimmed = line.trim();
     if (trimmed.startsWith('import ') && FRAMEWORK_IMPORT.test(trimmed)) return false;
+    if (SECTION_MARKER.test(line)) return false;
     return true;
   });
   let body = bodyLines.join('\n').trim();
