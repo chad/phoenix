@@ -316,6 +316,69 @@ export function planRootMounts(
   return out;
 }
 
+/** The slice of the declared interface one unit is responsible for, decided BEFORE generation. */
+export interface UnitSurface {
+  /** The prefix this unit will be mounted at ('' = site root, for a UI serving `GET /`). */
+  readonly prefix: string;
+  /** Declared routes this unit must implement. */
+  readonly own: readonly DeclaredRoute[];
+  /** Declared routes that belong to other units — this one must not register them. */
+  readonly others: readonly DeclaredRoute[];
+}
+
+/**
+ * Interface-first planning: hand each unit its slice of the declared interface before it
+ * is generated, instead of discovering after generation which module happened to
+ * implement what. Without it every module sees the whole HTTP section as context, and a
+ * `board` module may implement every route in the spec (observed: two modules each
+ * registering 7 of 8 declared routes, both mounted at the root, shadowing the real ones).
+ *
+ * Assignment is nominal and conservative — a surface goes to the ONE unit named for it
+ * (`/votes` ← `vote`); the site root `GET /` goes to the UI unit. Anything ambiguous is
+ * left unassigned (null), and generation proceeds exactly as before.
+ */
+export function declaredSurfaceForUnit(
+  routes: readonly DeclaredRoute[],
+  unit: { name: string; isUi: boolean },
+  allUnitNames: readonly string[],
+): UnitSurface | null {
+  const real = routes.filter(r => {
+    const seg = normalisePath(r.path).split('/').filter(Boolean)[0]?.toLowerCase();
+    return !(seg && RESERVED_PREFIXES.has(seg));
+  });
+  if (real.length === 0) return null;
+  const firstSeg = (r: DeclaredRoute) => normalisePath(r.path).split('/').filter(Boolean)[0]?.toLowerCase() ?? '';
+  const ownerOf = (prefix: string): string | null => {
+    const named = allUnitNames.filter(n => tokensMatch(fold(prefix), n));
+    return named.length === 1 ? named[0] : null;
+  };
+  let prefix: string | null = null;
+  let own: DeclaredRoute[] = [];
+  if (unit.isUi) {
+    own = real.filter(r => firstSeg(r) === '');
+    if (own.length) prefix = '';
+  } else {
+    for (const s of declaredSurfaces(real)) {
+      if (ownerOf(s.prefix) === unit.name) { prefix = '/' + s.prefix; own = real.filter(r => firstSeg(r) === s.prefix); break; }
+    }
+  }
+  if (prefix === null) {
+    // Owns nothing by name. Only constrain it if every surface has a confident owner —
+    // otherwise this unit may be the rightful owner under another name.
+    const allOwned = declaredSurfaces(real).every(s => ownerOf(s.prefix) !== null);
+    if (!allOwned) return null;
+  }
+  const ownSet = new Set(own);
+  return { prefix: prefix ?? '', own, others: real.filter(r => !ownSet.has(r)) };
+}
+
+/** `/votes/:id/x` under prefix `/votes` → `/:id/x`; `/votes` → `/`. */
+export function relativeTo(prefix: string, path: string): string {
+  if (!prefix) return path;
+  const rest = path.slice(prefix.length);
+  return rest === '' ? '/' : rest;
+}
+
 /** One-line report per decision, for the console and the journal. */
 export function describeMountPlan(plan: MountPlan, nameOf: (key: string) => string): string[] {
   const lines: string[] = [];

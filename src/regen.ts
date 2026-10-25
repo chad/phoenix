@@ -11,7 +11,7 @@
  */
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
-import { extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, planRootMounts, type ModuleSurface } from './spec-interface.js';
+import { extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, planRootMounts, declaredSurfaceForUnit, type ModuleSurface } from './spec-interface.js';
 import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
 import type { CanonicalNode } from './models/canonical.js';
@@ -316,7 +316,12 @@ async function generateWithLLM(
   const siblingMounts = projectRoot && allIUs
     ? declaredSiblingMounts(allIUs.filter(o => o.iu_id !== iu.iu_id), canonNodes, projectRoot)
     : {};
-  extras = { ...extras, siblingMounts };
+  const unitSurface = declaredSurfaceForUnit(
+    extractDeclaredRoutes(canonNodes.map(n => n.statement)),
+    { name: iu.name, isUi: isUiIU(iu) },
+    (allIUs ?? [iu]).map(o => o.name),
+  );
+  extras = { ...extras, siblingMounts, unitSurface };
 
   // Inter-IU contracts: any other IU (across services) whose real contract is known.
   const knownContracts: SiblingContract[] = (allIUs ?? [])

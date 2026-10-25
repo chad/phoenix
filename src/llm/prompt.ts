@@ -8,6 +8,8 @@
 import { createHash } from 'node:crypto';
 import type { ImplementationUnit } from '../models/iu.js';
 import type { CanonicalNode } from '../models/canonical.js';
+import type { UnitSurface } from '../spec-interface.js';
+import { relativeTo } from '../spec-interface.js';
 import type { ResolvedTarget } from '../models/architecture.js';
 import type { NegativeKnowledge } from '../models/negative-knowledge.js';
 import type { RepairFinding } from '../models/repair.js';
@@ -29,6 +31,8 @@ export interface PromptExtras {
    *  it registers full paths at the root). Overrides the IU-name slug wherever this
    *  prompt tells a consumer (e.g. the web UI) where a sibling API lives. */
   siblingMounts?: Record<string, string>;
+  /** This unit's slice of the spec's declared HTTP interface (interface-first planning). */
+  unitSurface?: UnitSurface | null;
 }
 
 /**
@@ -309,6 +313,27 @@ export function buildPrompt(
       if (nk.constraint_for_future) {
         lines.push(`  → ${nk.constraint_for_future}`);
       }
+    }
+    lines.push('');
+  }
+
+  // Interface-first: this unit's slice of the declared HTTP interface. Without it the
+  // model sees the whole HTTP section as context and may implement every route.
+  const us = extras?.unitSurface;
+  if (us && target) {
+    lines.push('## Your HTTP surface — declared by the spec (a contract)');
+    if (us.own.length > 0) {
+      lines.push(us.prefix
+        ? `This module is mounted at \`${us.prefix}\`. Register its routes RELATIVE to that prefix:`
+        : 'This module is mounted at the site root. Register exactly these routes:');
+      for (const r of us.own) lines.push(`- \`${r.method} ${r.path}\` → relative path \`${relativeTo(us.prefix, r.path)}\``);
+      lines.push('Implement ALL of these, and no other declared route.');
+    } else {
+      lines.push('This module owns NO route of the declared HTTP interface.');
+    }
+    if (us.others.length > 0) {
+      lines.push('These declared routes belong to OTHER modules — do NOT register them here' + (us.own.length > 0 && us.prefix === '' ? ' (call them over HTTP at exactly these paths):' : ':'));
+      lines.push(us.others.map(r => `\`${r.method} ${r.path}\``).join(', '));
     }
     lines.push('');
   }
