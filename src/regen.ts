@@ -10,7 +10,7 @@
  * and auto-detected from env vars.
  */
 
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync } from 'node:fs';
 import { extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, planRootMounts, declaredSurfaceForUnit, type ModuleSurface } from './spec-interface.js';
 import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
@@ -363,6 +363,9 @@ async function generateWithLLM(
     let errors = check(code);
     let attempt = 0;
     while (errors && attempt < MAX_RETRIES) {
+      if (process.env.PHOENIX_LLM_TRACE) {
+        try { appendFileSync(process.env.PHOENIX_LLM_TRACE, JSON.stringify({ start: new Date().toISOString(), kind: 'compile-retry', iu: iu.name, attempt, errors: errors.slice(0, 800) }) + '\n'); } catch { /* observation only */ }
+      }
       const fixResponse = await llm.generate(buildFixPrompt(code, errors), { system: systemPrompt, temperature: 0.1, maxTokens: 16384 });
       code = rt.assemble(fixResponse, iu);
       errors = check(code);

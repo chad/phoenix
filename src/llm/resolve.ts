@@ -95,6 +95,7 @@ function traced(inner: LLMProvider, file: string): LLMProvider {
           start: new Date(t0).toISOString(), ms: Date.now() - t0, ok, model: inner.model,
           prompt_chars: prompt.length, response_chars: out.length,
           head: (options?.system ?? prompt).split('\n').find(l => l.trim())?.slice(0, 100) ?? '',
+          ...((inner as { lastMeta?: Record<string, unknown> }).lastMeta ?? {}),
         });
         try { appendFileSync(file, line + '\n', 'utf8'); } catch { /* tracing must never break a run */ }
       }

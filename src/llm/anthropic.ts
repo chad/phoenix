@@ -29,6 +29,9 @@ export class AnthropicProvider implements LLMProvider {
   readonly name = 'anthropic';
   readonly model: string;
   private apiKey: string;
+  /** Metadata of the last successful response (stop reason, token usage, whether the
+   *  model thought) — read by PHOENIX_LLM_TRACE. Observation only. */
+  lastMeta?: Record<string, unknown>;
 
   constructor(apiKey: string, model: string) {
     this.apiKey = apiKey;
@@ -44,6 +47,12 @@ export class AnthropicProvider implements LLMProvider {
 
     if (options?.system) {
       body.system = options.system;
+    }
+    // PHOENIX_LLM_THINKING=off: skip extended thinking up front. Models that think by
+    // default spend most of a codegen call's latency there; whether the output is still
+    // good enough is for the evaluations to say, not for this switch.
+    if (process.env.PHOENIX_LLM_THINKING === 'off') {
+      body.thinking = { type: 'disabled' };
     }
     // Claude 5-family models (sonnet-5, opus-…-5, haiku-…-5, fable-5, mythos-5)
     // deprecated the temperature parameter and reject any value. Omit it for
@@ -88,7 +97,11 @@ export class AnthropicProvider implements LLMProvider {
           throw new Error(`Anthropic API error ${res.status}: ${text}`);
         }
 
-        const data = await res.json() as { content: Array<{ type: string; text: string }>; stop_reason?: string };
+        const data = await res.json() as { content: Array<{ type: string; text: string }>; stop_reason?: string; usage?: { input_tokens?: number; output_tokens?: number } };
+        this.lastMeta = {
+          stop_reason: data.stop_reason, output_tokens: data.usage?.output_tokens, input_tokens: data.usage?.input_tokens,
+          thinking: data.content.some(b => b.type === 'thinking'), attempt, thinking_disabled: 'thinking' in body,
+        };
         const textBlocks = data.content.filter(b => b.type === 'text');
         // Self-heal: models that think by default can burn the max_tokens budget
         // inside a thinking block — zero text, or text cut off mid-JSON (the same
