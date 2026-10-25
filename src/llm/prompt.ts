@@ -145,7 +145,7 @@ export function extractLineProvenance(
   // written as a line comment (//phx:R1) or a block comment (/*phx:R1*/) — the model
   // uses block style inside template literals. Match the whole list, strip it, and
   // record the first resolvable label as the line's primary provenance.
-  const re = /\s*(?:\/\/|\/\*)\s*phx:\s*([A-Za-z]\d+(?:[\s,]+[A-Za-z]\d+)*)\s*(?:\*\/)?\s*$/;
+  const re = /\s*(?:\/\/|\/\*|#)\s*phx:\s*([A-Za-z]\d+(?:[\s,]+[A-Za-z]\d+)*)\s*(?:\*\/)?\s*$/;
   // Inline block markers — e.g. inside a template literal: `<div>/*phx:R1*/</div>` — are
   // not at end of line, so strip them in place wherever they appear.
   const blockRe = /\/\*\s*phx:\s*([A-Za-z]\d+(?:[\s,]+[A-Za-z]\d+)*)\s*\*\//g;
@@ -226,6 +226,7 @@ export function buildPrompt(
   extras?: PromptExtras,
 ): string {
   const lines: string[] = [];
+  const isPython = target?.runtime.language === 'python';
   const labels = provenanceLabels(iu, canonNodes);
   const labelOf: Record<string, string> = {};
   for (const l of labels) labelOf[l.canonId] = l.label;
@@ -437,8 +438,13 @@ export function buildPrompt(
   if (labels.length > 0) {
     lines.push('## Provenance annotations (required)');
     lines.push('The requirements/constraints/invariants above are tagged with short labels in [brackets], e.g. [R1], [C1], [I1].');
-    lines.push('When a line of code implements one of them, append a marker comment at the END of that line: //phx:<label>');
-    lines.push("Example:  router.post('/login', login);  //phx:R1");
+    if (isPython) {
+      lines.push('When a line of code implements one of them, append a marker comment at the END of that line: #phx:<label>');
+      lines.push('Example:  @router.post("/login")  #phx:R1');
+    } else {
+      lines.push('When a line of code implements one of them, append a marker comment at the END of that line: //phx:<label>');
+      lines.push("Example:  router.post('/login', login);  //phx:R1");
+    }
     lines.push('Use the single most specific label. Add nothing for lines that map to no requirement. Never put the marker on its own line.');
     lines.push('');
   }
@@ -447,13 +453,26 @@ export function buildPrompt(
   lines.push('## Required metadata export');
   lines.push('Include this exact constant at the end of the module:');
   lines.push('```');
-  lines.push(`/** @internal Phoenix VCS traceability — do not remove. */`);
-  lines.push(`export const _phoenix = {`);
-  lines.push(`  iu_id: ${JSON.stringify(iu.iu_id)},`);
-  lines.push(`  name: ${JSON.stringify(iu.name)},`);
-  lines.push(`  risk_tier: ${JSON.stringify(iu.risk_tier)},`);
-  lines.push(`  canon_ids: [${iu.source_canon_ids.length} as const],`);
-  lines.push(`} as const;`);
+  if (isPython) {
+    // A Python target was shown the TypeScript block and copied it — `export const
+    // _phoenix = {` is a syntax error, and 48 of 53 Python compile-fix retries in one
+    // measured session were exactly this line.
+    lines.push(`# @internal Phoenix VCS traceability — do not remove.`);
+    lines.push(`_phoenix = {`);
+    lines.push(`    "iu_id": ${JSON.stringify(iu.iu_id)},`);
+    lines.push(`    "name": ${JSON.stringify(iu.name)},`);
+    lines.push(`    "risk_tier": ${JSON.stringify(iu.risk_tier)},`);
+    lines.push(`    "canon_ids": [],  # filled in by Phoenix`);
+    lines.push(`}`);
+  } else {
+    lines.push(`/** @internal Phoenix VCS traceability — do not remove. */`);
+    lines.push(`export const _phoenix = {`);
+    lines.push(`  iu_id: ${JSON.stringify(iu.iu_id)},`);
+    lines.push(`  name: ${JSON.stringify(iu.name)},`);
+    lines.push(`  risk_tier: ${JSON.stringify(iu.risk_tier)},`);
+    lines.push(`  canon_ids: [${iu.source_canon_ids.length} as const],`);
+    lines.push(`} as const;`);
+  }
   lines.push('```');
   lines.push('');
 
@@ -463,7 +482,7 @@ export function buildPrompt(
     lines.push('');
   }
 
-  lines.push('Output the complete TypeScript module now.');
+  lines.push(`Output the complete ${isPython ? 'Python' : 'TypeScript'} module now.`);
 
   return lines.join('\n');
 }
