@@ -199,7 +199,9 @@ function extractFromClause(clause: Clause): { candidates: CandidateNode[]; cover
     candidates.push({
       candidate_id: candidateId,
       type,
-      statement: normalizedStatement,
+      // The id hashes the normalized (case-folded) text so identity is unchanged; the
+      // statement the generator reads keeps the author's case inside literals.
+      statement: restoreLiteralCase(normalizedStatement, content),
       confidence,
       source_clause_ids: [clause.clause_id],
       tags,
@@ -225,6 +227,23 @@ function extractFromClause(clause: Clause): { candidates: CandidateNode[]; cover
   };
 
   return { candidates, coverage };
+}
+
+/**
+ * Normalization case-folds the whole sentence, which is right for hashing and wrong for
+ * literals: `store it as "Anonymous"` reached the generator as "anonymous" and shipped as
+ * the wrong value, and `DB_PATH` became db_path. Quoted strings and `code` spans are
+ * exact values the spec pins, so put the author's spelling back inside them.
+ */
+export function restoreLiteralCase(normalized: string, original: string): string {
+  let out = normalized;
+  for (const m of original.matchAll(/`([^`]+)`|"([^"]+)"|“([^”]+)”/g)) {
+    const literal = (m[1] ?? m[2] ?? m[3]).trim();
+    const folded = literal.toLowerCase();
+    if (!literal || literal === folded) continue;
+    out = out.split(folded).join(literal);
+  }
+  return out;
 }
 
 // ─── Term extraction (v2: acronym whitelist + hyphenated compounds) ───────────

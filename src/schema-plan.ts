@@ -164,6 +164,24 @@ function buildSchemaPrompt(ius: ImplementationUnit[], canonNodes: CanonicalNode[
     lines.push('');
   }
 
+  // The spec may pin its storage outright ("a table named `votes` with exactly the columns
+  // …"). Data outlives every implementation of it, so a declared schema is a contract —
+  // the same standing as a declared HTTP route — and the planner's naming conventions
+  // below must not override it. Without this the prompt carried only MINED attribute
+  // words, and a spec that declared `votes(question_id, voter, voted_at)` got a planned
+  // `votes(id, created_at, storage_id, there)`.
+  const declared = declaredStorageLines(allClauses);
+  if (declared.length > 0) {
+    lines.push('## Storage the SPEC DECLARES (a contract — reproduce it EXACTLY)');
+    for (const d of declared) lines.push(`- ${d}`);
+    lines.push('');
+    lines.push('These declarations OUTRANK every output rule below: use exactly these table names, column');
+    lines.push('names, types, defaults and keys; add NO columns to a declared table (no id or created_at unless');
+    lines.push('declared); and create NO table beyond the declared ones unless a rule above cannot be stored');
+    lines.push('without it. A module that owns no data (a UI, a derived/ranked view) gets no table.');
+    lines.push('');
+  }
+
   lines.push('## Output rules');
   lines.push("- Output ONLY registerMigration('<table>', `CREATE TABLE IF NOT EXISTS <table> (...)`) blocks, one per table.");
   lines.push('- Use snake_case, PLURAL table names (accounts, transactions, entries) and snake_case columns.');
@@ -174,6 +192,29 @@ function buildSchemaPrompt(ius: ImplementationUnit[], canonNodes: CanonicalNode[
   lines.push('');
   lines.push('Output the registerMigration statements now.');
   return lines.join('\n');
+}
+
+/**
+ * Spec lines that declare storage: a sentence naming a table together with its columns
+ * (or literal DDL). Conservative on purpose — prose that merely says "stored" declares
+ * nothing; a line must name a table AND columns/keys to count.
+ */
+export function declaredStorageLines(allClauses: Clause[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const c of allClauses) {
+    // Rejoin soft-wrapped list items so a declaration is one line.
+    const items = c.raw_text.replace(/\n[ \t]+(?![-*•]\s)/g, ' ').split('\n');
+    for (const raw of items) {
+      const line = raw.replace(/^\s*(?:[-*•]|\d{1,3}[.)])\s+/, '').trim();
+      const declares = /\bcreate\s+table\b/i.test(line)
+        || (/\btable\b/i.test(line) && /\bcolumns?\b|\bprimary\s+key\b/i.test(line));
+      if (!declares || seen.has(line)) continue;
+      seen.add(line);
+      out.push(line);
+    }
+  }
+  return out;
 }
 
 // ─── Deterministic derivation (fallback / stub mode) ────────────────────────────
