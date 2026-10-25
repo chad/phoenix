@@ -217,6 +217,30 @@ export function declaredStorageLines(allClauses: Clause[]): string[] {
   return out;
 }
 
+/**
+ * The CREATE TABLE statements in an existing migrations aggregate, whatever the runtime's
+ * syntax around them (TS template literals, Python triple quotes). Paren-balanced, so a
+ * column default like (datetime('now')) does not end the statement early.
+ */
+export function ddlFromMigrationsFile(content: string): string | undefined {
+  const out: string[] = [];
+  const re = /CREATE\s+TABLE\b/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content))) {
+    const open = content.indexOf('(', m.index);
+    if (open < 0) break;
+    let depth = 0, end = -1;
+    for (let i = open; i < content.length; i++) {
+      if (content[i] === '(') depth++;
+      else if (content[i] === ')' && --depth === 0) { end = i; break; }
+    }
+    if (end < 0) break;
+    out.push(content.slice(m.index, end + 1));
+    re.lastIndex = end;
+  }
+  return out.length ? out.join('\n') : undefined;
+}
+
 // ─── Deterministic derivation (fallback / stub mode) ────────────────────────────
 
 /**

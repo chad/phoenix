@@ -49,6 +49,12 @@ export interface SplitOptions {
    * (partial-regen semantics — a freshly-regenerated key wins).
    */
   preserveWins?: boolean;
+  /**
+   * Regions that win the dedupe regardless of batch — the pre-planned schema (owner
+   * SCHEMA_PLAN_IU). A partial regen must not let a regenerated module's own CREATE TABLE
+   * replace the declared schema every other module was generated against.
+   */
+  pinned?: ParsedRegion[];
 }
 
 /**
@@ -67,6 +73,10 @@ export function splitSharedArtifacts(
 
   for (const role of roles) {
     const contributions: Contribution[] = [];
+
+    for (const r of opts?.pinned ?? []) {
+      if (r.role === role.role) contributions.push({ iu_id: r.iu_id, key: r.key ?? r.body, body: r.body });
+    }
 
     // Authoritative preserve (schema-first): pre-planned regions come FIRST so their
     // keys win the dedupe over any stray module contribution for the same table.
