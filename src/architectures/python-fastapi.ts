@@ -25,14 +25,45 @@ import { cleanCodeResponse, validateInlineScripts, fixSqliteQuotes } from '../co
 
 const DB_FILE = `import os
 import sqlite3
+import threading
 
 DB_PATH = os.environ.get("DB_PATH", "data/app.db")
 os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
 
-db = sqlite3.connect(DB_PATH, check_same_thread=False)
-db.row_factory = sqlite3.Row
-db.execute("PRAGMA journal_mode = WAL")
-db.execute("PRAGMA foreign_keys = ON")
+
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+class _PerThreadConnection:
+    """FastAPI runs sync endpoints in a thread pool. One sqlite3 connection shared across
+    those threads fails under concurrent requests (sqlite3.InterfaceError: bad parameter or
+    other API misuse), so every thread gets its own connection to the same file (WAL)."""
+
+    _local = threading.local()
+
+    def _conn(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = self._local.conn = _connect()
+        return conn
+
+    def __getattr__(self, name):
+        return getattr(self._conn(), name)
+
+    def __enter__(self):
+        return self._conn().__enter__()
+
+    def __exit__(self, *exc):
+        return self._conn().__exit__(*exc)
+
+
+_connect().execute("PRAGMA journal_mode = WAL").close()
+db = _PerThreadConnection()
 
 _migrations: list[tuple[str, str]] = []
 
