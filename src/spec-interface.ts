@@ -287,11 +287,40 @@ export function planMounts(
   return { decisions, unplaced };
 }
 
+/**
+ * Modules that register declared routes by their FULL path (`router.post('/questions/:id/vote')`)
+ * rather than relative to a prefix. Mounting such a module under a prefix doubles it
+ * (`/votes/questions/:id/vote`) and every declared request 404s; mounting it at the root
+ * serves exactly the paths the spec declared. A module qualifies only when at least half
+ * of everything it registers is a declared full route — one coincidental match does not
+ * move a module to the root. The site root `GET /` never counts (it is ambiguous with a
+ * relative collection route).
+ */
+export function planRootMounts(
+  routes: readonly DeclaredRoute[],
+  modules: readonly ModuleSurface[],
+): Map<string, MountDecision> {
+  const declared = new Set(routes.map(r => `${r.method} ${normalisePath(r.path)}`));
+  const out = new Map<string, MountDecision>();
+  for (const mod of modules) {
+    if (mod.shapes.length === 0) continue;
+    const full = mod.shapes.filter(s => !s.endsWith(' /') && declared.has(s));
+    if (full.length === 0 || full.length * 2 < mod.shapes.length) continue;
+    out.set(mod.key, {
+      key: mod.key,
+      prefix: '',
+      basis: 'structural',
+      why: `registers ${full.length}/${mod.shapes.length} of its routes by their full declared path (${full.join(', ')}) — mounted at the root`,
+    });
+  }
+  return out;
+}
+
 /** One-line report per decision, for the console and the journal. */
 export function describeMountPlan(plan: MountPlan, nameOf: (key: string) => string): string[] {
   const lines: string[] = [];
   for (const d of plan.decisions.values()) {
-    lines.push(`${d.prefix} ← ${nameOf(d.key)} (declared in spec; ${d.why})`);
+    lines.push(`${d.prefix || '/'} ← ${nameOf(d.key)} (declared in spec; ${d.why})`);
   }
   for (const s of plan.unplaced) {
     lines.push(`/${s.prefix} declared in spec but not placed — no module implements it unambiguously (${s.shapes.join(', ')})`);

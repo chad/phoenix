@@ -430,7 +430,12 @@ function pruneMigrationImport(content: string): string {
 
 const WEB_RE = /\b(web|ui|frontend|interface|page|dashboard|board)\b/;
 
-function pythonScaffold(services: ServiceDescriptor[], projectName: string, sharedImports: string[]): Map<string, string> {
+function pythonScaffold(
+  services: ServiceDescriptor[],
+  projectName: string,
+  sharedImports: string[],
+  declaredMounts: ReadonlyMap<string, string> = new Map(),
+): Map<string, string> {
   const files = new Map<string, string>();
 
   files.set('src/db.py', DB_FILE);
@@ -451,8 +456,12 @@ function pythonScaffold(services: ServiceDescriptor[], projectName: string, shar
       // URL prefixes use hyphens (web convention); the Python package dir uses underscores.
       // Only the first web module keeps the root mount; later web modules fall back to
       // '/'+dir so their routes (e.g. GET /) stay reachable instead of colliding at root.
+      // The spec's declared interface outranks the directory slug (see
+      // src/spec-interface.ts) — the same contract node-typescript honours.
+      const declared = declaredMounts.get(`src/generated/${svc.dir}/${mod}`);
       let prefix: string;
-      if (isWeb && !webRootTaken) { prefix = ''; webRootTaken = true; }
+      if (declared !== undefined) prefix = declared;
+      else if (isWeb && !webRootTaken) { prefix = ''; webRootTaken = true; }
       else prefix = '/' + svc.dir.replace(/_/g, '-');
       mounts.push(`app.include_router(${alias}, prefix="${prefix}")`);
     }
@@ -461,6 +470,7 @@ function pythonScaffold(services: ServiceDescriptor[], projectName: string, shar
   const main = [
     'from fastapi import FastAPI',
     'from fastapi.responses import JSONResponse',
+    'from starlette.routing import Match',
     'from src.db import run_migrations',
     '',
     '# Shared aggregate artifacts (register migrations on import)',
@@ -470,6 +480,21 @@ function pythonScaffold(services: ServiceDescriptor[], projectName: string, shar
     ...imports,
     '',
     'app = FastAPI(title="' + projectName + '")',
+    '',
+    '',
+    '# A router route "/" mounted at "/things" answers on "/things/" only, and Starlette',
+    '# 307-redirects "/things" there — an absolute http:// Location behind a TLS proxy.',
+    '# The declared interface says "/things", so serve it in place instead of redirecting.',
+    '@app.middleware("http")',
+    'async def _declared_paths(request, call_next):',
+    '    path = request.scope["path"]',
+    '    if path != "/" and not path.endswith("/"):',
+    '        def _matches(p):',
+    '            scope = dict(request.scope, path=p)',
+    '            return any(r.matches(scope)[0] == Match.FULL for r in app.router.routes)',
+    '        if not _matches(path) and _matches(path + "/"):',
+    '            request.scope["path"] = path + "/"',
+    '    return await call_next(request)',
     '',
     '@app.get("/health")',
     'def health():',

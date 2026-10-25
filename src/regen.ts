@@ -10,7 +10,8 @@
  * and auto-detected from env vars.
  */
 
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, planRootMounts, type ModuleSurface } from './spec-interface.js';
 import { join, dirname } from 'node:path';
 import type { ImplementationUnit } from './models/iu.js';
 import type { CanonicalNode } from './models/canonical.js';
@@ -270,6 +271,27 @@ interface LLMGenerationResult {
   lineProvenance?: Record<string, string>;
 }
 
+/** IU name → declared mount prefix, for the siblings whose module exists on disk. */
+function declaredSiblingMounts(others: ImplementationUnit[], canonNodes: CanonicalNode[], projectRoot: string): Record<string, string> {
+  const routes = extractDeclaredRoutes(canonNodes.map(n => n.statement));
+  const surfaces = declaredSurfaces(routes);
+  if (surfaces.length === 0) return {};
+  const modules: ModuleSurface[] = [];
+  const nameByKey = new Map<string, string>();
+  for (const o of others) {
+    const file = o.output_files[0];
+    if (!file || !existsSync(join(projectRoot, file))) continue;
+    const source = readFileSync(join(projectRoot, file), 'utf8');
+    modules.push({ key: file, name: o.name, shapes: moduleShapes(source), entities: moduleEntities(source) });
+    nameByKey.set(file, o.name);
+  }
+  const root = planRootMounts(routes, modules);
+  const prefixed = planMounts(surfaces, modules.filter(m => !root.has(m.key)));
+  const out: Record<string, string> = {};
+  for (const d of [...root.values(), ...prefixed.decisions.values()]) out[nameByKey.get(d.key)!] = d.prefix;
+  return out;
+}
+
 async function generateWithLLM(
   iu: ImplementationUnit,
   llm: LLMProvider,
@@ -287,12 +309,21 @@ async function generateWithLLM(
     ?.filter(other => other.iu_id !== iu.iu_id && other.output_files[0]?.startsWith(iuDir || ''))
     .map(other => other.name) ?? [];
 
+  // Where each sibling is actually served: the spec's declared interface, resolved
+  // against the siblings already on disk — the same resolution the scaffold mounts by.
+  // The IU-name slug is only the fallback; telling a web UI to fetch('/vote') when the
+  // spec declares POST /votes ships a page whose every button 404s.
+  const siblingMounts = projectRoot && allIUs
+    ? declaredSiblingMounts(allIUs.filter(o => o.iu_id !== iu.iu_id), canonNodes, projectRoot)
+    : {};
+  extras = { ...extras, siblingMounts };
+
   // Inter-IU contracts: any other IU (across services) whose real contract is known.
   const knownContracts: SiblingContract[] = (allIUs ?? [])
     .filter(other => other.iu_id !== iu.iu_id && siblingContracts?.has(other.iu_id))
     .map(other => ({
       name: other.name,
-      mountPath: '/' + other.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+      mountPath: siblingMounts[other.name] ?? '/' + other.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
       contract: siblingContracts!.get(other.iu_id)!,
     }));
 

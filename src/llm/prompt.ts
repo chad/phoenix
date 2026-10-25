@@ -25,6 +25,10 @@ export interface PromptExtras {
   repairFindings?: RepairFinding[];
   /** The current on-disk source of the module being repaired, for reference. */
   currentSource?: string;
+  /** IU name → the mount prefix the SPEC's declared interface gives that module ('' =
+   *  it registers full paths at the root). Overrides the IU-name slug wherever this
+   *  prompt tells a consumer (e.g. the web UI) where a sibling API lives. */
+  siblingMounts?: Record<string, string>;
 }
 
 /**
@@ -284,7 +288,9 @@ export function buildPrompt(
     lines.push('OMIT it from the request body — only send null if the schema marks it `.nullable()`.');
     for (const s of siblingContracts) {
       lines.push('');
-      lines.push(`### "${s.name}" — mounted at ${s.mountPath}`);
+      lines.push(s.mountPath === ''
+        ? `### "${s.name}" — serves its routes at the full paths shown (mounted at the root)`
+        : `### "${s.name}" — mounted at ${s.mountPath}`);
       lines.push('```ts');
       lines.push(s.contract);
       lines.push('```');
@@ -385,7 +391,12 @@ export function buildPrompt(
         const lowerName = m.toLowerCase();
         const isWebUI = /\b(web|ui|frontend|interface|page|dashboard)\b/.test(lowerName);
         if (isWebUI) continue; // skip other web modules
-        const mountPath = '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const declared = extras?.siblingMounts?.[m];
+        if (declared === '') {
+          lines.push(`- "${m}" serves its routes at their full paths — call them exactly as the spec's HTTP interface declares`);
+          continue;
+        }
+        const mountPath = declared ?? '/' + lowerName.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         lines.push(`- "${m}" mounted at ${mountPath} — use fetch('${mountPath}') or fetch('${mountPath}/...') to call it`);
       }
     } else {

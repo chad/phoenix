@@ -132,8 +132,8 @@ import { failedGenerationKnowledge } from './models/negative-knowledge.js';
 import type { NegativeKnowledge } from './models/negative-knowledge.js';
 import type { PaceLayerMetadata } from './models/pace-layer.js';
 import {
-  extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, describeMountPlan,
-  type ModuleSurface,
+  extractDeclaredRoutes, declaredSurfaces, moduleShapes, moduleEntities, planMounts, planRootMounts, describeMountPlan,
+  type ModuleSurface, type MountPlan,
 } from './spec-interface.js';
 import { loadCases } from './bench/case.js';
 import { ARMS, isArmName, type ArmName } from './bench/arms.js';
@@ -3099,9 +3099,18 @@ async function cmdRegen(args: string[]): Promise<void> {
   // leaves stale imports to deleted modules and the app won't compile.
   const allIUs = loadIUs(phoenixDir);
   const services = deriveServices(allIUs);
+  // The spec's declared HTTP interface binds a regen exactly as it binds a bootstrap.
+  // Re-scaffolding without it fell back to IU-name slugs, so regenerating ONE unit
+  // silently moved every declared URL (`/questions` → `/question`).
+  const regenSpecStore = new SpecStore(phoenixDir);
+  const regenClauses: Clause[] = [];
+  for (const specFile of findSpecFiles(projectRoot)) {
+    regenClauses.push(...regenSpecStore.getClauses(relative(projectRoot, specFile)));
+  }
+  const declaredMounts = resolveDeclaredMounts(projectRoot, allIUs, canonNodes, regenClauses, phoenixDir);
   const scaffoldFiles = regenArch
-    ? regenArch.runtime.scaffold(services, basename(projectRoot), split.serverImports)
-    : nodeScaffold(services, basename(projectRoot), null).files;
+    ? regenArch.runtime.scaffold(services, basename(projectRoot), split.serverImports, declaredMounts)
+    : nodeScaffold(services, basename(projectRoot), null, [], declaredMounts).files;
   for (const [filePath, content] of scaffoldFiles) {
     const fullPath = join(projectRoot, filePath);
     mkdirSync(join(fullPath, '..'), { recursive: true });
@@ -4419,7 +4428,8 @@ function resolveDeclaredMounts(
     ...canonNodes.map(n => n.statement),
     ...clauses.map(c => c.raw_text),
   ];
-  const surfaces = declaredSurfaces(extractDeclaredRoutes(statements));
+  const declaredRoutes = extractDeclaredRoutes(statements);
+  const surfaces = declaredSurfaces(declaredRoutes);
   if (surfaces.length === 0) return new Map();
 
   const modules: ModuleSurface[] = [];
@@ -4439,7 +4449,18 @@ function resolveDeclaredMounts(
     }
   }
 
-  const plan = planMounts(surfaces, modules);
+  // Modules written against full paths mount at the root; the rest are placed by prefix.
+  const rootMounts = planRootMounts(declaredRoutes, modules);
+  const prefixed = planMounts(surfaces, modules.filter(m => !rootMounts.has(m.key)));
+  const rootServed = new Set(modules.filter(m => rootMounts.has(m.key)).flatMap(m => m.shapes));
+  const plan: MountPlan = {
+    decisions: new Map([...rootMounts, ...prefixed.decisions]),
+    // A surface every one of whose shapes a root-mounted module serves IS placed.
+    unplaced: prefixed.unplaced.filter(s => !s.shapes.every(sh => {
+      const [method, rest] = sh.split(' ');
+      return rootServed.has(`${method} /${s.prefix}${rest === '/' ? '' : rest}`);
+    })),
+  };
   const lines = describeMountPlan(plan, key => nameByKey.get(key) ?? key);
   if (lines.length > 0) {
     console.log(`  ${dim('Interface:')} ${surfaces.length} surface(s) declared by the spec`);
