@@ -32,7 +32,12 @@ os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
 
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, timeout=5.0)
+    # Autocommit, like better-sqlite3 on the node-typescript target: each statement is its
+    # own transaction (db.commit() stays harmless). Python's default implicit DEFERRED
+    # transactions hold a read snapshot across a request's SELECT-then-INSERT, and the
+    # upgrade to a write lock fails at once ("database is locked") when another thread has
+    # committed meanwhile — the busy timeout never applies to that case.
+    conn = sqlite3.connect(DB_PATH, timeout=5.0, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout = 5000")
     conn.execute("PRAGMA foreign_keys = ON")
